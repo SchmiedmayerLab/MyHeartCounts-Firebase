@@ -88,6 +88,11 @@ const AVAILABLE_WORKOUT_TYPES = [
 
 const LLM_MODEL = "gpt-5.4-mini-2026-03-17";
 
+// Version of the LLM prompt template built in generateLLMNudge. Bump this
+// whenever the prompt wording changes so generated nudges can be traced back
+// to the exact prompt version that produced them.
+const PROMPT_VERSION = "1.0.0";
+
 interface LlmTokenUsage {
   promptTokens: number;
   completionTokens: number;
@@ -97,6 +102,7 @@ interface LlmTokenUsage {
 interface PosttrialNudgeMessage extends BaseNudgeMessage {
   generatedAt: admin.firestore.Timestamp;
   llmPrompt?: string;
+  llmPromptVersion?: string;
   llmTokenUsage?: LlmTokenUsage;
   llmModel?: string;
 }
@@ -678,6 +684,7 @@ export class PosttrialNudgeService {
           isLLMGenerated: true,
           generatedAt,
           llmPrompt: prompt,
+          llmPromptVersion: PROMPT_VERSION,
           llmModel: LLM_MODEL,
           ...(tokenUsage && { llmTokenUsage: tokenUsage }),
         };
@@ -724,6 +731,9 @@ export class PosttrialNudgeService {
         isLLMGenerated: nudge.isLLMGenerated,
         generatedAt: nudge.generatedAt,
         ...(nudge.llmPrompt && { llmPrompt: nudge.llmPrompt }),
+        ...(nudge.llmPromptVersion !== undefined && {
+          llmPromptVersion: nudge.llmPromptVersion,
+        }),
         ...(nudge.llmTokenUsage && { llmTokenUsage: nudge.llmTokenUsage }),
         ...(nudge.llmModel && { llmModel: nudge.llmModel }),
       });
