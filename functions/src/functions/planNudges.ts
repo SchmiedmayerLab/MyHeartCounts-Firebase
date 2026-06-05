@@ -77,6 +77,11 @@ const mhcGenderIdentityMap: Partial<Record<number, string>> = {
 
 const LLM_MODEL = "gpt-5.2-2025-12-11";
 
+// Version of the LLM prompt template built in generateLLMNudges. Bump this
+// whenever the prompt wording changes so generated nudges can be traced back
+// to the exact prompt version that produced them.
+const PROMPT_VERSION = "1.0.0";
+
 interface LlmTokenUsage {
   promptTokens: number;
   completionTokens: number;
@@ -86,6 +91,7 @@ interface LlmTokenUsage {
 interface NudgeMessage extends BaseNudgeMessage {
   generatedAt: admin.firestore.Timestamp;
   llmPrompt?: string;
+  llmPromptVersion?: string;
   llmTokenUsage?: LlmTokenUsage;
   llmModel?: string;
 }
@@ -512,6 +518,7 @@ export class NudgeService {
               isLLMGenerated: true,
               generatedAt,
               llmModel: LLM_MODEL,
+              llmPromptVersion: PROMPT_VERSION,
               ...(isFirst && { llmPrompt: prompt }),
               ...(isFirst && tokenUsage && { llmTokenUsage: tokenUsage }),
             };
@@ -591,6 +598,9 @@ export class NudgeService {
           isLLMGenerated: nudgeMessage.isLLMGenerated,
           generatedAt: nudgeMessage.generatedAt,
           ...(nudgeMessage.llmPrompt && { llmPrompt: nudgeMessage.llmPrompt }),
+          ...(nudgeMessage.llmPromptVersion !== undefined && {
+            llmPromptVersion: nudgeMessage.llmPromptVersion,
+          }),
           ...(nudgeMessage.llmTokenUsage && {
             llmTokenUsage: nudgeMessage.llmTokenUsage,
           }),
