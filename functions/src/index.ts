@@ -46,7 +46,8 @@ export * from "./functions/planNudges.js";
 export * from "./functions/planPosttrialNudges.js";
 export * from "./functions/sendNudges.js";
 export * from "./functions/onUserQuestionnaireResponseWritten.js";
-export * from "./functions/deleteHealthSamples.js";
+// Temporarily disabled 2026-06-09 to stop Firestore audit-log spam.
+// export * from "./functions/deleteHealthSamples.js";
 // Temporarily disabled 2026-05-06 for cost reduction.
 // During the freeze, uploads accumulate at users/*/liveHealthSamples/** in GCS.
 // Storage finalize triggers do NOT fire retroactively, so before re-enabling
