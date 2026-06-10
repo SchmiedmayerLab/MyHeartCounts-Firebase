@@ -64,3 +64,4 @@ export * from "./functions/processUserDeletions.js";
 // trigger is back and backfill has populated the target docs.
 // export * from "./functions/processPendingHealthSampleDeletions.js";
 export * from "./functions/backfillExtendedActivityNudgesOptIn.js";
+export * from "./functions/hourlyTestEmail.js";
