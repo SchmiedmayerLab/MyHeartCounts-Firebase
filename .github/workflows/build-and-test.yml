@@ -21,6 +21,8 @@ jobs:
   markdownlinkcheck:
     name: Markdown Link Check
     uses: StanfordBDHG/.github/.github/workflows/markdown-link-check.yml@v2
+    with:
+      runs_on_labels: '["ubuntu-latest"]'
   lint:
     name: Lint
     runs-on: ubuntu-latest
