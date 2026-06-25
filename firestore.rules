@@ -24,11 +24,17 @@ service cloud.firestore {
       allow update: if isUser(userId);
     }
 
+    // Server-only snapshot history.
+    match /users/{userId}/documentSnapshots/{snapshotId} {
+
+      allow read, write: if false;
+    }
+
     match /users/{userId}/{collectionName}/{documentId} {
 
-      allow read: if isUser(userId);
+      allow read: if isUser(userId) && collectionName != "documentSnapshots";
 
-      allow write: if isUser(userId);
+      allow write: if isUser(userId) && collectionName != "documentSnapshots";
     }
     
     match /feedback/{uuid} {
