@@ -6,6 +6,12 @@
 import { logger } from "firebase-functions/v2";
 import { onSchedule } from "firebase-functions/v2/scheduler";
 import nodemailer from "nodemailer";
+import {
+  getSmtpPassword,
+  getSmtpUsername,
+  smtpPasswordParam,
+  smtpUsernameParam,
+} from "../env.js";
 import { defaultServiceAccount } from "./helpers.js";
 
 const senderAddress = "myheartcounts@stanford.edu";
@@ -30,6 +36,10 @@ export const sendTestEmail = async (): Promise<void> => {
     host: process.env.SMTP_HOST ?? "smtp.stanford.edu",
     port: Number(process.env.SMTP_PORT ?? 587),
     secure: false,
+    auth: {
+      user: getSmtpUsername(),
+      pass: getSmtpPassword(),
+    },
   });
 
   const info = await transporter.sendMail({
@@ -47,6 +57,7 @@ export const hourlyTestEmail = onSchedule(
   {
     schedule: "every 1 hours",
     timeZone: "UTC",
+    secrets: [smtpUsernameParam, smtpPasswordParam],
     serviceAccount: defaultServiceAccount,
   },
   async (_event) => {
