@@ -40,16 +40,40 @@ describeWithEmulators("function: onUserDocumentSnapshot", (env) => {
 
     await captureUserDocumentSnapshot(
       userId,
-      { genderIdentity: "X", comorbidities: { hypertension: true } },
+      {
+        genderIdentity: "X",
+        comorbidities: { hypertension: true },
+        ghost: undefined,
+      },
       null,
       t0,
     );
 
     const snapshots = await getSnapshots(env, userId);
     expect(snapshots.size).to.equal(1);
+    // `ghost` is stripped: undefined values never reach the snapshot.
     expect(snapshots.docs[0].get("content")).to.deep.equal({
       genderIdentity: "X",
       comorbidities: { hypertension: true },
+    });
+  });
+
+  it("captures the post-write state when invoked via the trigger", async () => {
+    const userId = "user-trigger-write";
+
+    const wrapped = env.wrapTrigger(onUserDocumentSnapshot);
+    await wrapped({
+      params: { userId },
+      data: env.createChange(`users/${userId}`, undefined, {
+        genderIdentity: "X",
+        fcmToken: "token-a",
+      }),
+    });
+
+    const snapshots = await getSnapshots(env, userId);
+    expect(snapshots.size).to.equal(1);
+    expect(snapshots.docs[0].get("content")).to.deep.equal({
+      genderIdentity: "X",
     });
   });
 
@@ -146,6 +170,19 @@ describeWithEmulators("function: onUserDocumentSnapshot", (env) => {
     expect(
       (snapshots.docs[0].get("sourceUpdatedAt") as Timestamp).toMillis(),
     ).to.equal(t0.toMillis());
+  });
+
+  it("no-ops when the event carries no data", async () => {
+    const userId = "user-no-event-data";
+
+    // Invoke the handler directly: the wrapper would synthesize mock data.
+    await onUserDocumentSnapshot.run({
+      params: { userId },
+      data: undefined,
+    } as unknown as Parameters<typeof onUserDocumentSnapshot.run>[0]);
+
+    const snapshots = await getSnapshots(env, userId);
+    expect(snapshots.size).to.equal(0);
   });
 
   it("does not snapshot when the user document is deleted", async () => {
