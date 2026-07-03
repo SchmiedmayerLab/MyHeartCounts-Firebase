@@ -8,11 +8,13 @@ import { expect } from "chai";
 import admin from "firebase-admin";
 import { type DocumentSnapshot, Timestamp } from "firebase-admin/firestore";
 import { type Change } from "firebase-functions";
+import { type CloudEvent, type CloudFunction } from "firebase-functions/v2";
 import {
   type CallableFunction,
   type CallableRequest,
 } from "firebase-functions/v2/https";
 import firebaseFunctionsTest from "firebase-functions-test";
+import { type WrappedV2Function } from "firebase-functions-test/lib/v2";
 import { Lazy, User } from "../../models/index.js";
 import { CollectionsService } from "../../services/database/collections.js";
 import { getServiceFactory } from "../../services/factory/getServiceFactory.js";
@@ -99,6 +101,12 @@ export class EmulatorTestEnvironment {
     return wrapped({
       data: input,
     } as unknown as CallableRequest<Input>);
+  }
+
+  wrapTrigger<T extends CloudEvent<unknown>>(
+    func: CloudFunction<T>,
+  ): WrappedV2Function<T> {
+    return this.wrapper.wrap(func);
   }
 
   async cleanup() {

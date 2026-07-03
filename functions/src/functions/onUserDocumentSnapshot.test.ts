@@ -9,13 +9,11 @@ import {
   type Timestamp,
   Timestamp as FirestoreTimestamp,
 } from "firebase-admin/firestore";
-import firebaseFunctionsTest from "firebase-functions-test";
 import { it } from "mocha";
 import {
   captureUserDocumentSnapshot,
   DEBOUNCE_WINDOW_MS,
   onUserDocumentSnapshot,
-  USER_DOCUMENT_SNAPSHOTS_COLLECTION,
 } from "./onUserDocumentSnapshot.js";
 import {
   describeWithEmulators,
@@ -23,19 +21,16 @@ import {
 } from "../tests/functions/testEnvironment.js";
 
 const t0 = FirestoreTimestamp.fromMillis(1_700_000_000_000);
-const withinWindow = FirestoreTimestamp.fromMillis(t0.toMillis() + 30_000);
-const beyondWindow = FirestoreTimestamp.fromMillis(
-  t0.toMillis() + DEBOUNCE_WINDOW_MS + 1,
-);
+const tPlus = (ms: number) => FirestoreTimestamp.fromMillis(t0.toMillis() + ms);
+const withinWindow = tPlus(30_000);
+const beyondWindow = tPlus(DEBOUNCE_WINDOW_MS + 1);
 
 const getSnapshots = async (
   env: EmulatorTestEnvironment,
   userId: string,
 ): Promise<QuerySnapshot> =>
-  env.firestore
-    .collection("users")
-    .doc(userId)
-    .collection(USER_DOCUMENT_SNAPSHOTS_COLLECTION)
+  env.collections
+    .userDocumentSnapshots(userId)
     .orderBy("capturedAt", "asc")
     .get();
 
@@ -52,9 +47,10 @@ describeWithEmulators("function: onUserDocumentSnapshot", (env) => {
 
     const snapshots = await getSnapshots(env, userId);
     expect(snapshots.size).to.equal(1);
-    const content = snapshots.docs[0].get("content") as Record<string, unknown>;
-    expect(content.genderIdentity).to.equal("X");
-    expect(content.comorbidities).to.deep.equal({ hypertension: true });
+    expect(snapshots.docs[0].get("content")).to.deep.equal({
+      genderIdentity: "X",
+      comorbidities: { hypertension: true },
+    });
   });
 
   it("does not create a snapshot when only excluded fields change", async () => {
@@ -98,13 +94,13 @@ describeWithEmulators("function: onUserDocumentSnapshot", (env) => {
       userId,
       { comorbidities: { a: true, b: true } },
       null,
-      FirestoreTimestamp.fromMillis(t0.toMillis() + 10_000),
+      tPlus(10_000),
     );
     await captureUserDocumentSnapshot(
       userId,
       { comorbidities: { a: true, b: true, c: true } },
       null,
-      FirestoreTimestamp.fromMillis(t0.toMillis() + 20_000),
+      tPlus(20_000),
     );
 
     const snapshots = await getSnapshots(env, userId);
@@ -158,7 +154,7 @@ describeWithEmulators("function: onUserDocumentSnapshot", (env) => {
     // Seed an existing snapshot so we can assert nothing changes on deletion.
     await captureUserDocumentSnapshot(userId, { language: "en" }, null, t0);
 
-    const wrapped = firebaseFunctionsTest().wrap(onUserDocumentSnapshot);
+    const wrapped = env.wrapTrigger(onUserDocumentSnapshot);
     await wrapped({
       params: { userId },
       data: env.createChange(`users/${userId}`, { language: "en" }, undefined),

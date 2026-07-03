@@ -53,6 +53,14 @@ export class CollectionsService {
       .withConverter(new DatabaseConverter(userConverter.value));
   }
 
+  userDocumentSnapshots(userId: string) {
+    // Server-only snapshot history (see firestore.rules).
+    return this.firestore
+      .collection("users")
+      .doc(userId)
+      .collection("documentSnapshots");
+  }
+
   userDevices(userId: string) {
     return this.firestore
       .collection("users")

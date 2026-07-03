@@ -3,20 +3,12 @@
 // SPDX-FileCopyrightText: 2026 Stanford University and the project authors (see CONTRIBUTORS.md)
 // SPDX-License-Identifier: MIT
 
+import { isDeepStrictEqual } from "util";
 import admin from "firebase-admin";
 import { Timestamp } from "firebase-admin/firestore";
 import { onDocumentWritten } from "firebase-functions/v2/firestore";
 import { privilegedServiceAccount } from "./helpers.js";
-import {
-  contentHash,
-  filterSnapshotContent,
-} from "../services/userSnapshot/userSnapshotContent.js";
-
-/**
- * Subcollection under each user that holds the snapshot history.
- * Writes are server-only (see firestore.rules); clients may read their own.
- */
-export const USER_DOCUMENT_SNAPSHOTS_COLLECTION = "documentSnapshots";
+import { CollectionsService } from "../services/database/collections.js";
 
 /**
  * Debounce window for collapsing a burst of writes into a single snapshot.
@@ -28,17 +20,50 @@ export const USER_DOCUMENT_SNAPSHOTS_COLLECTION = "documentSnapshots";
  */
 export const DEBOUNCE_WINDOW_MS = 120_000;
 
+/**
+ * Top-level keys excluded from user-document snapshots.
+ *
+ * A write that only changes excluded keys produces the same filtered content
+ * as the previous snapshot, so no new snapshot is created. These are
+ * volatile/bookkeeping fields that are not demographic and would otherwise
+ * make every write look like a change.
+ *
+ * This is the single place to tune what gets tracked.
+ */
+const EXCLUDED_KEYS = new Set<string>([
+  "fcmToken",
+  "fcmNotificationsToken",
+  "updated_at",
+  "lastActiveDate",
+  "lastUploadDate",
+  "mostRecentOnboardingStep",
+]);
+
 interface UserDocumentSnapshot {
   content: Record<string, unknown>;
-  contentHash: string;
   capturedAt: Timestamp;
   sourceUpdatedAt: Timestamp | null;
 }
 
 /**
- * Captures a point-in-time snapshot of the (already filtered) post-write user
- * document into `users/{userId}/documentSnapshots`, debouncing bursts of
- * writes.
+ * Removes excluded keys (top-level) and `undefined` values from a raw user
+ * document so the snapshot only carries meaningful, comparable content.
+ */
+const filterSnapshotContent = (
+  raw: Record<string, unknown>,
+): Record<string, unknown> => {
+  const result: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(raw)) {
+    if (EXCLUDED_KEYS.has(key)) continue;
+    if (value === undefined) continue;
+    result[key] = value;
+  }
+  return result;
+};
+
+/**
+ * Captures a point-in-time snapshot of the filtered post-write user document
+ * into `users/{userId}/documentSnapshots`, debouncing bursts of writes.
  *
  * Exported (rather than inlined in the trigger) so it can be exercised directly
  * against the emulator, with `now` injected to drive the debounce window
@@ -51,17 +76,20 @@ interface UserDocumentSnapshot {
 export const captureUserDocumentSnapshot = async (
   userId: string,
   afterData: Record<string, unknown>,
-  sourceUpdatedAt: Timestamp | null = null,
+  sourceUpdatedAt: Timestamp | null,
   now: Timestamp = Timestamp.now(),
 ): Promise<void> => {
   const firestore = admin.firestore();
-  const snapshotsRef = firestore
-    .collection("users")
-    .doc(userId)
-    .collection(USER_DOCUMENT_SNAPSHOTS_COLLECTION);
+  const snapshotsRef = new CollectionsService(firestore).userDocumentSnapshots(
+    userId,
+  );
 
   const filtered = filterSnapshotContent(afterData);
-  const hash = contentHash(filtered);
+  const payload: UserDocumentSnapshot = {
+    content: filtered,
+    capturedAt: now,
+    sourceUpdatedAt,
+  };
 
   await firestore.runTransaction(async (transaction) => {
     const latestQuery = await transaction.get(
@@ -70,32 +98,20 @@ export const captureUserDocumentSnapshot = async (
     const latest = latestQuery.docs.at(0);
 
     // Nothing meaningful changed
-    if (latest?.get("contentHash") === hash) {
+    if (
+      latest !== undefined &&
+      isDeepStrictEqual(latest.get("content"), filtered)
+    ) {
       return;
     }
 
-    const payload: UserDocumentSnapshot = {
-      content: filtered,
-      contentHash: hash,
-      capturedAt: now,
-      sourceUpdatedAt,
-    };
-
-    if (latest !== undefined) {
-      const latestCapturedAt = latest.get("capturedAt") as
-        | Timestamp
-        | undefined;
-      const withinWindow =
-        latestCapturedAt !== undefined &&
-        now.toMillis() - latestCapturedAt.toMillis() <= DEBOUNCE_WINDOW_MS;
-      if (withinWindow) {
-        // Collapse the burst; overwrite the most recent snapshot in place
-        transaction.set(latest.ref, payload);
-        return;
-      }
-    }
-
-    transaction.set(snapshotsRef.doc(), payload);
+    const withinWindow =
+      latest !== undefined &&
+      now.toMillis() - (latest.get("capturedAt") as Timestamp).toMillis() <=
+        DEBOUNCE_WINDOW_MS;
+    // Within the window: collapse the burst by overwriting the most recent
+    // snapshot in place; otherwise append a new snapshot.
+    transaction.set(withinWindow ? latest.ref : snapshotsRef.doc(), payload);
   });
 };
 

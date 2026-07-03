@@ -24,17 +24,11 @@ service cloud.firestore {
       allow update: if isUser(userId);
     }
 
-    // Server-only snapshot history.
-    match /users/{userId}/documentSnapshots/{snapshotId} {
-
-      allow read, write: if false;
-    }
-
     match /users/{userId}/{collectionName}/{documentId} {
 
-      allow read: if isUser(userId) && collectionName != "documentSnapshots";
-
-      allow write: if isUser(userId) && collectionName != "documentSnapshots";
+      // documentSnapshots is server-only snapshot history; this exclusion is
+      // the sole rule keeping clients out of it.
+      allow read, write: if isUser(userId) && collectionName != "documentSnapshots";
     }
     
     match /feedback/{uuid} {
