@@ -26,9 +26,9 @@ service cloud.firestore {
 
     match /users/{userId}/{collectionName}/{documentId} {
 
-      allow read: if isUser(userId);
-
-      allow write: if isUser(userId);
+      // documentSnapshots is server-only snapshot history; this exclusion is
+      // the sole rule keeping clients out of it.
+      allow read, write: if isUser(userId) && collectionName != "documentSnapshots";
     }
     
     match /feedback/{uuid} {
