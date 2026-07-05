@@ -47,9 +47,20 @@ const base64url = (buffer: Buffer): string =>
 
 export class HealthProviderService {
   private readonly databaseService: DatabaseService;
+  private readonly resolveAdapter: (
+    provider: HealthProviderId,
+  ) => HealthProviderAdapter;
 
-  constructor(databaseService: DatabaseService) {
+  constructor(
+    databaseService: DatabaseService,
+    // Injectable so tests can substitute a fake adapter without hitting provider
+    // networks; production uses the real registry.
+    resolveAdapter: (
+      provider: HealthProviderId,
+    ) => HealthProviderAdapter = getAdapter,
+  ) {
     this.databaseService = databaseService;
+    this.resolveAdapter = resolveAdapter;
   }
 
   // URLs ---------------------------------------------------------------------
@@ -77,7 +88,7 @@ export class HealthProviderService {
     userId: string,
     provider: HealthProviderId,
   ): Promise<string> {
-    const adapter = getAdapter(provider);
+    const adapter = this.resolveAdapter(provider);
     const state = base64url(randomBytes(32));
     const codeVerifier =
       adapter.usesPkce ? base64url(randomBytes(32)) : undefined;
@@ -121,7 +132,7 @@ export class HealthProviderService {
     }
 
     const { provider, userId, redirectUri, codeVerifier } = authRequest.content;
-    const adapter = getAdapter(provider);
+    const adapter = this.resolveAdapter(provider);
 
     const tokens = await adapter.exchangeCode({
       code,
@@ -147,28 +158,30 @@ export class HealthProviderService {
     await this.storeTokens(userId, provider, tokens, subscriptionId);
 
     await this.databaseService.bulkWrite(async (collections, writer) => {
-      await Promise.all([
-        writer.set(
-          collections.healthProviderUserIndex.doc(
-            healthProviderUserIndexId(provider, tokens.providerUserId),
-          ),
-          { provider, providerUserId: tokens.providerUserId, userId },
+      // The per-op promises can't be awaited here: the bulkWrite wrapper closes
+      // the writer only after this callback returns, so awaiting them would
+      // deadlock. flush() commits the buffered writes and resolves when done.
+      void writer.set(
+        collections.healthProviderUserIndex.doc(
+          healthProviderUserIndexId(provider, tokens.providerUserId),
         ),
-        writer.set(
-          collections.healthProviderConnections(userId).doc(provider),
-          {
-            provider,
-            status: HealthProviderConnectionStatus.connected,
-            scopes: tokens.scopes,
-            connectedAt: new Date(),
-            // Seed the first scheduled backfill to reach INITIAL_BACKFILL_DAYS back.
-            lastSyncAt: daysAgo(INITIAL_BACKFILL_DAYS),
-            lastSyncStatus: undefined,
-            lastError: undefined,
-          },
-        ),
-        writer.delete(collections.healthProviderAuthRequests.doc(state)),
-      ]);
+        { provider, providerUserId: tokens.providerUserId, userId },
+      );
+      void writer.set(
+        collections.healthProviderConnections(userId).doc(provider),
+        {
+          provider,
+          status: HealthProviderConnectionStatus.connected,
+          scopes: tokens.scopes,
+          connectedAt: new Date(),
+          // Seed the first scheduled backfill to reach INITIAL_BACKFILL_DAYS back.
+          lastSyncAt: daysAgo(INITIAL_BACKFILL_DAYS),
+          lastSyncStatus: undefined,
+          lastError: undefined,
+        },
+      );
+      void writer.delete(collections.healthProviderAuthRequests.doc(state));
+      await writer.flush();
     });
 
     return `${getHealthProviderAppRedirectUrl()}/${provider}/connected`;
@@ -181,7 +194,7 @@ export class HealthProviderService {
     );
 
     if (tokenDoc !== undefined) {
-      const adapter = getAdapter(provider);
+      const adapter = this.resolveAdapter(provider);
       const tokens: ProviderTokens = tokenDoc.content;
       try {
         await adapter.removeSubscription({
@@ -203,35 +216,33 @@ export class HealthProviderService {
     }
 
     await this.databaseService.bulkWrite(async (collections, writer) => {
-      const writes: Array<Promise<unknown>> = [
-        writer.delete(collections.healthProviderTokens(userId).doc(provider)),
-        // Full overwrite (no merge) resets the status document cleanly.
-        writer.set(
-          collections.healthProviderConnections(userId).doc(provider),
-          {
-            provider,
-            status: HealthProviderConnectionStatus.disconnected,
-            scopes: [],
-            connectedAt: undefined,
-            lastSyncAt: undefined,
-            lastSyncStatus: undefined,
-            lastError: undefined,
-          },
-        ),
-      ];
+      void writer.delete(
+        collections.healthProviderTokens(userId).doc(provider),
+      );
+      // Full overwrite (no merge) resets the status document cleanly.
+      void writer.set(
+        collections.healthProviderConnections(userId).doc(provider),
+        {
+          provider,
+          status: HealthProviderConnectionStatus.disconnected,
+          scopes: [],
+          connectedAt: undefined,
+          lastSyncAt: undefined,
+          lastSyncStatus: undefined,
+          lastError: undefined,
+        },
+      );
       if (tokenDoc !== undefined) {
-        writes.push(
-          writer.delete(
-            collections.healthProviderUserIndex.doc(
-              healthProviderUserIndexId(
-                provider,
-                tokenDoc.content.providerUserId,
-              ),
+        void writer.delete(
+          collections.healthProviderUserIndex.doc(
+            healthProviderUserIndexId(
+              provider,
+              tokenDoc.content.providerUserId,
             ),
           ),
         );
       }
-      await Promise.all(writes);
+      await writer.flush();
     });
   }
 
@@ -247,7 +258,7 @@ export class HealthProviderService {
     req: Request,
     res: Response,
   ): Promise<void> {
-    const adapter = getAdapter(provider);
+    const adapter = this.resolveAdapter(provider);
     let handling: WebhookHandling;
     try {
       handling = adapter.handleWebhook(req, res);
@@ -309,7 +320,7 @@ export class HealthProviderService {
    * connection's `lastSyncAt`. Used by the daily scheduled backfill.
    */
   async backfillProvider(provider: HealthProviderId): Promise<void> {
-    const adapter = getAdapter(provider);
+    const adapter = this.resolveAdapter(provider);
     const tokenDocs = await this.databaseService.getQuery((collections) =>
       collections.firestore
         .collectionGroup("healthProviderTokens")
@@ -372,10 +383,10 @@ export class HealthProviderService {
     observations: ProviderObservation[],
   ): Promise<void> {
     if (observations.length === 0) return;
-    // BulkWriter handles batching, throttling and retries for us; it schedules
-    // its own batch sends, so awaiting the per-op promises resolves normally.
+    // BulkWriter batches and throttles the fan-out for us. The per-op promises
+    // can't be awaited inside the callback (the wrapper closes the writer only
+    // afterwards), so we buffer the sets and await a flush to confirm completion.
     await this.databaseService.bulkWrite(async (collections, writer) => {
-      const writes: Array<Promise<unknown>> = [];
       for (const { metric, observation } of observations) {
         if (observation.id === undefined) continue;
         const ref = collections
@@ -384,9 +395,9 @@ export class HealthProviderService {
             providerObservationCollectionName(provider, metric),
           )
           .doc(observation.id);
-        writes.push(writer.set(ref, observation));
+        void writer.set(ref, observation);
       }
-      await Promise.all(writes);
+      await writer.flush();
     });
   }
 
