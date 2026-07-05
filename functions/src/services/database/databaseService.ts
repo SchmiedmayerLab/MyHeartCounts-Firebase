@@ -7,6 +7,7 @@ import {
   type Transaction,
   type BulkWriter,
   type BulkWriterOptions,
+  type SetOptions,
 } from "firebase-admin/firestore";
 import { type CollectionsService } from "./collections.js";
 
@@ -29,6 +30,14 @@ export interface DatabaseService {
       collectionsService: CollectionsService,
     ) => FirebaseFirestore.DocumentReference<T>,
   ): Promise<Document<T> | undefined>;
+
+  setDocument<T>(
+    reference: (
+      collectionsService: CollectionsService,
+    ) => FirebaseFirestore.DocumentReference<T>,
+    data: T,
+    options?: SetOptions,
+  ): Promise<void>;
 
   bulkWrite(
     write: (

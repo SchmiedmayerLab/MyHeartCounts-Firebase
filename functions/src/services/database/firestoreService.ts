@@ -6,6 +6,7 @@
 import {
   type BulkWriter,
   type BulkWriterOptions,
+  type SetOptions,
   type Transaction,
   type Firestore,
 } from "firebase-admin/firestore";
@@ -61,6 +62,21 @@ export class FirestoreService implements DatabaseService {
           content: data,
         }
       : undefined;
+  }
+
+  async setDocument<T>(
+    reference: (
+      collectionsService: CollectionsService,
+    ) => FirebaseFirestore.DocumentReference<T>,
+    data: T,
+    options?: SetOptions,
+  ): Promise<void> {
+    const ref = reference(this.collectionsService.value);
+    if (options !== undefined) {
+      await ref.set(data, options);
+    } else {
+      await ref.set(data);
+    }
   }
 
   async bulkWrite(

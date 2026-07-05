@@ -9,6 +9,10 @@ import {
   fhirObservationConverter,
   fhirQuestionnaireConverter,
   fhirQuestionnaireResponseConverter,
+  healthProviderAuthRequestConverter,
+  healthProviderConnectionConverter,
+  healthProviderTokenConverter,
+  healthProviderUserIndexConverter,
   scoreConverter,
   userConverter,
   userDeviceConverter,
@@ -101,6 +105,55 @@ export class CollectionsService {
       .doc(userId)
       .collection(collectionName)
       .withConverter(new DatabaseConverter(fhirObservationConverter.value));
+  }
+
+  // Health providers (Oura / Fitbit / Withings)
+
+  /** Server-only: OAuth tokens per connected provider. */
+  healthProviderTokens(userId: string) {
+    return this.firestore
+      .collection("users")
+      .doc(userId)
+      .collection("healthProviderTokens")
+      .withConverter(new DatabaseConverter(healthProviderTokenConverter.value));
+  }
+
+  /** Client-readable status per connected provider (no secrets). */
+  healthProviderConnections(userId: string) {
+    return this.firestore
+      .collection("users")
+      .doc(userId)
+      .collection("healthProviderConnections")
+      .withConverter(
+        new DatabaseConverter(healthProviderConnectionConverter.value),
+      );
+  }
+
+  /** Normalized FHIR observations for a given provider metric collection. */
+  userProviderObservations(userId: string, collectionName: string) {
+    return this.firestore
+      .collection("users")
+      .doc(userId)
+      .collection(collectionName)
+      .withConverter(new DatabaseConverter(fhirObservationConverter.value));
+  }
+
+  /** Root, server-only: short-lived pending OAuth state records. */
+  get healthProviderAuthRequests() {
+    return this.firestore
+      .collection("healthProviderAuthRequests")
+      .withConverter(
+        new DatabaseConverter(healthProviderAuthRequestConverter.value),
+      );
+  }
+
+  /** Root, server-only: providerUserId -> Firebase uid reverse lookup. */
+  get healthProviderUserIndex() {
+    return this.firestore
+      .collection("healthProviderUserIndex")
+      .withConverter(
+        new DatabaseConverter(healthProviderUserIndexConverter.value),
+      );
   }
 
   pendingHealthSampleDeletions(userId: string) {

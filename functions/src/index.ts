@@ -39,6 +39,11 @@ export {
   beforeUserSignedInFunction as beforeUserSignedIn,
 } from "./functions/blocking.js";
 export * from "./functions/customSeed.js";
+export * from "./functions/getHealthProviderAuthUrl.js";
+export * from "./functions/disconnectHealthProvider.js";
+export * from "./functions/healthProviderOAuthCallback.js";
+export * from "./functions/healthProviderWebhooks.js";
+export * from "./functions/healthProviderBackfill.js";
 export * from "./functions/joinWaitlist.js";
 export * from "./functions/updateStaticData.js";
 export * from "./functions/updateUserInformation.js";

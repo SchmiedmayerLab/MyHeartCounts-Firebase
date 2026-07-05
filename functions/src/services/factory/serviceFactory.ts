@@ -5,6 +5,7 @@
 
 import { type AuthData } from "firebase-functions/v2/tasks";
 import { type Credential } from "../credential/credential.js";
+import { type HealthProviderService } from "../healthProviders/healthProviderService.js";
 import { type HistoryService } from "../history/historyService.js";
 import { type QuestionnaireResponseService } from "../questionnaireResponse/questionnaireResponseService.js";
 import { type DebugDataService } from "../seeding/debugData/debugDataService.js";
@@ -27,6 +28,10 @@ export interface ServiceFactory {
   // Questionnaires
 
   questionnaireResponse(): QuestionnaireResponseService;
+
+  // Health providers
+
+  healthProvider(): HealthProviderService;
 
   // Trigger
 
