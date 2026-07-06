@@ -100,6 +100,8 @@ export interface HealthProviderAdapter {
   removeSubscription(params: {
     tokens: ProviderTokens;
     subscriptionId?: string;
+    /** The callback URL that was subscribed (required by Withings `revoke`). */
+    callbackUrl?: string;
   }): Promise<void>;
 
   /**

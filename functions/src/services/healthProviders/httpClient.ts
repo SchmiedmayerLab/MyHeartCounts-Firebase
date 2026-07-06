@@ -8,6 +8,8 @@
  * all provider adapters. No third-party HTTP dependency is required.
  */
 
+import { logger } from "firebase-functions/v2";
+
 export class ProviderHttpError extends Error {
   readonly status: number;
   readonly body: string;
@@ -17,6 +19,32 @@ export class ProviderHttpError extends Error {
     this.name = "ProviderHttpError";
     this.status = status;
     this.body = body;
+    // Restore the prototype chain: the es5 compile target down-levels `Error`
+    // subclasses in a way that otherwise breaks `instanceof` and prototype
+    // getters (see the `isAuthFailure` getter below).
+    Object.setPrototypeOf(this, ProviderHttpError.prototype);
+  }
+
+  /** Whether the status indicates the credentials are no longer usable. */
+  get isAuthFailure(): boolean {
+    return this.status === 400 || this.status === 401 || this.status === 403;
+  }
+}
+
+/**
+ * Raised when a token refresh fails, signalling that the stored credentials can
+ * no longer be renewed (revoked/expired refresh token). The orchestrator uses
+ * this to flip the connection status to `error` — unlike a transient data-fetch
+ * failure, which leaves the connection `connected`.
+ */
+export class ProviderAuthError extends Error {
+  constructor(
+    context: string,
+    readonly cause: unknown,
+  ) {
+    super(`${context}: ${String(cause)}`);
+    this.name = "ProviderAuthError";
+    Object.setPrototypeOf(this, ProviderAuthError.prototype);
   }
 }
 
@@ -45,12 +73,14 @@ export const getJson = async <T>(
   url: string,
   accessToken: string,
   context: string,
+  extraHeaders?: Record<string, string>,
 ): Promise<T> => {
   const response = await fetch(url, {
     method: "GET",
     headers: {
       Authorization: `Bearer ${accessToken}`,
       Accept: "application/json",
+      ...(extraHeaders ?? {}),
     },
   });
   return parseJson<T>(response, context);
@@ -77,6 +107,28 @@ export const postJson = async <T>(
     body: init.body,
   });
   return parseJson<T>(response, context);
+};
+
+/**
+ * Await one per-metric request, isolating transient failures: a 429/5xx (or any
+ * non-auth error) for a single endpoint is logged and resolves to `undefined` so
+ * the surrounding `Promise.all` still yields the metrics that did succeed,
+ * instead of dropping the whole window. Auth failures are rethrown so the caller
+ * can mark the connection as broken.
+ */
+export const settleEndpoint = async <T>(
+  context: string,
+  promise: Promise<T>,
+): Promise<T | undefined> => {
+  try {
+    return await promise;
+  } catch (error) {
+    if (error instanceof ProviderHttpError && error.isAuthFailure) {
+      throw error;
+    }
+    logger.warn(`${context}: dropped this window's data: ${String(error)}`);
+    return undefined;
+  }
 };
 
 /** Basic-auth header value for `client_id:client_secret`. */

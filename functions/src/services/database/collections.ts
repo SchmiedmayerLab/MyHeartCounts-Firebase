@@ -129,15 +129,6 @@ export class CollectionsService {
       );
   }
 
-  /** Normalized FHIR observations for a given provider metric collection. */
-  userProviderObservations(userId: string, collectionName: string) {
-    return this.firestore
-      .collection("users")
-      .doc(userId)
-      .collection(collectionName)
-      .withConverter(new DatabaseConverter(fhirObservationConverter.value));
-  }
-
   /** Root, server-only: short-lived pending OAuth state records. */
   get healthProviderAuthRequests() {
     return this.firestore

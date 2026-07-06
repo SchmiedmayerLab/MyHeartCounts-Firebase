@@ -6,6 +6,7 @@
 import { type Response } from "express";
 import { logger } from "firebase-functions/v2";
 import { type Request } from "firebase-functions/v2/https";
+import { z } from "zod";
 import {
   getOuraClientId,
   getOuraClientSecret,
@@ -22,7 +23,12 @@ import {
   type ProviderObservation,
   type WebhookHandling,
 } from "../healthProviderAdapter.js";
-import { getJson, postJson, ProviderHttpError } from "../httpClient.js";
+import {
+  getJson,
+  postJson,
+  ProviderHttpError,
+  settleEndpoint,
+} from "../httpClient.js";
 import { buildProviderObservation } from "../observationBuilder.js";
 import { MetricSpecs } from "../providerCodes.js";
 
@@ -50,8 +56,15 @@ const SUBSCRIBED_DATA_TYPES = [
 
 const SUBSCRIBED_EVENT_TYPES = ["create", "update"];
 
-const minutesFromSeconds = (seconds: number | null | undefined): number =>
-  Math.round(((seconds ?? 0) / 60) * 100) / 100;
+/** Safety cap on token-paginated fetches (raised from the original 100). */
+const MAX_PAGES = 1000;
+
+const minutesFromSeconds = (
+  seconds: number | null | undefined,
+): number | undefined =>
+  seconds === null || seconds === undefined ?
+    undefined
+  : Math.round((seconds / 60) * 100) / 100;
 
 const isoDate = (date: Date): string => date.toISOString().slice(0, 10);
 
@@ -62,15 +75,6 @@ interface OuraTokenResponse {
   refresh_token: string;
   expires_in: number;
   scope?: string;
-}
-
-interface OuraPersonalInfo {
-  id: string;
-}
-
-interface OuraList<T> {
-  data?: T[];
-  next_token?: string | null;
 }
 
 interface OuraHeartRatePoint {
@@ -114,13 +118,34 @@ interface OuraWorkout {
   end_datetime?: string;
 }
 
-interface OuraWebhookEvent {
-  event_type: string;
-  data_type: string;
-  object_id: string;
-  event_time: string;
-  user_id: string;
-}
+// --- Response validation (zod) ---------------------------------------------
+// Provider payloads are untrusted input; validate the shapes we depend on and
+// stay permissive (`.passthrough()`) about everything else so new upstream
+// fields don't break ingestion.
+
+const ouraTokenResponseSchema = z
+  .object({
+    access_token: z.string().min(1),
+    refresh_token: z.string().min(1),
+    expires_in: z.number(),
+    scope: z.string().optional(),
+  })
+  .passthrough();
+
+const ouraPersonalInfoSchema = z
+  .object({ id: z.string().min(1) })
+  .passthrough();
+
+const ouraListEnvelopeSchema = z
+  .object({
+    data: z.array(z.unknown()).optional(),
+    next_token: z.string().nullish(),
+  })
+  .passthrough();
+
+const ouraWebhookEventSchema = z
+  .object({ user_id: z.string().min(1) })
+  .passthrough();
 
 const tokensFrom = (
   response: OuraTokenResponse,
@@ -276,12 +301,9 @@ export const normalizeOura = (
 export const parseOuraEvent = (
   body: unknown,
 ): { providerUserId: string } | undefined => {
-  if (!body || typeof body !== "object") return undefined;
-  const event = body as Partial<OuraWebhookEvent>;
-  if (typeof event.user_id !== "string" || event.user_id.length === 0) {
-    return undefined;
-  }
-  return { providerUserId: event.user_id };
+  const parsed = ouraWebhookEventSchema.safeParse(body);
+  if (!parsed.success) return undefined;
+  return { providerUserId: parsed.data.user_id };
 };
 
 export class OuraAdapter implements HealthProviderAdapter {
@@ -306,18 +328,20 @@ export class OuraAdapter implements HealthProviderAdapter {
     code: string;
     redirectUri: string;
   }): Promise<ProviderTokens> {
-    const response = await postJson<OuraTokenResponse>(
-      TOKEN_URL,
-      {
-        body: new URLSearchParams({
-          grant_type: "authorization_code",
-          code: params.code,
-          redirect_uri: params.redirectUri,
-          client_id: getOuraClientId(),
-          client_secret: getOuraClientSecret(),
-        }),
-      },
-      "Oura token exchange",
+    const response = ouraTokenResponseSchema.parse(
+      await postJson<unknown>(
+        TOKEN_URL,
+        {
+          body: new URLSearchParams({
+            grant_type: "authorization_code",
+            code: params.code,
+            redirect_uri: params.redirectUri,
+            client_id: getOuraClientId(),
+            client_secret: getOuraClientSecret(),
+          }),
+        },
+        "Oura token exchange",
+      ),
     );
     const providerUserId = await this.fetchProviderUserId(
       response.access_token,
@@ -326,17 +350,19 @@ export class OuraAdapter implements HealthProviderAdapter {
   }
 
   async refreshTokens(refreshToken: string): Promise<ProviderTokens> {
-    const response = await postJson<OuraTokenResponse>(
-      TOKEN_URL,
-      {
-        body: new URLSearchParams({
-          grant_type: "refresh_token",
-          refresh_token: refreshToken,
-          client_id: getOuraClientId(),
-          client_secret: getOuraClientSecret(),
-        }),
-      },
-      "Oura token refresh",
+    const response = ouraTokenResponseSchema.parse(
+      await postJson<unknown>(
+        TOKEN_URL,
+        {
+          body: new URLSearchParams({
+            grant_type: "refresh_token",
+            refresh_token: refreshToken,
+            client_id: getOuraClientId(),
+            client_secret: getOuraClientSecret(),
+          }),
+        },
+        "Oura token refresh",
+      ),
     );
     // Oura omits the user id on refresh; the service preserves the stored one.
     return tokensFrom(response, "");
@@ -425,31 +451,49 @@ export class OuraAdapter implements HealthProviderAdapter {
     const startDt = since.toISOString();
     const endDt = until.toISOString();
 
+    // Each endpoint is isolated: a transient failure on one leaves the others'
+    // data intact rather than dropping the entire window (an auth failure still
+    // propagates to flip the connection status).
     const [heartRate, activity, sleep, spo2, workouts] = await Promise.all([
-      this.fetchAll<OuraHeartRatePoint>(
-        `${API_BASE}/heartrate?start_datetime=${encodeURIComponent(startDt)}&end_datetime=${encodeURIComponent(endDt)}`,
-        token,
+      settleEndpoint(
         "Oura heartrate",
+        this.fetchAll<OuraHeartRatePoint>(
+          `${API_BASE}/heartrate?start_datetime=${encodeURIComponent(startDt)}&end_datetime=${encodeURIComponent(endDt)}`,
+          token,
+          "Oura heartrate",
+        ),
       ),
-      this.fetchAll<OuraDailyActivity>(
-        `${API_BASE}/daily_activity?start_date=${startDate}&end_date=${endDate}`,
-        token,
+      settleEndpoint(
         "Oura daily_activity",
+        this.fetchAll<OuraDailyActivity>(
+          `${API_BASE}/daily_activity?start_date=${startDate}&end_date=${endDate}`,
+          token,
+          "Oura daily_activity",
+        ),
       ),
-      this.fetchAll<OuraSleep>(
-        `${API_BASE}/sleep?start_date=${startDate}&end_date=${endDate}`,
-        token,
+      settleEndpoint(
         "Oura sleep",
+        this.fetchAll<OuraSleep>(
+          `${API_BASE}/sleep?start_date=${startDate}&end_date=${endDate}`,
+          token,
+          "Oura sleep",
+        ),
       ),
-      this.fetchAll<OuraDailySpo2>(
-        `${API_BASE}/daily_spo2?start_date=${startDate}&end_date=${endDate}`,
-        token,
+      settleEndpoint(
         "Oura daily_spo2",
+        this.fetchAll<OuraDailySpo2>(
+          `${API_BASE}/daily_spo2?start_date=${startDate}&end_date=${endDate}`,
+          token,
+          "Oura daily_spo2",
+        ),
       ),
-      this.fetchAll<OuraWorkout>(
-        `${API_BASE}/workout?start_date=${startDate}&end_date=${endDate}`,
-        token,
+      settleEndpoint(
         "Oura workout",
+        this.fetchAll<OuraWorkout>(
+          `${API_BASE}/workout?start_date=${startDate}&end_date=${endDate}`,
+          token,
+          "Oura workout",
+        ),
       ),
     ]);
 
@@ -462,10 +506,12 @@ export class OuraAdapter implements HealthProviderAdapter {
   // Helpers ------------------------------------------------------------------
 
   private async fetchProviderUserId(accessToken: string): Promise<string> {
-    const info = await getJson<OuraPersonalInfo>(
-      `${API_BASE}/personal_info`,
-      accessToken,
-      "Oura personal_info",
+    const info = ouraPersonalInfoSchema.parse(
+      await getJson<unknown>(
+        `${API_BASE}/personal_info`,
+        accessToken,
+        "Oura personal_info",
+      ),
     );
     return info.id;
   }
@@ -478,14 +524,23 @@ export class OuraAdapter implements HealthProviderAdapter {
     const results: T[] = [];
     let url: string | null = initialUrl;
     let guard = 0;
-    while (url !== null && guard < 100) {
-      const page: OuraList<T> = await getJson<OuraList<T>>(url, token, context);
-      results.push(...(page.data ?? []));
+    while (url !== null && guard < MAX_PAGES) {
+      const page = ouraListEnvelopeSchema.parse(
+        await getJson<unknown>(url, token, context),
+      );
+      results.push(...((page.data ?? []) as T[]));
       url =
         page.next_token ?
           `${initialUrl}${initialUrl.includes("?") ? "&" : "?"}next_token=${encodeURIComponent(page.next_token)}`
         : null;
       guard++;
+    }
+    if (url !== null) {
+      // Hit the page cap with more data pending: surface it rather than silently
+      // truncating the tail. The daily backfill re-fetches the same window.
+      logger.warn(
+        `${context}: reached ${MAX_PAGES}-page cap with more pages pending; window truncated`,
+      );
     }
     return results;
   }

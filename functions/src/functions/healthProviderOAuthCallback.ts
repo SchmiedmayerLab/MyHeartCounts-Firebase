@@ -10,6 +10,7 @@ import {
   getHealthProviderAppRedirectUrl,
   healthProviderSecretParams,
 } from "../env.js";
+import { healthProviderOAuthCallbackQuerySchema } from "../models/index.js";
 import { getServiceFactory } from "../services/factory/getServiceFactory.js";
 
 /**
@@ -25,12 +26,12 @@ export const healthProviderOAuthCallback = onRequest(
     secrets: healthProviderSecretParams,
   },
   async (req, res) => {
-    const code =
-      typeof req.query.code === "string" ? req.query.code : undefined;
-    const state =
-      typeof req.query.state === "string" ? req.query.state : undefined;
-    const providerError =
-      typeof req.query.error === "string" ? req.query.error : undefined;
+    const query = healthProviderOAuthCallbackQuerySchema.safeParse(req.query);
+    if (!query.success) {
+      res.status(400).send("Invalid callback parameters");
+      return;
+    }
+    const { code, state, error: providerError } = query.data;
 
     if (providerError) {
       logger.warn(

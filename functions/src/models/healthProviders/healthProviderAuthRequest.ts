@@ -49,9 +49,13 @@ export type HealthProviderAuthRequestDocument = z.output<
 /**
  * Reverse-lookup record at the root collection
  * `healthProviderUserIndex/{provider}:{providerUserId}` mapping a provider's own
- * user id back to our Firebase uid, so inbound webhooks (which only carry the
- * provider user id) can be routed to the right account without a collection-group
- * query. Server-only.
+ * user id back to our Firebase uid(s), so inbound webhooks (which only carry the
+ * provider user id) can be routed to the right account(s) without a
+ * collection-group query. Server-only.
+ *
+ * `userIds` is a set (deduplicated) rather than a single id so that the same
+ * provider account connected under two MHC accounts routes to both, and a
+ * disconnect by one account does not cut off the other.
  */
 export const healthProviderUserIndexConverter = new Lazy(
   () =>
@@ -59,12 +63,12 @@ export const healthProviderUserIndexConverter = new Lazy(
       schema: z.object({
         provider: z.nativeEnum(HealthProviderId),
         providerUserId: z.string(),
-        userId: z.string(),
+        userIds: z.array(z.string()),
       }),
       encode: (object) => ({
         provider: object.provider,
         providerUserId: object.providerUserId,
-        userId: object.userId,
+        userIds: object.userIds,
       }),
     }),
 );

@@ -105,7 +105,12 @@ export class DefaultServiceFactory implements ServiceFactory {
   );
 
   private readonly userService = new Lazy(
-    () => new DatabaseUserService(this.auth.value, this.databaseService.value),
+    () =>
+      new DatabaseUserService(
+        this.auth.value,
+        this.databaseService.value,
+        this.healthProviderService.value,
+      ),
   );
 
   // Methods - User

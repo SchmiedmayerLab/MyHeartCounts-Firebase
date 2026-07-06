@@ -6,13 +6,51 @@
 import { createHmac } from "crypto";
 import { expect } from "chai";
 import {
+  FitbitAdapter,
   normalizeFitbit,
   parseFitbitNotifications,
   verifyFitbitSignature,
 } from "./fitbitAdapter.js";
+import { type ProviderTokens } from "../../../models/index.js";
 import { type ProviderObservation } from "../healthProviderAdapter.js";
 
 const subject = { reference: "user/u1" };
+
+const fakeTokens: ProviderTokens = {
+  accessToken: "access",
+  refreshToken: "refresh",
+  expiresAt: new Date(Date.now() + 3600_000),
+  scopes: [],
+  providerUserId: "u",
+};
+
+/**
+ * Replace global fetch with a stub that maps a URL to a JSON payload (or, when
+ * the value is a number, an error status). Returns a restore function.
+ */
+const stubFetch = (route: (url: string) => unknown): (() => void) => {
+  const original = globalThis.fetch;
+  globalThis.fetch = ((input: unknown) => {
+    const url =
+      typeof input === "string" ? input : (input as { url: string }).url;
+    const payload = route(url);
+    const response =
+      typeof payload === "number" ?
+        { ok: false, status: payload, text: () => Promise.resolve("error") }
+      : {
+          ok: true,
+          status: 200,
+          text: () =>
+            Promise.resolve(
+              payload === undefined ? "" : JSON.stringify(payload),
+            ),
+        };
+    return Promise.resolve(response as Response);
+  }) as typeof fetch;
+  return () => {
+    globalThis.fetch = original;
+  };
+};
 
 const observationFor = (
   observations: ProviderObservation[],
@@ -80,6 +118,57 @@ describe("FitbitAdapter: normalizeFitbit", () => {
     );
     expect(observationFor(result, "sleepDuration").id).to.equal("fitbit-42");
   });
+
+  it("treats naive sleep timestamps as UTC when no offset is known", () => {
+    const result = normalizeFitbit(
+      {
+        sleep: [
+          {
+            logId: 1,
+            dateOfSleep: "2026-01-01",
+            startTime: "2026-01-01T23:00:00.000",
+            endTime: "2026-01-02T07:00:00.000",
+            minutesAsleep: 480,
+          },
+        ],
+      },
+      subject,
+    );
+    // offset defaults to 0 -> the wall-clock value is read as UTC.
+    expect(
+      observationFor(
+        result,
+        "sleepDuration",
+      ).effectivePeriod?.start?.toISOString(),
+    ).to.equal("2026-01-01T23:00:00.000Z");
+  });
+
+  it("shifts naive sleep timestamps by the profile UTC offset", () => {
+    // America/Los_Angeles: offsetFromUTCMillis = -8h.
+    const offset = -8 * 60 * 60 * 1000;
+    const result = normalizeFitbit(
+      {
+        sleep: [
+          {
+            logId: 2,
+            dateOfSleep: "2026-01-01",
+            startTime: "2026-01-01T23:00:00.000",
+            endTime: "2026-01-02T07:00:00.000",
+            minutesAsleep: 480,
+          },
+        ],
+      },
+      subject,
+      offset,
+    );
+    // Local 23:00 PST is 07:00Z the next day.
+    expect(
+      observationFor(
+        result,
+        "sleepDuration",
+      ).effectivePeriod?.start?.toISOString(),
+    ).to.equal("2026-01-02T07:00:00.000Z");
+  });
 });
 
 describe("FitbitAdapter: parseFitbitNotifications", () => {
@@ -116,6 +205,65 @@ describe("FitbitAdapter: parseFitbitNotifications", () => {
 
   it("returns an empty list for a non-array body", () => {
     expect(parseFitbitNotifications({})).to.deep.equal([]);
+  });
+
+  it("drops entries missing ownerId or date", () => {
+    const result = parseFitbitNotifications([
+      { ownerId: "userA", date: "2026-01-01" },
+      { ownerId: "userB" },
+      { date: "2026-01-02" },
+      { ownerId: 5, date: "2026-01-03" },
+    ]);
+    expect(result).to.have.lengthOf(1);
+    expect(result[0].providerUserId).to.equal("userA");
+  });
+});
+
+describe("FitbitAdapter: fetchObservations", () => {
+  it("applies the profile offset and tolerates a failing endpoint", async () => {
+    const restore = stubFetch((url) => {
+      if (url.includes("/profile.json"))
+        return { user: { offsetFromUTCMillis: -8 * 60 * 60 * 1000 } };
+      if (url.includes("/activities/steps/"))
+        return {
+          "activities-steps": [{ dateTime: "2026-01-01", value: "8000" }],
+        };
+      if (url.includes("/sleep/"))
+        return {
+          sleep: [
+            {
+              logId: 1,
+              dateOfSleep: "2026-01-01",
+              startTime: "2026-01-01T23:00:00.000",
+              endTime: "2026-01-02T07:00:00.000",
+              minutesAsleep: 480,
+            },
+          ],
+        };
+      if (url.includes("/br/")) return 500; // transient failure, must not throw
+      return {};
+    });
+    try {
+      const adapter = new FitbitAdapter();
+      const result = await adapter.fetchObservations({
+        tokens: fakeTokens,
+        since: new Date("2026-01-01T00:00:00Z"),
+        until: new Date("2026-01-02T00:00:00Z"),
+        subject,
+      });
+      expect(observationFor(result, "steps").valueQuantity?.value).to.equal(
+        8000,
+      );
+      // Sleep start shifted by the -8h profile offset.
+      expect(
+        observationFor(
+          result,
+          "sleepDuration",
+        ).effectivePeriod?.start?.toISOString(),
+      ).to.equal("2026-01-02T07:00:00.000Z");
+    } finally {
+      restore();
+    }
   });
 });
 

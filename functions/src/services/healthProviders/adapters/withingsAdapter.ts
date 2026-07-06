@@ -6,6 +6,7 @@
 import { type Response } from "express";
 import { logger } from "firebase-functions/v2";
 import { type Request } from "firebase-functions/v2/https";
+import { z } from "zod";
 import { getWithingsClientId, getWithingsClientSecret } from "../../../env.js";
 import {
   type FHIRReference,
@@ -18,7 +19,7 @@ import {
   type ProviderObservation,
   type WebhookHandling,
 } from "../healthProviderAdapter.js";
-import { postJson } from "../httpClient.js";
+import { postJson, settleEndpoint } from "../httpClient.js";
 import { buildProviderObservation } from "../observationBuilder.js";
 import { MetricSpecs, type MetricSpec } from "../providerCodes.js";
 
@@ -45,8 +46,12 @@ const MEASURE_TYPE_SPECS = new Map<number, MetricSpec>([
 
 const epochSeconds = (date: Date): number => Math.floor(date.getTime() / 1000);
 const ymd = (date: Date): string => date.toISOString().slice(0, 10);
-const minutesFromSeconds = (seconds: number | null | undefined): number =>
-  Math.round(((seconds ?? 0) / 60) * 100) / 100;
+const minutesFromSeconds = (
+  seconds: number | null | undefined,
+): number | undefined =>
+  seconds === null || seconds === undefined ?
+    undefined
+  : Math.round((seconds / 60) * 100) / 100;
 
 // --- Raw response shapes (only the fields we consume) ----------------------
 
@@ -94,6 +99,28 @@ interface WithingsSleepSeries {
     rr_average?: number;
   };
 }
+
+// --- Response / notification validation (zod) ------------------------------
+// Withings payloads are untrusted; validate the fields we depend on and stay
+// permissive about the rest.
+
+const withingsTokenBodySchema = z
+  .object({
+    userid: z.union([z.number(), z.string()]),
+    access_token: z.string().min(1),
+    refresh_token: z.string().min(1),
+    expires_in: z.number(),
+    scope: z.string().optional(),
+  })
+  .passthrough();
+
+const withingsNotificationSchema = z
+  .object({
+    userid: z.union([z.string(), z.number()]),
+    startdate: z.union([z.string(), z.number()]).optional(),
+    enddate: z.union([z.string(), z.number()]).optional(),
+  })
+  .passthrough();
 
 const tokensFrom = (body: WithingsTokenBody): ProviderTokens => ({
   accessToken: body.access_token,
@@ -209,22 +236,21 @@ export const normalizeWithings = (
   return out;
 };
 
-/** Parse a Withings Notify POST (urlencoded) into a changed window. */
+/**
+ * Parse a Withings Notify POST (urlencoded) into a changed window. The
+ * `startdate`/`enddate` here are attacker-controllable (the Notify callback has
+ * no per-request signature), so the service clamps them to a bounded window
+ * before fetching — see `HealthProviderService.ingestNotification`.
+ */
 export const parseWithingsNotification = (
   body: unknown,
 ): { providerUserId: string; since?: Date; until?: Date } | undefined => {
-  if (!body || typeof body !== "object") return undefined;
-  const form = body as Record<string, unknown>;
-  const userid = form.userid;
-  const providerUserId =
-    typeof userid === "string" ? userid
-    : typeof userid === "number" ? String(userid)
-    : undefined;
-  if (providerUserId === undefined || providerUserId.length === 0) {
-    return undefined;
-  }
-  const start = Number(form.startdate);
-  const end = Number(form.enddate);
+  const parsed = withingsNotificationSchema.safeParse(body);
+  if (!parsed.success) return undefined;
+  const providerUserId = String(parsed.data.userid);
+  if (providerUserId.length === 0) return undefined;
+  const start = Number(parsed.data.startdate);
+  const end = Number(parsed.data.enddate);
   return {
     providerUserId,
     since: Number.isFinite(start) ? new Date(start * 1000) : undefined,
@@ -298,13 +324,25 @@ export class WithingsAdapter implements HealthProviderAdapter {
     return {};
   }
 
-  async removeSubscription(params: { tokens: ProviderTokens }): Promise<void> {
-    // Withings revoke needs the exact callbackurl that was subscribed; it is not
-    // stored per-appli, so this is best-effort using the current base URL.
+  async removeSubscription(params: {
+    tokens: ProviderTokens;
+    callbackUrl?: string;
+  }): Promise<void> {
+    // Withings `revoke` requires the exact `callbackurl` that was subscribed (in
+    // addition to `appli`); omitting it makes the call fail with a non-zero
+    // status and leaves the subscription live. The callback URL is deterministic
+    // from the deployment origin, so the service passes the current one.
+    if (!params.callbackUrl) {
+      logger.warn(
+        "WithingsAdapter: removeSubscription called without callbackUrl; skipping revoke",
+      );
+      return;
+    }
     for (const appli of NOTIFY_APPLI) {
       try {
         await this.call(NOTIFY_URL, params.tokens.accessToken, {
           action: "revoke",
+          callbackurl: params.callbackUrl,
           appli: String(appli),
         });
       } catch (error) {
@@ -344,34 +382,49 @@ export class WithingsAdapter implements HealthProviderAdapter {
     const { tokens, since, until, subject } = params;
     const token = tokens.accessToken;
 
+    // Isolate per-endpoint failures so a transient error on one measure type
+    // doesn't discard the others (an auth failure still propagates).
     const [measures, activity, sleep] = await Promise.all([
-      this.call<{ measuregrps?: WithingsMeasureGroup[] }>(MEASURE_URL, token, {
-        action: "getmeas",
-        meastypes: Array.from(MEASURE_TYPE_SPECS.keys()).join(","),
-        category: "1",
-        startdate: String(epochSeconds(since)),
-        enddate: String(epochSeconds(until)),
-      }),
-      this.call<{ activities?: WithingsActivity[] }>(V2_MEASURE_URL, token, {
-        action: "getactivity",
-        startdateymd: ymd(since),
-        enddateymd: ymd(until),
-        data_fields: "steps,distance,calories",
-      }),
-      this.call<{ series?: WithingsSleepSeries[] }>(V2_SLEEP_URL, token, {
-        action: "getsummary",
-        startdateymd: ymd(since),
-        enddateymd: ymd(until),
-        data_fields:
-          "deepsleepduration,remsleepduration,lightsleepduration,wakeupduration,hr_average,rr_average",
-      }),
+      settleEndpoint(
+        "Withings getmeas",
+        this.call<{ measuregrps?: WithingsMeasureGroup[] }>(
+          MEASURE_URL,
+          token,
+          {
+            action: "getmeas",
+            meastypes: Array.from(MEASURE_TYPE_SPECS.keys()).join(","),
+            category: "1",
+            startdate: String(epochSeconds(since)),
+            enddate: String(epochSeconds(until)),
+          },
+        ),
+      ),
+      settleEndpoint(
+        "Withings getactivity",
+        this.call<{ activities?: WithingsActivity[] }>(V2_MEASURE_URL, token, {
+          action: "getactivity",
+          startdateymd: ymd(since),
+          enddateymd: ymd(until),
+          data_fields: "steps,distance,calories",
+        }),
+      ),
+      settleEndpoint(
+        "Withings getsummary",
+        this.call<{ series?: WithingsSleepSeries[] }>(V2_SLEEP_URL, token, {
+          action: "getsummary",
+          startdateymd: ymd(since),
+          enddateymd: ymd(until),
+          data_fields:
+            "deepsleepduration,remsleepduration,lightsleepduration,wakeupduration,hr_average,rr_average",
+        }),
+      ),
     ]);
 
     return normalizeWithings(
       {
-        measureGroups: measures.measuregrps,
-        activities: activity.activities,
-        sleep: sleep.series,
+        measureGroups: measures?.measuregrps,
+        activities: activity?.activities,
+        sleep: sleep?.series,
       },
       subject,
     );
@@ -387,7 +440,7 @@ export class WithingsAdapter implements HealthProviderAdapter {
       client_id: getWithingsClientId(),
       client_secret: getWithingsClientSecret(),
     });
-    const envelope = await postJson<WithingsEnvelope<WithingsTokenBody>>(
+    const envelope = await postJson<WithingsEnvelope<unknown>>(
       OAUTH_URL,
       { body },
       "Withings oauth",
@@ -397,7 +450,7 @@ export class WithingsAdapter implements HealthProviderAdapter {
         `Withings oauth failed: status=${envelope.status} ${envelope.error ?? ""}`,
       );
     }
-    return envelope.body;
+    return withingsTokenBodySchema.parse(envelope.body);
   }
 
   private async call<T>(

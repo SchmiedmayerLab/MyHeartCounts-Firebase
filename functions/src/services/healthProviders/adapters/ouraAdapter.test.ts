@@ -4,10 +4,37 @@
 // SPDX-License-Identifier: MIT
 
 import { expect } from "chai";
-import { normalizeOura, parseOuraEvent } from "./ouraAdapter.js";
+import { normalizeOura, OuraAdapter, parseOuraEvent } from "./ouraAdapter.js";
+import { type ProviderTokens } from "../../../models/index.js";
 import { type ProviderObservation } from "../healthProviderAdapter.js";
 
 const subject = { reference: "user/u1" };
+
+const fakeTokens: ProviderTokens = {
+  accessToken: "access",
+  refreshToken: "refresh",
+  expiresAt: new Date(Date.now() + 3600_000),
+  scopes: [],
+  providerUserId: "u",
+};
+
+const stubFetch = (route: (url: string) => unknown): (() => void) => {
+  const original = globalThis.fetch;
+  globalThis.fetch = ((input: unknown) => {
+    const url =
+      typeof input === "string" ? input : (input as { url: string }).url;
+    const payload = route(url);
+    return Promise.resolve({
+      ok: true,
+      status: 200,
+      text: () =>
+        Promise.resolve(payload === undefined ? "" : JSON.stringify(payload)),
+    } as Response);
+  }) as typeof fetch;
+  return () => {
+    globalThis.fetch = original;
+  };
+};
 
 const observationFor = (
   observations: ProviderObservation[],
@@ -92,6 +119,28 @@ describe("OuraAdapter: normalizeOura", () => {
     );
   });
 
+  it("skips sleep stages that are absent instead of emitting zeros", () => {
+    const result = normalizeOura(
+      {
+        sleep: [
+          {
+            id: "s2",
+            day: "2026-01-02",
+            total_sleep_duration: 28800,
+            // deep/rem/light/awake all absent
+          },
+        ],
+      },
+      subject,
+    );
+    const metrics = result.map((o) => o.metric);
+    expect(metrics).to.include("sleepDuration");
+    expect(metrics).to.not.include("sleepDeep");
+    expect(metrics).to.not.include("sleepRem");
+    expect(metrics).to.not.include("sleepLight");
+    expect(metrics).to.not.include("sleepAwake");
+  });
+
   it("computes workout duration in minutes from the interval", () => {
     const result = normalizeOura(
       {
@@ -116,6 +165,43 @@ describe("OuraAdapter: normalizeOura", () => {
       subject,
     );
     expect(result).to.have.lengthOf(0);
+  });
+});
+
+describe("OuraAdapter: fetchObservations", () => {
+  it("follows next_token pagination and normalizes", async () => {
+    let heartCalls = 0;
+    const restore = stubFetch((url) => {
+      if (url.includes("/heartrate")) {
+        heartCalls += 1;
+        if (!url.includes("next_token")) {
+          return {
+            data: [{ bpm: 60, timestamp: "2026-01-01T00:00:00Z" }],
+            next_token: "page2",
+          };
+        }
+        return {
+          data: [{ bpm: 61, timestamp: "2026-01-01T00:05:00Z" }],
+          next_token: null,
+        };
+      }
+      return { data: [] };
+    });
+    try {
+      const adapter = new OuraAdapter();
+      const result = await adapter.fetchObservations({
+        tokens: fakeTokens,
+        since: new Date("2026-01-01T00:00:00Z"),
+        until: new Date("2026-01-02T00:00:00Z"),
+        subject,
+      });
+      expect(heartCalls).to.equal(2);
+      expect(result.filter((o) => o.metric === "heartRate")).to.have.lengthOf(
+        2,
+      );
+    } finally {
+      restore();
+    }
   });
 });
 

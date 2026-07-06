@@ -14,6 +14,7 @@ import {
   type ProviderWebhookNotification,
   type WebhookHandling,
 } from "./healthProviderAdapter.js";
+import { ProviderAuthError, ProviderHttpError } from "./httpClient.js";
 import { getAdapter } from "./providerRegistry.js";
 import {
   getHealthProviderBaseUrl,
@@ -34,9 +35,22 @@ import { type DatabaseService } from "../database/databaseService.js";
 const INITIAL_BACKFILL_DAYS = 30;
 /** Refresh access tokens this long before their nominal expiry. */
 const TOKEN_EXPIRY_SKEW_MS = 60_000;
+/**
+ * Upper bound on how far back a webhook-triggered fetch may reach. Webhook
+ * bodies (notably Withings Notify) carry a caller-supplied `startdate` with no
+ * per-request signature, so the window is clamped here to prevent a forged
+ * notification from forcing an unbounded backfill on a victim's token. Deeper
+ * history is covered by the daily scheduled backfill.
+ */
+const WEBHOOK_MAX_LOOKBACK_DAYS = 7;
 
 const daysAgo = (days: number): Date =>
   new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+
+/** Whether an ingest error indicates the stored credentials are unusable. */
+const isAuthFailure = (error: unknown): boolean =>
+  error instanceof ProviderAuthError ||
+  (error instanceof ProviderHttpError && error.isAuthFailure);
 
 const base64url = (buffer: Buffer): string =>
   buffer
@@ -157,16 +171,15 @@ export class HealthProviderService {
 
     await this.storeTokens(userId, provider, tokens, subscriptionId);
 
+    // Add this user to the reverse index (a set-union so a provider account
+    // shared across two MHC accounts routes to both). Kept out of the bulkWrite
+    // below because it is a read-modify-write on a shared root doc.
+    await this.addUserToIndex(provider, tokens.providerUserId, userId);
+
     await this.databaseService.bulkWrite(async (collections, writer) => {
       // The per-op promises can't be awaited here: the bulkWrite wrapper closes
       // the writer only after this callback returns, so awaiting them would
       // deadlock. flush() commits the buffered writes and resolves when done.
-      void writer.set(
-        collections.healthProviderUserIndex.doc(
-          healthProviderUserIndexId(provider, tokens.providerUserId),
-        ),
-        { provider, providerUserId: tokens.providerUserId, userId },
-      );
       void writer.set(
         collections.healthProviderConnections(userId).doc(provider),
         {
@@ -200,6 +213,7 @@ export class HealthProviderService {
         await adapter.removeSubscription({
           tokens,
           subscriptionId: tokenDoc.content.subscriptionId,
+          callbackUrl: this.webhookUrl(provider),
         });
       } catch (error) {
         logger.error(
@@ -213,6 +227,12 @@ export class HealthProviderService {
           `HealthProviderService: revoke failed for ${provider}/${userId}: ${String(error)}`,
         );
       }
+      // Remove only this user from the (possibly shared) reverse index.
+      await this.removeUserFromIndex(
+        provider,
+        tokenDoc.content.providerUserId,
+        userId,
+      );
     }
 
     await this.databaseService.bulkWrite(async (collections, writer) => {
@@ -232,17 +252,74 @@ export class HealthProviderService {
           lastError: undefined,
         },
       );
-      if (tokenDoc !== undefined) {
-        void writer.delete(
-          collections.healthProviderUserIndex.doc(
-            healthProviderUserIndexId(
-              provider,
-              tokenDoc.content.providerUserId,
-            ),
-          ),
+      await writer.flush();
+    });
+  }
+
+  /**
+   * Tear down every provider connection for a user. Used on account deletion so
+   * provider-side webhook subscriptions and the root reverse-index entries (which
+   * `recursiveDelete(users/{uid})` does not touch) are cleaned up before the
+   * user's documents are removed.
+   */
+  async disconnectAll(userId: string): Promise<void> {
+    const tokenDocs = await this.databaseService.getQuery((collections) =>
+      collections.healthProviderTokens(userId),
+    );
+    for (const tokenDoc of tokenDocs) {
+      try {
+        await this.disconnect(userId, tokenDoc.content.provider);
+      } catch (error) {
+        logger.error(
+          `HealthProviderService: disconnectAll failed for ${tokenDoc.content.provider}/${userId}: ${String(error)}`,
         );
       }
-      await writer.flush();
+    }
+  }
+
+  // Reverse index -------------------------------------------------------------
+
+  /** Add a user to a provider-account's reverse-index entry (set-union). */
+  private async addUserToIndex(
+    provider: HealthProviderId,
+    providerUserId: string,
+    userId: string,
+  ): Promise<void> {
+    await this.databaseService.runTransaction(async (collections, tx) => {
+      const ref = collections.healthProviderUserIndex.doc(
+        healthProviderUserIndexId(provider, providerUserId),
+      );
+      const snap = await tx.get(ref);
+      const existing = snap.data()?.userIds ?? [];
+      const userIds =
+        existing.includes(userId) ? existing : [...existing, userId];
+      tx.set(ref, { provider, providerUserId, userIds });
+    });
+  }
+
+  /**
+   * Remove a user from a provider-account's reverse-index entry, deleting the
+   * doc entirely once no user references it.
+   */
+  private async removeUserFromIndex(
+    provider: HealthProviderId,
+    providerUserId: string,
+    userId: string,
+  ): Promise<void> {
+    await this.databaseService.runTransaction(async (collections, tx) => {
+      const ref = collections.healthProviderUserIndex.doc(
+        healthProviderUserIndexId(provider, providerUserId),
+      );
+      const snap = await tx.get(ref);
+      if (!snap.exists) return;
+      const remaining = (snap.data()?.userIds ?? []).filter(
+        (id) => id !== userId,
+      );
+      if (remaining.length === 0) {
+        tx.delete(ref);
+      } else {
+        tx.set(ref, { provider, providerUserId, userIds: remaining });
+      }
     });
   }
 
@@ -307,10 +384,23 @@ export class HealthProviderService {
       return;
     }
 
-    const userId = index.content.userId;
-    const until = notification.until ?? new Date();
-    const since = notification.since ?? daysAgo(2);
-    await this.ingest(userId, provider, adapter, since, until);
+    // Clamp the window: `until` never runs past now, and `since` never reaches
+    // further back than WEBHOOK_MAX_LOOKBACK_DAYS — the notification's timestamps
+    // are caller-controlled and must not drive an unbounded fetch.
+    const now = new Date();
+    const until = new Date(
+      Math.min((notification.until ?? now).getTime(), now.getTime()),
+    );
+    const earliest = daysAgo(WEBHOOK_MAX_LOOKBACK_DAYS);
+    const requestedSince = notification.since ?? daysAgo(2);
+    const since = new Date(
+      Math.max(requestedSince.getTime(), earliest.getTime()),
+    );
+
+    // A shared provider account may map to more than one MHC user.
+    for (const userId of index.content.userIds) {
+      await this.ingest(userId, provider, adapter, since, until);
+    }
   }
 
   // Backfill / polling -------------------------------------------------------
@@ -366,12 +456,17 @@ export class HealthProviderService {
       await this.writeObservations(userId, provider, observations);
       await this.markSync(userId, provider, HealthProviderSyncStatus.ok, until);
     } catch (error) {
+      // Only a credential failure (unrenewable/rejected token) flips the
+      // client-visible connection status to `error`; a transient fetch failure
+      // records the error but leaves the connection `connected` so a single blip
+      // doesn't show the wearable as broken until the next sync.
       await this.markSync(
         userId,
         provider,
         HealthProviderSyncStatus.error,
         undefined,
         String(error),
+        isAuthFailure(error),
       );
       throw error;
     }
@@ -390,7 +485,7 @@ export class HealthProviderService {
       for (const { metric, observation } of observations) {
         if (observation.id === undefined) continue;
         const ref = collections
-          .userProviderObservations(
+          .userHealthObservations(
             userId,
             providerObservationCollectionName(provider, metric),
           )
@@ -445,20 +540,48 @@ export class HealthProviderService {
       return stored;
     }
 
-    const refreshed = await adapter.refreshTokens(stored.refreshToken);
+    let refreshed: ProviderTokens;
+    try {
+      refreshed = await adapter.refreshTokens(stored.refreshToken);
+    } catch (error) {
+      // A failed refresh means the stored credentials can no longer be renewed;
+      // surface it as an auth failure so the connection status flips to `error`.
+      throw new ProviderAuthError(`${provider} token refresh`, error);
+    }
     // Preserve providerUserId if the refresh response omits it.
     const merged: ProviderTokens = {
       ...refreshed,
       providerUserId: refreshed.providerUserId || stored.providerUserId,
       scopes: refreshed.scopes.length > 0 ? refreshed.scopes : stored.scopes,
     };
-    await this.storeTokens(
-      userId,
-      provider,
-      merged,
-      tokenDoc.content.subscriptionId,
-    );
-    return merged;
+
+    // Compare-and-set: persist only if no concurrent sync already rotated the
+    // refresh token (Fitbit/Withings invalidate the old one on first use). If
+    // another writer got there first, keep its tokens rather than clobbering
+    // them with a now-stale value.
+    return this.databaseService.runTransaction(async (collections, tx) => {
+      const ref = collections.healthProviderTokens(userId).doc(provider);
+      const snap = await tx.get(ref);
+      const current = snap.data();
+      if (
+        current !== undefined &&
+        current.refreshToken !== stored.refreshToken
+      ) {
+        return current;
+      }
+      tx.set(ref, {
+        provider,
+        accessToken: merged.accessToken,
+        refreshToken: merged.refreshToken,
+        expiresAt: merged.expiresAt,
+        scopes: merged.scopes,
+        providerUserId: merged.providerUserId,
+        updatedAt: new Date(),
+        subscriptionId:
+          current?.subscriptionId ?? tokenDoc.content.subscriptionId,
+      });
+      return merged;
+    });
   }
 
   private async markSync(
@@ -467,15 +590,20 @@ export class HealthProviderService {
     status: HealthProviderSyncStatus,
     lastSyncAt?: Date,
     lastError?: string,
+    markConnectionError = false,
   ): Promise<void> {
     const data: Record<string, unknown> = {
       provider,
-      status:
-        status === HealthProviderSyncStatus.ok ?
-          HealthProviderConnectionStatus.connected
-        : HealthProviderConnectionStatus.error,
       lastSyncStatus: status,
     };
+    // Only touch the client-visible connection `status` on success (→ connected)
+    // or a credential failure (→ error). A transient sync failure leaves the
+    // existing status untouched so the wearable isn't shown as broken over a blip.
+    if (status === HealthProviderSyncStatus.ok) {
+      data.status = HealthProviderConnectionStatus.connected;
+    } else if (markConnectionError) {
+      data.status = HealthProviderConnectionStatus.error;
+    }
     if (lastSyncAt) data.lastSyncAt = Timestamp.fromDate(lastSyncAt);
     if (lastError) data.lastError = lastError;
 

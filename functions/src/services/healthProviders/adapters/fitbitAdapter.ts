@@ -7,6 +7,7 @@ import { createHmac, timingSafeEqual } from "crypto";
 import { type Response } from "express";
 import { logger } from "firebase-functions/v2";
 import { type Request } from "firebase-functions/v2/https";
+import { z } from "zod";
 import {
   getFitbitClientId,
   getFitbitClientSecret,
@@ -29,6 +30,7 @@ import {
   getJson,
   postJson,
   ProviderHttpError,
+  settleEndpoint,
 } from "../httpClient.js";
 import { buildProviderObservation } from "../observationBuilder.js";
 import { MetricSpecs } from "../providerCodes.js";
@@ -105,13 +107,34 @@ interface FitbitWeightLog {
   fat?: number;
 }
 
-interface FitbitNotification {
-  collectionType: string;
-  date: string;
-  ownerId: string;
-  ownerType: string;
-  subscriptionId: string;
-}
+const fitbitNotificationSchema = z
+  .object({
+    ownerId: z.string().min(1),
+    date: z.string().min(1),
+  })
+  .passthrough();
+
+// --- Response validation (zod) ---------------------------------------------
+// Provider payloads are untrusted; validate the fields we depend on and stay
+// permissive (`.passthrough()`) about the rest.
+
+const fitbitTokenResponseSchema = z
+  .object({
+    access_token: z.string().min(1),
+    refresh_token: z.string().min(1),
+    expires_in: z.number(),
+    scope: z.string().optional(),
+    user_id: z.string().min(1),
+  })
+  .passthrough();
+
+const fitbitProfileSchema = z
+  .object({
+    user: z
+      .object({ offsetFromUTCMillis: z.number().optional() })
+      .passthrough(),
+  })
+  .passthrough();
 
 const tokensFrom = (response: FitbitTokenResponse): ProviderTokens => ({
   accessToken: response.access_token,
@@ -125,6 +148,15 @@ const tokensFrom = (response: FitbitTokenResponse): ProviderTokens => ({
 
 const midday = (day: string): Date => new Date(`${day}T12:00:00Z`);
 
+/**
+ * Fitbit sleep `startTime`/`endTime` are wall-clock local timestamps with no
+ * offset (e.g. `"2026-01-01T23:00:00.000"`). Interpreting them as UTC would
+ * shift the instant by the user's offset, so we anchor the naive value to UTC
+ * and subtract the profile's `offsetFromUTCMillis` to recover the true instant.
+ */
+const parseLocalNaive = (naive: string, utcOffsetMillis: number): Date =>
+  new Date(new Date(`${naive}Z`).getTime() - utcOffsetMillis);
+
 export const normalizeFitbit = (
   raw: {
     steps?: FitbitDatedValue[];
@@ -137,6 +169,8 @@ export const normalizeFitbit = (
     weight?: FitbitWeightLog[];
   },
   subject: FHIRReference,
+  /** User's UTC offset in ms (Fitbit `offsetFromUTCMillis`); 0 if unknown. */
+  utcOffsetMillis = 0,
 ): ProviderObservation[] => {
   const out: ProviderObservation[] = [];
   const add = (
@@ -195,7 +229,10 @@ export const normalizeFitbit = (
   for (const sleep of raw.sleep ?? []) {
     const period =
       sleep.startTime && sleep.endTime ?
-        { start: new Date(sleep.startTime), end: new Date(sleep.endTime) }
+        {
+          start: parseLocalNaive(sleep.startTime, utcOffsetMillis),
+          end: parseLocalNaive(sleep.endTime, utcOffsetMillis),
+        }
       : midday(sleep.dateOfSleep);
     const id = String(sleep.logId);
     add(MetricSpecs.sleepDuration, sleep.minutesAsleep, period, id);
@@ -274,13 +311,12 @@ export const parseFitbitNotifications = (
 ): ProviderWebhookNotification[] => {
   if (!Array.isArray(body)) return [];
   const byUser = new Map<string, Set<string>>();
-  for (const item of body as Array<Partial<FitbitNotification>>) {
-    if (typeof item.ownerId !== "string" || typeof item.date !== "string") {
-      continue;
-    }
-    const dates = byUser.get(item.ownerId) ?? new Set<string>();
-    dates.add(item.date);
-    byUser.set(item.ownerId, dates);
+  for (const raw of body) {
+    const item = fitbitNotificationSchema.safeParse(raw);
+    if (!item.success) continue;
+    const dates = byUser.get(item.data.ownerId) ?? new Set<string>();
+    dates.add(item.data.date);
+    byUser.set(item.data.ownerId, dates);
   }
   return Array.from(byUser.entries()).map(([providerUserId, dates]) => {
     const sorted = Array.from(dates).sort();
@@ -325,38 +361,42 @@ export class FitbitAdapter implements HealthProviderAdapter {
       client_id: getFitbitClientId(),
     });
     if (params.codeVerifier) body.set("code_verifier", params.codeVerifier);
-    const response = await postJson<FitbitTokenResponse>(
-      TOKEN_URL,
-      {
-        headers: {
-          Authorization: basicAuthHeader(
-            getFitbitClientId(),
-            getFitbitClientSecret(),
-          ),
+    const response = fitbitTokenResponseSchema.parse(
+      await postJson<unknown>(
+        TOKEN_URL,
+        {
+          headers: {
+            Authorization: basicAuthHeader(
+              getFitbitClientId(),
+              getFitbitClientSecret(),
+            ),
+          },
+          body,
         },
-        body,
-      },
-      "Fitbit token exchange",
+        "Fitbit token exchange",
+      ),
     );
     return tokensFrom(response);
   }
 
   async refreshTokens(refreshToken: string): Promise<ProviderTokens> {
-    const response = await postJson<FitbitTokenResponse>(
-      TOKEN_URL,
-      {
-        headers: {
-          Authorization: basicAuthHeader(
-            getFitbitClientId(),
-            getFitbitClientSecret(),
-          ),
+    const response = fitbitTokenResponseSchema.parse(
+      await postJson<unknown>(
+        TOKEN_URL,
+        {
+          headers: {
+            Authorization: basicAuthHeader(
+              getFitbitClientId(),
+              getFitbitClientSecret(),
+            ),
+          },
+          body: new URLSearchParams({
+            grant_type: "refresh_token",
+            refresh_token: refreshToken,
+          }),
         },
-        body: new URLSearchParams({
-          grant_type: "refresh_token",
-          refresh_token: refreshToken,
-        }),
-      },
-      "Fitbit token refresh",
+        "Fitbit token refresh",
+      ),
     );
     return tokensFrom(response);
   }
@@ -454,10 +494,15 @@ export class FitbitAdapter implements HealthProviderAdapter {
     const token = tokens.accessToken;
     const start = isoDate(since);
     const end = isoDate(until);
+    // NOTE: Fitbit distance/weight are assumed metric (km/kg). The unit system
+    // actually follows the account locale unless an Accept-Language header pins
+    // it; making that explicit needs a product decision and is tracked
+    // separately, so it is intentionally left as-is here.
     const get = <T>(path: string, context: string) =>
-      getJson<T>(`${API_BASE}${path}`, token, context);
+      settleEndpoint(context, getJson<T>(`${API_BASE}${path}`, token, context));
 
     const [
+      utcOffsetMillis,
       stepsRes,
       caloriesRes,
       distanceRes,
@@ -467,6 +512,7 @@ export class FitbitAdapter implements HealthProviderAdapter {
       brRes,
       weightRes,
     ] = await Promise.all([
+      this.fetchUtcOffsetMillis(token),
       get<{ "activities-steps"?: FitbitDatedValue[] }>(
         `/1/user/-/activities/steps/date/${start}/${end}.json`,
         "Fitbit steps",
@@ -501,20 +547,43 @@ export class FitbitAdapter implements HealthProviderAdapter {
       ),
     ]);
 
-    const spo2 = Array.isArray(spo2Res) ? spo2Res : (spo2Res.spo2 ?? []);
+    const spo2 =
+      spo2Res === undefined ? undefined
+      : Array.isArray(spo2Res) ? spo2Res
+      : (spo2Res.spo2 ?? []);
 
     return normalizeFitbit(
       {
-        steps: stepsRes["activities-steps"],
-        activityCalories: caloriesRes["activities-activityCalories"],
-        distance: distanceRes["activities-distance"],
-        heart: heartRes["activities-heart"],
-        sleep: sleepRes.sleep,
+        steps: stepsRes?.["activities-steps"],
+        activityCalories: caloriesRes?.["activities-activityCalories"],
+        distance: distanceRes?.["activities-distance"],
+        heart: heartRes?.["activities-heart"],
+        sleep: sleepRes?.sleep,
         spo2,
-        br: brRes.br,
-        weight: weightRes.weight,
+        br: brRes?.br,
+        weight: weightRes?.weight,
       },
       subject,
+      utcOffsetMillis,
     );
+  }
+
+  /**
+   * Fetch the user's UTC offset (ms) from the Fitbit profile so naive local
+   * sleep timestamps can be converted to absolute instants. Best-effort: any
+   * failure falls back to 0 (naive value treated as UTC).
+   */
+  private async fetchUtcOffsetMillis(token: string): Promise<number> {
+    const profile = await settleEndpoint(
+      "Fitbit profile",
+      getJson<unknown>(
+        `${API_BASE}/1/user/-/profile.json`,
+        token,
+        "Fitbit profile",
+      ),
+    );
+    if (profile === undefined) return 0;
+    const parsed = fitbitProfileSchema.safeParse(profile);
+    return parsed.success ? (parsed.data.user.offsetFromUTCMillis ?? 0) : 0;
   }
 }

@@ -27,3 +27,24 @@ export type DisconnectHealthProviderInput = z.input<
 export interface DisconnectHealthProviderOutput {
   status: "disconnected";
 }
+
+/**
+ * Query parameters on the provider's OAuth redirect back to
+ * `healthProviderOAuthCallback`. Everything here is untrusted external input, so
+ * it is validated with zod rather than hand-rolled `typeof` checks. Express
+ * parses repeated/array query params, so each field is coerced to a single
+ * string and anything else is dropped to `undefined`.
+ */
+const singleString = z
+  .unknown()
+  .transform((value) => (typeof value === "string" ? value : undefined))
+  .pipe(z.string().optional());
+
+export const healthProviderOAuthCallbackQuerySchema = z.object({
+  code: singleString,
+  state: singleString,
+  error: singleString,
+});
+export type HealthProviderOAuthCallbackQuery = z.output<
+  typeof healthProviderOAuthCallbackQuerySchema
+>;
