@@ -6,6 +6,7 @@
 import { logger } from "firebase-functions/v2";
 import { onSchedule } from "firebase-functions/v2/scheduler";
 import nodemailer from "nodemailer";
+import type SMTPTransport from "nodemailer/lib/smtp-transport";
 import {
   getSmtpPassword,
   getSmtpUsername,
@@ -31,16 +32,29 @@ export const sendTestEmail = async (): Promise<void> => {
   const egressIp = await getEgressIp();
   logger.info(`Sending test email from egress IP ${egressIp}`);
 
-  // GCP blocks outbound port 25, so we default to 587 with STARTTLS
+  const smtpUsername = getSmtpUsername();
+  const smtpPassword = getSmtpPassword();
+  logger.info(
+    `SMTP credentials resolved: username length ${smtpUsername.length}, password length ${smtpPassword.length}`,
+  );
+
+  // GCP blocks outbound port 25, so we default to 587 with STARTTLS.
+  // requireTLS/forceAuth make the transport fail loudly if the server does not
+  // offer STARTTLS or AUTH, instead of silently sending unauthenticated.
+  // forceAuth is supported by nodemailer at runtime but missing from
+  // @types/nodemailer, so the options object needs an explicit cast
   const transporter = nodemailer.createTransport({
     host: process.env.SMTP_HOST ?? "smtp.stanford.edu",
     port: Number(process.env.SMTP_PORT ?? 587),
     secure: false,
+    requireTLS: true,
+    forceAuth: true,
+    logger: true,
     auth: {
-      user: getSmtpUsername(),
-      pass: getSmtpPassword(),
+      user: smtpUsername,
+      pass: smtpPassword,
     },
-  });
+  } as SMTPTransport.Options);
 
   const info = await transporter.sendMail({
     from: `"MyHeart Counts" <${senderAddress}>`,
