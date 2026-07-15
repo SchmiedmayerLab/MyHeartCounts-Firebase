@@ -27,16 +27,11 @@ export const deleteUserStorageFiles = async (userId: string): Promise<void> => {
     const [files] = await bucket.getFiles({ prefix });
 
     if (files.length === 0) {
-      logger.info(`No storage files found for user ${userId}`);
       return;
     }
 
-    logger.info(`Deleting ${files.length} storage files for user ${userId}`);
-
     const deletePromises = files.map((file) => file.delete());
     await Promise.all(deletePromises);
-
-    logger.info(`Successfully deleted storage files for user ${userId}`);
   } catch (error) {
     logger.error(`Failed to delete storage files for user ${userId}:`, error);
     throw error;
@@ -60,7 +55,6 @@ export const processUserDeletions = async (): Promise<void> => {
     });
 
     if (usersToDelete.length === 0) {
-      logger.info("No users marked for deletion found");
       return;
     }
 
@@ -70,13 +64,8 @@ export const processUserDeletions = async (): Promise<void> => {
       const userId = user.id;
 
       try {
-        logger.info(`Processing deletion for user ${userId}`);
-
         await deleteUserStorageFiles(userId);
-
         await userService.deleteUser(userId);
-
-        logger.info(`Successfully completed deletion for user ${userId}`);
       } catch (error) {
         logger.error(`Failed to delete user ${userId}:`, error);
       }
@@ -94,8 +83,6 @@ export const processUserDeletionsScheduled = onSchedule(
     serviceAccount: privilegedServiceAccount,
   },
   async (_event) => {
-    logger.info("Starting scheduled user deletion process");
     await processUserDeletions();
-    logger.info("Completed scheduled user deletion process");
   },
 );

@@ -30,6 +30,7 @@ describeWithEmulators("function: planNudges", (env) => {
           userLanguage: "en",
           preferredNotificationTime: "09:00",
           didOptInToTrial: true,
+          mostRecentOnboardingStep: "finalStep",
         });
 
       await createNudgeNotifications();
@@ -73,6 +74,7 @@ describeWithEmulators("function: planNudges", (env) => {
           comorbidities: {},
           preferredNotificationTime: "09:00",
           didOptInToTrial: true,
+          mostRecentOnboardingStep: "finalStep",
         });
 
       await createNudgeNotifications();
@@ -117,6 +119,7 @@ describeWithEmulators("function: planNudges", (env) => {
           comorbidities: {},
           preferredNotificationTime: "09:00",
           didOptInToTrial: true,
+          mostRecentOnboardingStep: "finalStep",
         });
 
       await createNudgeNotifications();
@@ -150,6 +153,7 @@ describeWithEmulators("function: planNudges", (env) => {
           userLanguage: "en",
           preferredNotificationTime: "09:00",
           didOptInToTrial: true,
+          mostRecentOnboardingStep: "finalStep",
         });
 
       await createNudgeNotifications();
@@ -181,6 +185,7 @@ describeWithEmulators("function: planNudges", (env) => {
           userLanguage: "es",
           preferredNotificationTime: "09:00",
           didOptInToTrial: true,
+          mostRecentOnboardingStep: "finalStep",
         });
 
       await createNudgeNotifications();
@@ -266,6 +271,7 @@ describeWithEmulators("function: planNudges", (env) => {
           comorbidities: {},
           preferredNotificationTime: "09:00",
           didOptInToTrial: true,
+          mostRecentOnboardingStep: "finalStep",
         });
 
       await createNudgeNotifications();
@@ -302,6 +308,7 @@ describeWithEmulators("function: planNudges", (env) => {
           comorbidities: {},
           preferredNotificationTime: "09:00",
           didOptInToTrial: true,
+          mostRecentOnboardingStep: "finalStep",
         });
 
       await createNudgeNotifications();
@@ -340,6 +347,7 @@ describeWithEmulators("function: planNudges", (env) => {
           participantGroup: 1,
           userLanguage: "en",
           didOptInToTrial: true,
+          mostRecentOnboardingStep: "finalStep",
         });
 
       await createNudgeNotifications();
@@ -389,6 +397,7 @@ describeWithEmulators("function: planNudges", (env) => {
           userLanguage: "en",
           preferredNotificationTime: "09:00",
           didOptInToTrial: true,
+          mostRecentOnboardingStep: "finalStep",
         });
 
       await createNudgeNotifications();
@@ -433,6 +442,7 @@ describeWithEmulators("function: planNudges", (env) => {
           userLanguage: "en",
           preferredNotificationTime: "09:00",
           didOptInToTrial: true,
+          mostRecentOnboardingStep: "finalStep",
         });
 
       await createNudgeNotifications();
@@ -504,6 +514,7 @@ describeWithEmulators("function: planNudges", (env) => {
             userLanguage: "en",
             preferredNotificationTime: "10:00",
             didOptInToTrial: true,
+            mostRecentOnboardingStep: "finalStep",
           });
       }
 
@@ -556,6 +567,7 @@ describeWithEmulators("function: planNudges", (env) => {
           userLanguage: "fr",
           preferredNotificationTime: "09:00",
           didOptInToTrial: true,
+          mostRecentOnboardingStep: "finalStep",
         });
 
       await createNudgeNotifications();

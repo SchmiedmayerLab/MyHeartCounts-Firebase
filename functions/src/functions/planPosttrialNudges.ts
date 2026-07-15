@@ -11,12 +11,9 @@ import { DateTime } from "luxon";
 import OpenAI from "openai";
 import { getOpenaiApiKey, openaiApiKeyParam } from "../env.js";
 import { privilegedServiceAccount } from "./helpers.js";
-import {
-  getPredefinedNudgeMessages,
-  type BaseNudgeMessage,
-} from "./nudgeMessages.js";
+import { type BaseNudgeMessage } from "./nudgeMessages.js";
 
-interface UserData {
+interface PosttrialUserData {
   genderIdentity?: string;
   mhcGenderIdentity?: number;
   dateOfBirth?: Date | string | admin.firestore.Timestamp;
@@ -27,13 +24,15 @@ interface UserData {
   preferredNotificationTime?: string;
   timeZone?: string;
   dateOfEnrollment?: Date | string | admin.firestore.Timestamp;
-  participantGroup?: number;
   didOptInToTrial?: boolean;
-  triggerNudgeGeneration?: boolean;
   userLanguage?: string;
   disabled?: boolean;
   hasWithdrawnFromStudy?: boolean;
   mostRecentOnboardingStep?: string;
+  extendedActivityNudgesOptIn?: boolean;
+  preferredWorkoutTypes?: string;
+  lastActiveDate?: Date | string | admin.firestore.Timestamp;
+  posttrialWelcomeNudgeScheduled?: boolean;
 }
 
 enum Disease {
@@ -75,9 +74,21 @@ const mhcGenderIdentityMap: Partial<Record<number, string>> = {
   5: "other",
 };
 
-const LLM_MODEL = "gpt-5.2-2025-12-11";
+const AVAILABLE_WORKOUT_TYPES = [
+  "other",
+  "HIIT",
+  "walk",
+  "swim",
+  "run",
+  "sport",
+  "strength",
+  "bicycle",
+  "yoga/pilates",
+] as const;
 
-// Version of the LLM prompt template built in generateLLMNudges. Bump this
+const LLM_MODEL = "gpt-5.4-mini-2026-03-17";
+
+// Version of the LLM prompt template built in generateLLMNudge. Bump this
 // whenever the prompt wording changes so generated nudges can be traced back
 // to the exact prompt version that produced them.
 const PROMPT_VERSION = "1.0.0";
@@ -88,7 +99,7 @@ interface LlmTokenUsage {
   totalTokens: number;
 }
 
-interface NudgeMessage extends BaseNudgeMessage {
+interface PosttrialNudgeMessage extends BaseNudgeMessage {
   generatedAt: admin.firestore.Timestamp;
   llmPrompt?: string;
   llmPromptVersion?: string;
@@ -96,10 +107,22 @@ interface NudgeMessage extends BaseNudgeMessage {
   llmModel?: string;
 }
 
-export class NudgeService {
+export class PosttrialNudgeService {
   // Properties
 
   private static readonly DEFAULT_NOTIFICATION_TIME = "09:00";
+  private static readonly TRIAL_COMPLETION_DAYS = 21;
+  private static readonly ACTIVE_WINDOW_DAYS = 14;
+  private static readonly CATEGORY = "nudge-posttrial";
+  private static readonly WELCOME_CATEGORY = "nudge-posttrial-welcome";
+  private static readonly WELCOME_TITLE = "Physical Activity Nudges Extended";
+  private static readonly WELCOME_BODY =
+    "Daily nudges for your preferred activities continue after trial! Manage anytime in Profile/Settings under long-term nudges toggle.";
+  private static readonly WELCOME_TITLE_ES =
+    "Empujoncitos de actividad física extendidos";
+  private static readonly WELCOME_BODY_ES =
+    "¡Los empujoncitos diarios para tus actividades preferidas continúan después del período de prueba! Puedes administrarlos en cualquier momento en Perfil/Configuración bajo el interruptor de empujoncitos a largo plazo.";
+  private static readonly WELCOME_LEAD_MS = 60 * 60 * 1000;
   private readonly firestore: admin.firestore.Firestore;
 
   // Constructor
@@ -170,16 +193,7 @@ export class NudgeService {
     return yearDiff;
   }
 
-  getPredefinedNudges(language: string): NudgeMessage[] {
-    const generatedAt = admin.firestore.Timestamp.now();
-    const baseNudges = getPredefinedNudgeMessages(language);
-    return baseNudges.map((nudge) => ({
-      ...nudge,
-      generatedAt,
-    }));
-  }
-
-  getDaysSinceEnrollment(
+  private getDaysSinceEnrollment(
     dateOfEnrollment: admin.firestore.Timestamp | Date | string,
   ): number {
     let enrollmentDate: Date;
@@ -201,11 +215,142 @@ export class NudgeService {
     return Math.floor(timeDiff / (1000 * 60 * 60 * 24));
   }
 
-  async generateLLMNudges(
+  private isWithinActiveWindow(
+    lastActiveDate: admin.firestore.Timestamp | Date | string | undefined,
+  ): boolean {
+    if (!lastActiveDate) return false;
+
+    let date: Date;
+    if (typeof lastActiveDate === "object" && "toDate" in lastActiveDate) {
+      date = lastActiveDate.toDate();
+    } else if (lastActiveDate instanceof Date) {
+      date = lastActiveDate;
+    } else {
+      date = new Date(lastActiveDate);
+    }
+
+    const cutoff =
+      Date.now() -
+      PosttrialNudgeService.ACTIVE_WINDOW_DAYS * 24 * 60 * 60 * 1000;
+    return date.getTime() >= cutoff;
+  }
+
+  private computeTargetUtc(timeZone: string, preferredTime: string): Date {
+    const [hourStr, minuteStr] = preferredTime.split(":");
+    const hour = Number(hourStr);
+    const minute = Number(minuteStr);
+
+    const nowLocal = DateTime.now().setZone(timeZone);
+    let target = nowLocal.set({
+      hour,
+      minute,
+      second: 0,
+      millisecond: 0,
+    });
+    if (target <= nowLocal) {
+      target = target.plus({ days: 1 });
+    }
+    return target.toUTC().toJSDate();
+  }
+
+  private async hasNudgeForLocalDay(
+    userId: string,
+    targetUtc: Date,
+    timeZone: string,
+  ): Promise<boolean> {
+    const targetLocalDay = DateTime.fromJSDate(targetUtc)
+      .setZone(timeZone)
+      .toISODate();
+    const snap = await this.firestore
+      .collection("users")
+      .doc(userId)
+      .collection("notificationBacklog")
+      .where("category", "==", PosttrialNudgeService.CATEGORY)
+      .get();
+    return snap.docs.some((doc) => {
+      const data = doc.data();
+      const ts = data.timestamp as admin.firestore.Timestamp | undefined;
+      if (!ts) return false;
+      return (
+        DateTime.fromJSDate(ts.toDate()).setZone(timeZone).toISODate() ===
+        targetLocalDay
+      );
+    });
+  }
+
+  async getRecentPosttrialNudgeBodies(
+    userId: string,
+    beforeUtc: Date,
+    limit = 3,
+  ): Promise<string[]> {
+    const userRef = this.firestore.collection("users").doc(userId);
+
+    // Posttrial nudges live in `notificationBacklog` until delivery, then
+    // sendNudges archives them to `notificationHistory` (with `timestamp`
+    // renamed to `originalTimestamp`) and deletes the backlog doc. Read
+    // both so the LLM sees already-delivered nudges, not just upcoming ones.
+    const [backlogSnap, historySnap] = await Promise.all([
+      userRef
+        .collection("notificationBacklog")
+        .where("category", "==", PosttrialNudgeService.CATEGORY)
+        .get(),
+      userRef
+        .collection("notificationHistory")
+        .where("category", "==", PosttrialNudgeService.CATEGORY)
+        .orderBy("originalTimestamp", "desc")
+        .limit(limit * 3)
+        .get(),
+    ]);
+
+    const beforeMs = beforeUtc.getTime();
+    const byId = new Map<string, { body: string; ms: number }>();
+
+    const consider = (
+      id: string,
+      body: string | undefined,
+      ts: admin.firestore.Timestamp | undefined,
+    ): void => {
+      if (!ts || !body) return;
+      const ms = ts.toDate().getTime();
+      if (ms >= beforeMs) return;
+      if (byId.has(id)) return;
+      byId.set(id, { body, ms });
+    };
+
+    // History wins on the rare overlap: sendNudges writes the archive doc
+    // before deleting the backlog doc, so a fired-but-not-yet-cleaned entry
+    // briefly exists in both. The history copy is authoritative.
+    for (const doc of historySnap.docs) {
+      const data = doc.data();
+      consider(
+        doc.id,
+        data.body as string | undefined,
+        data.originalTimestamp as admin.firestore.Timestamp | undefined,
+      );
+    }
+    for (const doc of backlogSnap.docs) {
+      const data = doc.data();
+      consider(
+        doc.id,
+        data.body as string | undefined,
+        data.timestamp as admin.firestore.Timestamp | undefined,
+      );
+    }
+
+    const entries = Array.from(byId.values());
+    entries.sort((a, b) => b.ms - a.ms);
+    return entries
+      .slice(0, limit)
+      .map((entry) => entry.body)
+      .reverse();
+  }
+
+  async generateLLMNudge(
     userId: string,
     language: string,
-    userData: UserData,
-  ): Promise<{ nudges: NudgeMessage[]; usedFallback: boolean }> {
+    userData: PosttrialUserData,
+    targetUtc: Date,
+  ): Promise<PosttrialNudgeMessage | null> {
     let resolvedGenderIdentity = userData.genderIdentity;
 
     if (resolvedGenderIdentity === undefined) {
@@ -213,31 +358,40 @@ export class NudgeService {
         resolvedGenderIdentity =
           mhcGenderIdentityMap[userData.mhcGenderIdentity];
         if (resolvedGenderIdentity === undefined) {
-          logger.warn(
-            `User ${userId} has unmapped mhcGenderIdentity value: ${userData.mhcGenderIdentity}. LLM nudge will be generated without gender context.`,
+          logger.error(
+            `User ${userId} has unmapped mhcGenderIdentity value: ${userData.mhcGenderIdentity}. Cannot generate post-trial LLM nudge.`,
           );
+          return null;
         }
       } else {
-        logger.warn(
-          `User ${userId} has no gender identity set. LLM nudge will be generated without gender context.`,
+        logger.error(
+          `User ${userId} has no gender identity. Cannot generate post-trial LLM nudge.`,
         );
+        return null;
       }
     }
 
     if (userData.comorbidities === undefined) {
       logger.error(
-        // Error out here for safty reasons, since comorbidities are critical for generating safe and effective nudges. If this data is missing, it's better to fail than to generate potentially harmful recommendations.
-        `User ${userId} has no comorbidities data. Cannot generate LLM nudges.`,
+        `User ${userId} has no comorbidities data. Cannot generate post-trial LLM nudge.`,
       );
-      throw new Error(
-        `User ${userId} is missing required field: comorbidities`,
+      return null;
+    }
+
+    const educationLevel = userData.educationUS ?? userData.educationUK;
+    if (!educationLevel) {
+      logger.warn(
+        `User ${userId} has neither educationUS nor educationUK set. Post-trial LLM nudge will be generated without education level context.`,
       );
     }
 
+    const recentNudgeBodies = await this.getRecentPosttrialNudgeBodies(
+      userId,
+      targetUtc,
+    );
+
     const maxRetries = 3;
     let lastError: Error | null = null;
-
-    // Get personalization data
 
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
@@ -248,24 +402,6 @@ export class NudgeService {
         const dateOfBirth = userData.dateOfBirth;
         const comorbidities = userData.comorbidities;
         const stageOfChange = this.mapStageOfChangeKey(userData.stageOfChange);
-        const educationLevel = userData.educationUS ?? userData.educationUK;
-
-        // Log missing optional personalization fields
-        if (!dateOfBirth) {
-          logger.warn(
-            `User ${userId} has no dateOfBirth set. LLM nudge will be generated without age context.`,
-          );
-        }
-        if (!userData.stageOfChange) {
-          logger.warn(
-            `User ${userId} has no stageOfChange set. LLM nudge will be generated without stage of change context.`,
-          );
-        }
-        if (!educationLevel) {
-          logger.warn(
-            `User ${userId} has neither educationUS nor educationUK set. LLM nudge will be generated without education level context.`,
-          );
-        }
 
         // Calculate age from dateOfBirth
         let ageContext = "";
@@ -311,7 +447,6 @@ export class NudgeService {
         }
 
         // Build disease context from comorbidities
-        // Background: The use of disease-specific messaging comes from clinical research and exercise science, which show that people with different medical conditions have very different physiological limitations, risks, and opportunities for improvement. For example, exercise has strong therapeutic benefits across heart failure, pulmonary hypertension, diabetes, and congenital heart disease, but the type, intensity, and framing of recommendations need to be tailored to the condition. By grounding guidance in both evidence and lived experience, messaging can promote safety while motivating individuals to engage in sustainable activity. Each condition reflects unique communication needs. For some diseases, like diabetes or mild congenital heart disease, messaging can be more motivational, goal-oriented, and performance-driven because the physiological reserve allows for more vigorous activity. For others, like pulmonary hypertension, heart failure, or complex congenital heart disease, recommendations need to emphasize pacing, safety, and quality of life over intensity or competition. This approach ensures that guidance is both empowering and realistic, helping participants engage in exercise that supports their health while respecting their limitations.
         let diseaseContext = "";
         const diseaseContexts: string[] = [];
 
@@ -357,13 +492,11 @@ export class NudgeService {
           }
         }
 
-        // Combine all disease contexts
         if (diseaseContexts.length > 0) {
           diseaseContext = diseaseContexts.join(" Additionally, ");
         }
 
         // Build stage of change context
-        // Background: The Stages of Change model (Transtheoretical Model) was developed by psychologists James Prochaska and Carlo DiClemente in the late 1970s while studying how people quit smoking. Their research showed that behavior change isn’t a single event but a process people move through in stages, often cycling forward and backward before a new behavior becomes lasting. Since then, the model has been widely applied to health behaviors like exercise, diet, and medication adherence. Each stage reflects different needs: building awareness in precontemplation, resolving ambivalence in contemplation, planning in preparation, reinforcing routines in action, and preventing relapse in maintenance. This model emphasizes that change is not all-or-nothing but a cycle, and matching support to a person’s stage makes long-term success more likely.
         let stageContext = "";
         if (stageOfChange) {
           switch (stageOfChange) {
@@ -391,7 +524,6 @@ export class NudgeService {
         }
 
         // Build education level context
-        // Background: The idea of tailoring content to education level comes from research in health communication and literacy, which shows that people understand and act on information more effectively when it’s written at a level that matches their background. Someone with a high school education or less may benefit from clear, simple language and shorter sentences, while someone with college-level education is typically more comfortable with complex ideas and vocabulary. Matching the reading level helps reduce barriers to understanding and ensures that messages are accessible rather than overwhelming or condescending. Each level reflects different communication needs: for those with less formal education, the focus is on clarity and plain language, while for those with higher education, the focus can shift to nuance and more detailed explanation. This approach recognizes that effective communication isn’t “one-size-fits-all” but should adapt to the audience to maximize understanding and impact.
         let educationContext = "";
         if (educationLevel) {
           switch (educationLevel as EducationLevel) {
@@ -428,15 +560,64 @@ export class NudgeService {
         const notificationTime =
           rawNotifTime !== undefined && rawNotifTime !== "" ?
             rawNotifTime
-          : NudgeService.DEFAULT_NOTIFICATION_TIME;
+          : PosttrialNudgeService.DEFAULT_NOTIFICATION_TIME;
         if (notificationTime !== rawNotifTime) {
           logger.warn(
-            `User ${userId} has no preferred notification time for LLM prompt. Assuming ${NudgeService.DEFAULT_NOTIFICATION_TIME} as default.`,
+            `User ${userId} has no preferred notification time for post-trial LLM prompt. Assuming ${PosttrialNudgeService.DEFAULT_NOTIFICATION_TIME} as default.`,
           );
         }
         const notificationTimeContext = `This user prefers to receive recommendations at ${notificationTime} (given in the 24-hour format). Tailor the prompt to match the typical context of that time of day and suggest realistic opportunities for activity they could do the same day they receive the prompt, even if it is late evening. For instance, if the time is in the morning, encourage early activity or planning for later (e.g., lunch or after work). Avoid irrelevant examples that do not fit the selected time of day.`;
 
-        const prompt = `Write 7 motivational messages that are of proper length to go in a push notification using a calm, encouraging, and professional tone, like that of a health coach to motivate a smartphone user to increase their daily physical activity, prioritizing movement that contributes to their step count. Also create a title for each of the push notifications that is a short summary/call to action of the push notification that is paired with it. Return the response as a JSON array with exactly 7 objects, each having "title" and "body" fields. If there is a disease context given, you can reference that disease in some of the nudges. When generating nudges, avoid the word 'healthy' and remove unnecessary qualifiers such as 'brisk' or 'deep'. Suggest only simple, low-risk forms of movement without adding extra exercises or medical disclaimers not provided. Keep messages concise, calm, and practical; focus on one clear activity with plain language. Keep recommendations practical, varied, and easy to integrate into daily routines. NEVER USE EM DASHES, EMOJIS OR ABBREVIATIONS FOR DISEASES IN THE NUDGE. Each nudge should be personalized to the following information: ${languageContext} ${genderContext} ${ageContext} ${diseaseContext} ${stageContext} ${educationContext} ${notificationTimeContext} Think carefully before delivering the prompts to ensure they are personalized to the information given (especially any given disease context) and give recommendations based on research backed motivational methods.`;
+        // Build preferred workout types context (ported from historical
+        // planNudges implementation; see git commits b816a86d / 3e426d75 /
+        // 7d5c767f). This is post-trial-only personalization.
+        let activityTypeContext = "";
+        if (userData.preferredWorkoutTypes) {
+          const selectedTypes = userData.preferredWorkoutTypes
+            .split(",")
+            .map((t) => t.trim())
+            .filter((t) => t.length > 0);
+          const hasOther = selectedTypes.includes("other");
+          const selectedActivities = selectedTypes.filter((t) => t !== "other");
+          const formattedSelectedTypes =
+            selectedActivities.length > 0 ?
+              selectedActivities.join(", ")
+            : "various activities";
+
+          activityTypeContext = `${formattedSelectedTypes} are the user's preferred activity types. Recommendations should be centered around these activity types. Recommendations should be creative, encouraging, and aligned with their preferred activity type.`;
+
+          if (hasOther) {
+            const notChosenTypes = AVAILABLE_WORKOUT_TYPES.filter(
+              (t) => t !== "other" && !selectedTypes.includes(t),
+            );
+            if (selectedActivities.length === 0) {
+              activityTypeContext = `The user indicated that their preferred activity types differ from the available options (${AVAILABLE_WORKOUT_TYPES.filter((t) => t !== "other").join(", ")}). Provide creative recommendations and suggest other ways to stay physically active without relying on the listed options.`;
+            } else if (notChosenTypes.length > 0) {
+              activityTypeContext += ` The user indicated that they also prefer activity types beyond the remaining options (${notChosenTypes.join(", ")}). Provide creative recommendations and suggest other ways to stay physically active.`;
+            } else {
+              activityTypeContext += ` The user indicated additional preferred activity types beyond the listed options. Provide creative recommendations and suggest other ways to stay physically active.`;
+            }
+          }
+        }
+
+        // Build previous-nudges context: feed the LLM up to 3 of the user's
+        // most recent posttrial nudge bodies so it can vary tone and avoid
+        // repetition. Empty when no prior nudges exist (e.g. first day).
+        let previousNudgesContext = "";
+        let varietyClause = "";
+        if (recentNudgeBodies.length > 0) {
+          const formattedNudges = recentNudgeBodies
+            .map((body) => `- ${JSON.stringify(body)}`)
+            .join("\n");
+          previousNudgesContext =
+            `The nudge for today should be unique in tone and motivational style from the past ${recentNudgeBodies.length} days and should not sound repetitive. ` +
+            `These are the nudges that were given to this user over the past ${recentNudgeBodies.length} days:\n${formattedNudges}`;
+          varietyClause =
+            " and make sure that it is different in overall style from the previously delivered nudges";
+        }
+
+        // Prompt: Just one nudge, include personalization context.
+        const prompt = `Write 1 motivational message that is a proper length to go in a push notification using a calm, encouraging, and professional tone, like that of a health coach to motivate a smartphone user to increase their daily physical activity. Also create a title for the push notification that is a short summary/call to action of the push notification. Return the response as a JSON object with 'title' and 'body' fields. If there is a disease context given, you can reference that disease in the nudge. When generating the nudge, avoid the word 'healthy' and remove unnecessary qualifiers such as 'brisk' or 'deep'. Suggest only simple, low-risk forms of movement without adding extra exercises or medical disclaimers not provided. Keep the message concise, calm, and practical; focus on one clear activity with plain language. Keep the recommendation practical and easy to integrate into daily routines. NEVER USE EM DASHES, EMOJIS OR ABBREVIATIONS FOR DISEASES IN THE NUDGE. The nudge should be personalized to the following information: ${languageContext} ${genderContext} ${ageContext} ${diseaseContext} ${stageContext} ${educationContext} ${notificationTimeContext} ${activityTypeContext} ${previousNudgesContext} Think carefully before delivering the prompt to ensure it is personalized to the information given (especially any given disease context) and give recommendations based on research backed motivational methods${varietyClause}.`;
 
         const openai = new OpenAI({
           apiKey: getOpenaiApiKey(),
@@ -453,35 +634,22 @@ export class NudgeService {
           response_format: {
             type: "json_schema",
             json_schema: {
-              name: "nudge_messages",
+              name: "nudge_message",
               schema: {
                 type: "object",
                 properties: {
-                  nudges: {
-                    type: "array",
-                    items: {
-                      type: "object",
-                      properties: {
-                        title: {
-                          type: "string",
-                          description:
-                            "Short summary/call to action for the push notification",
-                        },
-                        body: {
-                          type: "string",
-                          description:
-                            "Motivational message content for the push notification",
-                        },
-                      },
-                      required: ["title", "body"],
-                      additionalProperties: false,
-                    },
-                    minItems: 7,
-                    maxItems: 7,
-                    description: "Exactly 7 nudge messages",
+                  title: {
+                    type: "string",
+                    description:
+                      "Short summary/call to action for the push notification",
+                  },
+                  body: {
+                    type: "string",
+                    description:
+                      "Motivational message content for the push notification",
                   },
                 },
-                required: ["nudges"],
+                required: ["title", "body"],
                 additionalProperties: false,
               },
             },
@@ -490,10 +658,12 @@ export class NudgeService {
 
         const parsedContent = JSON.parse(
           response.choices[0].message.content ?? "{}",
-        ) as { nudges?: unknown };
-        const parsedNudges = parsedContent.nudges;
+        ) as { title?: string; body?: string };
 
-        if (!Array.isArray(parsedNudges) || parsedNudges.length !== 7) {
+        if (
+          typeof parsedContent.title !== "string" ||
+          typeof parsedContent.body !== "string"
+        ) {
           throw new Error("Invalid response format from OpenAI API");
         }
 
@@ -508,31 +678,25 @@ export class NudgeService {
           : undefined;
 
         const generatedAt = admin.firestore.Timestamp.now();
-        const nudges: NudgeMessage[] = parsedNudges.map(
-          (nudge: unknown, index: number) => {
-            const n = nudge as { title: string; body: string };
-            const isFirst = index === 0;
-            return {
-              title: n.title,
-              body: n.body,
-              isLLMGenerated: true,
-              generatedAt,
-              llmModel: LLM_MODEL,
-              llmPromptVersion: PROMPT_VERSION,
-              ...(isFirst && { llmPrompt: prompt }),
-              ...(isFirst && tokenUsage && { llmTokenUsage: tokenUsage }),
-            };
-          },
-        );
+        const nudge: PosttrialNudgeMessage = {
+          title: parsedContent.title,
+          body: parsedContent.body,
+          isLLMGenerated: true,
+          generatedAt,
+          llmPrompt: prompt,
+          llmPromptVersion: PROMPT_VERSION,
+          llmModel: LLM_MODEL,
+          ...(tokenUsage && { llmTokenUsage: tokenUsage }),
+        };
 
         logger.info(
-          `Generated ${nudges.length} LLM nudges for user ${userId} in ${language} (attempt ${attempt})`,
+          `Generated post-trial LLM nudge for user ${userId} in ${language} (attempt ${attempt})`,
         );
-        return { nudges, usedFallback: false };
+        return nudge;
       } catch (error) {
         lastError = error instanceof Error ? error : new Error(String(error));
         logger.warn(
-          `Attempt ${attempt}/${maxRetries} failed for LLM nudge generation for user ${userId}: ${String(error)}`,
+          `Attempt ${attempt}/${maxRetries} failed for post-trial LLM nudge generation for user ${userId}: ${String(error)}`,
         );
 
         if (attempt < maxRetries) {
@@ -542,270 +706,269 @@ export class NudgeService {
     }
 
     logger.error(
-      `All ${maxRetries} attempts failed for LLM nudge generation for user ${userId}. Final error: ${String(lastError)}`,
+      `All ${maxRetries} attempts failed for post-trial LLM nudge generation for user ${userId}. Final error: ${String(lastError)}`,
     );
-    return { nudges: this.getPredefinedNudges(language), usedFallback: true };
+    return null;
   }
 
-  async createNudgesForUser(
+  async createPosttrialNudgeForUser(
     userId: string,
-    userData: UserData,
-    nudges: NudgeMessage[],
-    category: string,
-  ): Promise<number> {
-    const rawPrefTime = userData.preferredNotificationTime?.trim();
-    const preferredTime =
-      rawPrefTime !== undefined && rawPrefTime !== "" ?
-        rawPrefTime
-      : NudgeService.DEFAULT_NOTIFICATION_TIME;
-    if (preferredTime !== rawPrefTime) {
-      logger.warn(
-        `User ${userId} has no preferred notification time in createNudgesForUser. Assuming ${NudgeService.DEFAULT_NOTIFICATION_TIME} as default.`,
-      );
-    }
-
-    if (!userData.timeZone) {
-      throw new Error(`User ${userId} is missing required field: timeZone`);
-    }
-
-    let nudgesCreated = 0;
-
-    for (let dayIndex = 0; dayIndex < 7; dayIndex++) {
-      const nudgeMessage = nudges[dayIndex];
-      const nudgeId = randomUUID().toUpperCase();
-      const [hourStr, minuteStr] = preferredTime.split(":");
-      const hour = Number(hourStr);
-      const minute = Number(minuteStr);
-
-      const userDateTime = DateTime.now()
-        .setZone(userData.timeZone)
-        .plus({ days: dayIndex })
-        .set({ hour, minute, second: 0, millisecond: 0 });
-
-      const utcTime = userDateTime.toUTC().toJSDate();
-
-      await this.firestore
-        .collection("users")
-        .doc(userId)
-        .collection("notificationBacklog")
-        .doc(nudgeId)
-        .set({
-          id: nudgeId,
-          title: nudgeMessage.title,
-          body: nudgeMessage.body,
-          timestamp: admin.firestore.Timestamp.fromDate(utcTime),
-          category,
-          isLLMGenerated: nudgeMessage.isLLMGenerated,
-          generatedAt: nudgeMessage.generatedAt,
-          ...(nudgeMessage.llmPrompt && { llmPrompt: nudgeMessage.llmPrompt }),
-          ...(nudgeMessage.llmPromptVersion !== undefined && {
-            llmPromptVersion: nudgeMessage.llmPromptVersion,
-          }),
-          ...(nudgeMessage.llmTokenUsage && {
-            llmTokenUsage: nudgeMessage.llmTokenUsage,
-          }),
-          ...(nudgeMessage.llmModel && { llmModel: nudgeMessage.llmModel }),
-        });
-
-      nudgesCreated++;
-    }
-
-    return nudgesCreated;
+    nudge: PosttrialNudgeMessage,
+    targetUtc: Date,
+  ): Promise<void> {
+    const nudgeId = randomUUID().toUpperCase();
+    await this.firestore
+      .collection("users")
+      .doc(userId)
+      .collection("notificationBacklog")
+      .doc(nudgeId)
+      .set({
+        id: nudgeId,
+        title: nudge.title,
+        body: nudge.body,
+        timestamp: admin.firestore.Timestamp.fromDate(targetUtc),
+        category: PosttrialNudgeService.CATEGORY,
+        isLLMGenerated: nudge.isLLMGenerated,
+        generatedAt: nudge.generatedAt,
+        ...(nudge.llmPrompt && { llmPrompt: nudge.llmPrompt }),
+        ...(nudge.llmPromptVersion !== undefined && {
+          llmPromptVersion: nudge.llmPromptVersion,
+        }),
+        ...(nudge.llmTokenUsage && { llmTokenUsage: nudge.llmTokenUsage }),
+        ...(nudge.llmModel && { llmModel: nudge.llmModel }),
+      });
   }
 
-  getUserLanguage(userData: UserData): string {
+  async scheduleWelcomeIfNeeded(
+    userId: string,
+    userData: PosttrialUserData,
+    firstNudgeTargetUtc: Date,
+    language: string,
+  ): Promise<boolean> {
+    if (userData.posttrialWelcomeNudgeScheduled === true) {
+      return false;
+    }
+    if (userData.didOptInToTrial !== true) {
+      logger.info(
+        `Skipping post-trial welcome nudge for user ${userId}: did not opt into trial`,
+      );
+      return false;
+    }
+
+    const isSpanish = language === "es";
+    const welcomeTitle =
+      isSpanish ?
+        PosttrialNudgeService.WELCOME_TITLE_ES
+      : PosttrialNudgeService.WELCOME_TITLE;
+    const welcomeBody =
+      isSpanish ?
+        PosttrialNudgeService.WELCOME_BODY_ES
+      : PosttrialNudgeService.WELCOME_BODY;
+
+    const welcomeTime = new Date(
+      firstNudgeTargetUtc.getTime() - PosttrialNudgeService.WELCOME_LEAD_MS,
+    );
+    const welcomeId = randomUUID().toUpperCase();
+    const userRef = this.firestore.collection("users").doc(userId);
+    const welcomeRef = userRef.collection("notificationBacklog").doc(welcomeId);
+
+    const batch = this.firestore.batch();
+    batch.set(welcomeRef, {
+      id: welcomeId,
+      title: welcomeTitle,
+      body: welcomeBody,
+      timestamp: admin.firestore.Timestamp.fromDate(welcomeTime),
+      category: PosttrialNudgeService.WELCOME_CATEGORY,
+      isLLMGenerated: false,
+      generatedAt: admin.firestore.Timestamp.now(),
+    });
+    batch.update(userRef, { posttrialWelcomeNudgeScheduled: true });
+    await batch.commit();
+
+    logger.info(
+      `Scheduled post-trial welcome nudge for user ${userId} at ${welcomeTime.toISOString()} (1 h before first post-trial nudge at ${firstNudgeTargetUtc.toISOString()})`,
+    );
+    return true;
+  }
+
+  private getUserLanguage(userData: PosttrialUserData): string {
     return userData.userLanguage === "es" ? "es" : "en";
   }
 
-  async createNudgeNotifications(): Promise<void> {
-    const regularUsersSnapshot = await this.firestore.collection("users").get();
-
-    const manualTriggerSnapshot = await this.firestore
+  async createPosttrialNudgeNotifications(): Promise<void> {
+    const usersSnapshot = await this.firestore
       .collection("users")
-      .where("triggerNudgeGeneration", "==", true)
+      .where("extendedActivityNudgesOptIn", "==", true)
       .get();
-
-    const allUserDocs = new Map<
-      string,
-      admin.firestore.QueryDocumentSnapshot
-    >();
-
-    regularUsersSnapshot.docs.forEach((doc) => {
-      allUserDocs.set(doc.id, doc);
-    });
-
-    manualTriggerSnapshot.docs.forEach((doc) => {
-      allUserDocs.set(doc.id, doc);
-    });
-
-    const usersSnapshot = { docs: Array.from(allUserDocs.values()) };
 
     let usersProcessed = 0;
     let nudgesCreated = 0;
+    let welcomesScheduled = 0;
+    let usersSkippedDedup = 0;
+    let usersSkippedFailure = 0;
 
     for (const userDoc of usersSnapshot.docs) {
       try {
-        const userData = userDoc.data() as UserData;
+        const userData = userDoc.data() as PosttrialUserData;
         const userId = userDoc.id;
         usersProcessed++;
 
         if (userData.mostRecentOnboardingStep !== "finalStep") {
-          logger.warn(
-            `Skipping user ${userId}: onboarding not completed (mostRecentOnboardingStep: ${userData.mostRecentOnboardingStep ?? "undefined"}).`,
+          logger.info(
+            `Skipping post-trial nudge for user ${userId}: onboarding not completed (mostRecentOnboardingStep: ${userData.mostRecentOnboardingStep ?? "undefined"}).`,
           );
           continue;
         }
 
-        if (!userData.participantGroup) {
-          logger.error(
-            `User ${userId} has no participant group assigned. Cannot create nudges.`,
-          );
-          throw new Error(
-            `User ${userId} is missing required field: participantGroup`,
-          );
-        }
-
-        if (!userData.timeZone || !userData.dateOfEnrollment) {
-          continue;
-        }
-
-        // Skip disabled users
         if (userData.disabled === true) {
           logger.info(
-            `Skipping nudge planning for user ${userId} - account disabled`,
+            `Skipping post-trial nudge for user ${userId} - account disabled`,
           );
           continue;
         }
 
-        // Skip users who have withdrawn from the study
         if (userData.hasWithdrawnFromStudy === true) {
           continue;
         }
 
-        const rawNotificationTime = userData.preferredNotificationTime?.trim();
-        if (!rawNotificationTime) {
-          logger.warn(
-            `User ${userId} has no preferred notification time. Assuming ${NudgeService.DEFAULT_NOTIFICATION_TIME} as default.`,
+        if (userData.didOptInToTrial !== true) {
+          logger.info(
+            `Skipping post-trial nudge for user ${userId}: did not opt into trial`,
           );
-          userData.preferredNotificationTime =
-            NudgeService.DEFAULT_NOTIFICATION_TIME;
-        } else {
-          userData.preferredNotificationTime = rawNotificationTime;
+          continue;
         }
 
-        if (!userData.didOptInToTrial) {
+        if (!userData.timeZone || !userData.dateOfEnrollment) {
+          logger.info(
+            `Skipping post-trial nudge for user ${userId}: missing timeZone or dateOfEnrollment`,
+          );
           continue;
         }
 
         const daysSinceEnrollment = this.getDaysSinceEnrollment(
           userData.dateOfEnrollment,
         );
-        const participantGroup = userData.participantGroup;
+        if (daysSinceEnrollment < PosttrialNudgeService.TRIAL_COMPLETION_DAYS) {
+          logger.info(
+            `Skipping post-trial nudge for user ${userId}: trial nudges not yet complete (${daysSinceEnrollment} days since enrollment, need ${PosttrialNudgeService.TRIAL_COMPLETION_DAYS})`,
+          );
+          continue;
+        }
+
+        if (!this.isWithinActiveWindow(userData.lastActiveDate)) {
+          logger.info(
+            `Skipping post-trial nudge for user ${userId}: not active within the last ${PosttrialNudgeService.ACTIVE_WINDOW_DAYS} days`,
+          );
+          continue;
+        }
+
+        const rawNotificationTime = userData.preferredNotificationTime?.trim();
+        const preferredTime =
+          rawNotificationTime !== undefined && rawNotificationTime !== "" ?
+            rawNotificationTime
+          : PosttrialNudgeService.DEFAULT_NOTIFICATION_TIME;
+        if (preferredTime !== rawNotificationTime) {
+          logger.warn(
+            `User ${userId} has no preferred notification time for post-trial nudge. Assuming ${PosttrialNudgeService.DEFAULT_NOTIFICATION_TIME} as default.`,
+          );
+          userData.preferredNotificationTime = preferredTime;
+        }
+
+        const targetUtc = this.computeTargetUtc(
+          userData.timeZone,
+          preferredTime,
+        );
+
+        const duplicate = await this.hasNudgeForLocalDay(
+          userId,
+          targetUtc,
+          userData.timeZone,
+        );
+        if (duplicate) {
+          logger.info(
+            `Skipping post-trial nudge for user ${userId}: already queued for ${targetUtc.toISOString()}`,
+          );
+          usersSkippedDedup++;
+          continue;
+        }
+
         const userLanguage = this.getUserLanguage(userData);
-        const manualTrigger = userData.triggerNudgeGeneration === true;
+        const nudge = await this.generateLLMNudge(
+          userId,
+          userLanguage,
+          userData,
+          targetUtc,
+        );
 
-        let shouldCreatePredefinedNudges = false;
-        let shouldCreateLLMNudges = false;
-        let isManualTrigger = false;
-
-        if (manualTrigger) {
-          shouldCreateLLMNudges = true;
-          isManualTrigger = true;
-        } else if (participantGroup === 1 && daysSinceEnrollment === 7) {
-          shouldCreatePredefinedNudges = true;
-        } else if (participantGroup === 1 && daysSinceEnrollment === 14) {
-          shouldCreateLLMNudges = true;
-        } else if (participantGroup === 2 && daysSinceEnrollment === 7) {
-          shouldCreateLLMNudges = true;
-        } else if (participantGroup === 2 && daysSinceEnrollment === 14) {
-          shouldCreatePredefinedNudges = true;
+        if (!nudge) {
+          logger.warn(
+            `Skipping post-trial nudge for user ${userId}: LLM nudge generation returned no nudge.`,
+          );
+          usersSkippedFailure++;
+          continue;
         }
 
-        if (shouldCreatePredefinedNudges) {
-          const triggerReason =
-            isManualTrigger ? "manual trigger" : (
-              `group ${participantGroup}, ${daysSinceEnrollment} days since enrollment`
-            );
-          logger.info(
-            `Creating pre-defined nudges for user ${userId} (${triggerReason}), language: ${userLanguage}`,
-          );
-          const predefinedNudges = this.getPredefinedNudges(userLanguage);
-          const created = await this.createNudgesForUser(
+        await this.createPosttrialNudgeForUser(userId, nudge, targetUtc);
+        nudgesCreated++;
+        logger.info(
+          `Created post-trial nudge for user ${userId} at ${targetUtc.toISOString()} (${userLanguage})`,
+        );
+
+        try {
+          const welcomed = await this.scheduleWelcomeIfNeeded(
             userId,
             userData,
-            predefinedNudges,
-            "nudge-predefined",
+            targetUtc,
+            userLanguage,
           );
-          nudgesCreated += created;
-        }
-
-        if (shouldCreateLLMNudges) {
-          const triggerReason =
-            isManualTrigger ? "manual trigger" : (
-              `group ${participantGroup}, ${daysSinceEnrollment} days since enrollment`
-            );
-          logger.info(
-            `Creating LLM-generated nudges for user ${userId} (${triggerReason}), language: ${userLanguage}`,
+          if (welcomed) welcomesScheduled++;
+        } catch (welcomeError) {
+          // Non-fatal: the post-trial nudge itself was already queued, and
+          // the unset flag means the next daily run will retry the welcome.
+          logger.error(
+            `Failed to schedule post-trial welcome nudge for user ${userId}: ${String(welcomeError)}`,
           );
-          const { nudges: llmNudges, usedFallback } =
-            await this.generateLLMNudges(userId, userLanguage, userData);
-          const category = usedFallback ? "nudge-predefined" : "nudge-llm";
-          const created = await this.createNudgesForUser(
-            userId,
-            userData,
-            llmNudges,
-            category,
-          );
-          nudgesCreated += created;
-        }
-
-        if (
-          isManualTrigger &&
-          (shouldCreatePredefinedNudges || shouldCreateLLMNudges)
-        ) {
-          await this.firestore.collection("users").doc(userId).update({
-            triggerNudgeGeneration: false,
-          });
-          logger.info(`Reset manual trigger flag for user ${userId}`);
         }
       } catch (error) {
         logger.error(
-          `Error creating nudges for user ${userDoc.id}: ${String(error)}`,
+          `Error creating post-trial nudge for user ${userDoc.id}: ${String(error)}`,
         );
       }
     }
 
     logger.info(
-      `Nudge creation complete: ${nudgesCreated} nudges created for ${usersProcessed} users processed`,
+      `Post-trial nudge creation complete: ${nudgesCreated} nudges created, ${welcomesScheduled} welcome nudges scheduled, ${usersProcessed} users processed, ${usersSkippedDedup} skipped (dedup), ${usersSkippedFailure} skipped (LLM failure)`,
     );
   }
 }
 
-let nudgeService: NudgeService | undefined;
+let posttrialNudgeService: PosttrialNudgeService | undefined;
 
-const getNudgeService = (): NudgeService => {
-  nudgeService ??= new NudgeService();
-  return nudgeService;
+const getPosttrialNudgeService = (): PosttrialNudgeService => {
+  posttrialNudgeService ??= new PosttrialNudgeService();
+  return posttrialNudgeService;
 };
 
-export const createNudgeNotifications = () =>
-  getNudgeService().createNudgeNotifications();
+export const createPosttrialNudgeNotifications = () =>
+  getPosttrialNudgeService().createPosttrialNudgeNotifications();
 
-export const onScheduleDailyNudgeCreation = onSchedule(
+export const onScheduleDailyPosttrialNudgeCreation = onSchedule(
   {
-    schedule: "0 8 * * *",
+    schedule: "30 8 * * *",
     timeZone: "UTC",
     secrets: [openaiApiKeyParam],
     serviceAccount: privilegedServiceAccount,
   },
   async () => {
-    logger.info("Starting daily nudge notification creation");
+    logger.info("Starting daily post-trial nudge notification creation");
 
     try {
-      await getNudgeService().createNudgeNotifications();
-      logger.info("Daily nudge notification creation complete");
+      await getPosttrialNudgeService().createPosttrialNudgeNotifications();
+      logger.info("Daily post-trial nudge notification creation complete");
     } catch (error) {
-      logger.error(`Error in daily nudge creation: ${String(error)}`);
+      logger.error(
+        `Error in daily post-trial nudge creation: ${String(error)}`,
+      );
     }
   },
 );

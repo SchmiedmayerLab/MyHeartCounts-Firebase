@@ -8,11 +8,13 @@ import { expect } from "chai";
 import admin from "firebase-admin";
 import { type DocumentSnapshot, Timestamp } from "firebase-admin/firestore";
 import { type Change } from "firebase-functions";
+import { type CloudEvent, type CloudFunction } from "firebase-functions/v2";
 import {
   type CallableFunction,
   type CallableRequest,
 } from "firebase-functions/v2/https";
 import firebaseFunctionsTest from "firebase-functions-test";
+import { type WrappedV2Function } from "firebase-functions-test/lib/v2";
 import { Lazy, User } from "../../models/index.js";
 import { CollectionsService } from "../../services/database/collections.js";
 import { getServiceFactory } from "../../services/factory/getServiceFactory.js";
@@ -101,6 +103,12 @@ export class EmulatorTestEnvironment {
     } as unknown as CallableRequest<Input>);
   }
 
+  wrapTrigger<T extends CloudEvent<unknown>>(
+    func: CloudFunction<T>,
+  ): WrappedV2Function<T> {
+    return this.wrapper.wrap(func);
+  }
+
   async cleanup() {
     const collections = await admin.firestore().listCollections();
     for (const collection of collections) {
@@ -141,6 +149,7 @@ export class EmulatorTestEnvironment {
       disabled?: boolean;
       dateOfEnrollment?: Date;
       lastActiveDate?: Date;
+      lastUploadDate?: Date;
     } & admin.auth.CreateRequest,
   ) {
     const authUser = await this.auth.createUser(options);
@@ -149,6 +158,8 @@ export class EmulatorTestEnvironment {
         disabled: options.disabled ?? false,
         dateOfEnrollment: options.dateOfEnrollment ?? new Date(),
         lastActiveDate: options.lastActiveDate ?? new Date(),
+        extendedActivityNudgesOptIn: true,
+        lastUploadDate: options.lastUploadDate ?? new Date(),
       }),
     );
     return authUser.uid;

@@ -69,6 +69,7 @@ describe("DatabaseUserService", () => {
       const userData = userSnapshot.data();
       expect(userData).to.exist;
       expect(userData?.dateOfEnrollment).to.exist;
+      expect(userData?.extendedActivityNudgesOptIn).to.equal(true);
       expect(userData?.claims).to.deep.equal({
         disabled: false,
       });
@@ -101,18 +102,18 @@ describe("DatabaseUserService", () => {
       });
     });
 
-    it("updates last active date", async () => {
-      // Test update last active date
+    it("updates last upload date", async () => {
+      // Test update last upload date
       const beforeUpdate = await userService.getUser(testUserId);
-      const initialDate = beforeUpdate?.content.lastActiveDate;
+      const initialDate = beforeUpdate?.content.lastUploadDate;
 
       // Wait a bit to ensure time difference
       await new Promise((resolve) => setTimeout(resolve, 10));
 
-      await userService.updateLastActiveDate(testUserId);
+      await userService.updateLastUploadDate(testUserId);
 
       const afterUpdate = await userService.getUser(testUserId);
-      const updatedDate = afterUpdate?.content.lastActiveDate;
+      const updatedDate = afterUpdate?.content.lastUploadDate;
 
       expect(updatedDate).to.not.equal(initialDate);
       // Use type assertion instead of non-null assertion

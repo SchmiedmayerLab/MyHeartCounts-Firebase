@@ -25,9 +25,6 @@ export class HealthSampleDeletionService {
   // errors that occur when hundreds of concurrent ops saturate the connection pool.
   private readonly CONCURRENCY_LIMIT = 25;
 
-  // Log a progress line every N documents so long jobs stay observable.
-  private readonly PROGRESS_LOG_INTERVAL = 1000;
-
   // gRPC / Firebase error codes that are safe to retry automatically.
   // Numeric codes come from raw gRPC transport; string codes from FirestoreError.
   // 4 / "deadline-exceeded"  – DEADLINE_EXCEEDED
@@ -44,7 +41,7 @@ export class HealthSampleDeletionService {
   private readonly NOT_FOUND_NUMERIC = 5;
   private readonly NOT_FOUND_STRING = "not-found";
 
-  private readonly MAX_RETRIES = 3;
+  private readonly MAX_RETRIES = 1;
   private readonly RETRY_BASE_DELAY_MS = 250;
 
   constructor(
@@ -64,46 +61,22 @@ export class HealthSampleDeletionService {
     collection: string,
     documentIds: string[],
   ): Promise<HealthSampleDeletionResult> {
-    logger.info(
-      `Starting async entered-in-error marking job '${jobId}': processing ${documentIds.length} samples in collection '${collection}' with concurrency limit ${this.CONCURRENCY_LIMIT}`,
-      {
-        jobId,
-        requestingUserId,
-        targetUserId,
-        collection,
-        totalSamples: documentIds.length,
-        concurrencyLimit: this.CONCURRENCY_LIMIT,
-      },
-    );
-
     let totalMarked = 0;
     let totalSkipped = 0;
     let totalFailed = 0;
     let totalQueued = 0;
-    let processed = 0;
 
     const results = await this.runWithConcurrencyLimit(
       documentIds,
       this.CONCURRENCY_LIMIT,
-      async (documentId) => {
-        const result = await this.markSampleAsEnteredInError(
+      async (documentId) =>
+        this.markSampleAsEnteredInError(
           targetUserId,
           collection,
           documentId,
           jobId,
           requestingUserId,
-        );
-
-        processed++;
-        if (processed % this.PROGRESS_LOG_INTERVAL === 0) {
-          logger.info(
-            `Job '${jobId}' progress: ${processed}/${documentIds.length} processed`,
-            { jobId, processed, total: documentIds.length },
-          );
-        }
-
-        return result;
-      },
+        ),
     );
 
     for (const result of results) {
@@ -133,22 +106,6 @@ export class HealthSampleDeletionService {
     const successRate =
       ((totalMarked / documentIds.length) * 100).toFixed(2) + "%";
 
-    logger.info(
-      `Async entered-in-error marking job '${jobId}' completed: ${totalMarked} marked, ${totalQueued} queued, ${totalSkipped} skipped (not found), ${totalFailed} failed out of ${documentIds.length} total`,
-      {
-        jobId,
-        requestingUserId,
-        targetUserId,
-        collection,
-        totalSamples: documentIds.length,
-        totalMarked,
-        totalQueued,
-        totalSkipped,
-        totalFailed,
-        successRate,
-      },
-    );
-
     return { totalMarked, totalSkipped, totalFailed, totalQueued, successRate };
   }
 
@@ -174,63 +131,17 @@ export class HealthSampleDeletionService {
       await this.withRetry(() =>
         ref.update({ status: FHIRObservationStatus.entered_in_error }),
       );
-
-      logger.debug(
-        `Marked sample as entered-in-error in job '${jobId}': '${documentId}' from collection '${collection}'`,
-        {
-          jobId,
-          requestingUserId,
-          targetUserId: userId,
-          collection,
-          documentId,
-        },
-      );
-
       return { success: true };
     } catch (error) {
-      if (this.isNotFoundError(error)) {
-        await this.queueService.enqueue({
-          userId,
-          collection,
-          documentId,
-          jobId,
-          requestingUserId,
-          reason: "NOT_FOUND",
-          lastError: String(error),
-        });
-        logger.info(
-          `Queued not-found sample for retry in job '${jobId}': '${documentId}' in collection '${collection}'`,
-          {
-            jobId,
-            requestingUserId,
-            targetUserId: userId,
-            collection,
-            documentId,
-          },
-        );
-        return { success: false, reason: "QUEUED" };
-      }
-
       await this.queueService.enqueue({
         userId,
         collection,
         documentId,
         jobId,
         requestingUserId,
-        reason: "TRANSIENT_ERROR",
+        reason: this.isNotFoundError(error) ? "NOT_FOUND" : "TRANSIENT_ERROR",
         lastError: String(error),
       });
-      logger.info(
-        `Queued failed sample for retry in job '${jobId}': '${documentId}' from collection '${collection}': ${String(error)}`,
-        {
-          jobId,
-          requestingUserId,
-          targetUserId: userId,
-          collection,
-          documentId,
-          error: String(error),
-        },
-      );
       return { success: false, reason: "QUEUED" };
     }
   }

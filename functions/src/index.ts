@@ -43,13 +43,26 @@ export * from "./functions/joinWaitlist.js";
 export * from "./functions/updateStaticData.js";
 export * from "./functions/updateUserInformation.js";
 export * from "./functions/planNudges.js";
+export * from "./functions/planPosttrialNudges.js";
 export * from "./functions/sendNudges.js";
 export * from "./functions/onFeedbackCreated.js";
 export * from "./functions/onUserQuestionnaireResponseWritten.js";
+export * from "./functions/onUserDocumentSnapshot.js";
 export * from "./functions/deleteHealthSamples.js";
-export * from "./functions/onArchivedLiveHealthSampleUploaded.js";
+// Temporarily disabled 2026-05-06 for cost reduction.
+// During the freeze, uploads accumulate at users/*/liveHealthSamples/** in GCS.
+// Storage finalize triggers do NOT fire retroactively, so before re-enabling
+// we MUST run scripts/backfillArchivedLiveHealthSamples.ts to drain the backlog.
+// export * from "./functions/onArchivedLiveHealthSampleUploaded.js";
 export * from "./functions/markAccountForDeletion.js";
 export * from "./functions/markAccountForStudyReenrollment.js";
 export * from "./functions/markAccountForStudyWithdrawal.js";
 export * from "./functions/processUserDeletions.js";
-export * from "./functions/processPendingHealthSampleDeletions.js";
+// Temporarily disabled 2026-05-07 for cost-reduction freeze.
+// Companion to the onArchivedLiveHealthSampleUploaded disable: while uploads
+// are not being ingested, queue items would NOT_FOUND-retry-then-dead-letter
+// Pausing the worker lets pending deletions accumulate in
+// users/*/pendingHealthSampleDeletions until the
+// trigger is back and backfill has populated the target docs.
+// export * from "./functions/processPendingHealthSampleDeletions.js";
+export * from "./functions/backfillExtendedActivityNudgesOptIn.js";

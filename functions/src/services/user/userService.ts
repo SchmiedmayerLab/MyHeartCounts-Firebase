@@ -26,7 +26,7 @@ export interface UserService {
   finishUserEnrollment(user: Document<User>): Promise<void>;
   getAllPatients(): Promise<Array<Document<User>>>;
   getUser(userId: string): Promise<Document<User> | undefined>;
-  updateLastActiveDate(userId: string): Promise<void>;
+  updateLastUploadDate(userId: string): Promise<void>;
   markAccountForDeletion(userId: string, markedAt: Date): Promise<void>;
   markAccountForStudyWithdrawal(
     userId: string,

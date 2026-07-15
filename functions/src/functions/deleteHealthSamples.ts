@@ -64,17 +64,6 @@ export const deleteHealthSamples = validatedOnCall(
 
     const jobId = `del_${Date.now()}_${Math.random().toString(36).substring(2)}`;
 
-    logger.info(
-      `User '${credential.userId}' initiated entered-in-error marking job '${jobId}' for ${documentIds.length} health samples in collection '${collection}' for user '${userId}'`,
-      {
-        jobId,
-        requestingUserId: credential.userId,
-        targetUserId: userId,
-        collection,
-        samplesCount: documentIds.length,
-      },
-    );
-
     const deletionService = new HealthSampleDeletionService();
 
     let summary;

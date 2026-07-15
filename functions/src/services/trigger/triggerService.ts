@@ -62,57 +62,44 @@ export class TriggerServiceImpl implements TriggerService {
 
   // Methods - Schedule
 
-  // eslint-disable-next-line @typescript-eslint/require-await
   async sendDailyReminders(): Promise<void> {
-    logger.debug(
-      "TriggerService.sendDailyReminders(): No daily reminders configured",
-    );
+    // no-op
   }
 
-  // eslint-disable-next-line @typescript-eslint/require-await
   async sendWeeklySymptomQuestionnaires(): Promise<void> {
-    logger.debug(
-      "TriggerService.sendWeeklySymptomQuestionnaires(): No users configured for weekly questionnaires",
-    );
+    // no-op
   }
 
   // Implementation of interface methods
 
   async userEnrolled(user: Document<User>): Promise<void> {
-    logger.debug(`TriggerService.userEnrolled(${user.id})`);
     await this.userCreated(user.id);
   }
 
-  // eslint-disable-next-line @typescript-eslint/require-await
   async userObservationWritten(
-    userId: string,
-    observationType: string,
-    documentId: string,
+    _userId: string,
+    _observationType: string,
+    _documentId: string,
     _document: Document<unknown>,
   ): Promise<void> {
-    logger.debug(
-      `TriggerService.userObservationWritten(${userId}, ${observationType}, ${documentId})`,
-    );
+    // no-op
   }
 
   // Methods - Events
 
-  // eslint-disable-next-line @typescript-eslint/require-await
-  async userCreated(userId: string): Promise<void> {
-    logger.info(`TriggerService.userCreated(${userId}): User created`);
+  async userCreated(_userId: string): Promise<void> {
+    // no-op
   }
 
-  // eslint-disable-next-line @typescript-eslint/require-await
-  async userUpdated(userId: string): Promise<void> {
-    logger.debug(`TriggerService.userUpdated(${userId})`);
+  async userUpdated(_userId: string): Promise<void> {
+    // no-op
   }
 
-  // eslint-disable-next-line @typescript-eslint/require-await
   async userRegistrationWritten(
-    userId: string,
+    _userId: string,
     _document: Document<UserRegistration>,
   ): Promise<void> {
-    logger.debug(`TriggerService.userRegistrationWritten(${userId})`);
+    // no-op
   }
 
   // Methods - Actions
@@ -130,7 +117,6 @@ export class TriggerServiceImpl implements TriggerService {
     userId: string,
     document: Document<FHIRQuestionnaireResponse>,
   ): Promise<void> {
-    logger.debug(`processQuestionnaireResponse for user ${userId}`);
     const questionnaireResponseService = this.factory.questionnaireResponse();
     await questionnaireResponseService.handle(
       userId,
@@ -145,15 +131,11 @@ export class TriggerServiceImpl implements TriggerService {
     before?: Document<FHIRQuestionnaireResponse>,
     after?: Document<FHIRQuestionnaireResponse>,
   ): Promise<void> {
-    logger.debug(
-      `TriggerService.questionnaireResponseWritten(${userId}, ${questionnaireResponseId}): beforeData: ${before !== undefined ? "exists" : "undefined"}, afterData: ${after !== undefined ? "exists" : "undefined"}`,
-    );
-
     try {
       if (after !== undefined) {
         const questionnaireResponseService =
           this.factory.questionnaireResponse();
-        const handled = await questionnaireResponseService.handle(
+        await questionnaireResponseService.handle(
           userId,
           {
             id: questionnaireResponseId,
@@ -163,10 +145,6 @@ export class TriggerServiceImpl implements TriggerService {
           },
           { isNew: before === undefined },
         );
-
-        logger.debug(
-          `TriggerService.questionnaireResponseWritten(${userId}, ${questionnaireResponseId}): Handled questionnaire response: ${handled}`,
-        );
       }
     } catch (error) {
       logger.error(
@@ -175,12 +153,9 @@ export class TriggerServiceImpl implements TriggerService {
     }
   }
 
-  // eslint-disable-next-line @typescript-eslint/require-await
   private async sendSymptomQuestionnaireReminderIfNeeded(
-    userId: string,
+    _userId: string,
   ): Promise<void> {
-    logger.info(
-      `TriggerService.sendSymptomQuestionnaireReminderIfNeeded(${userId}): Reminder skipped`,
-    );
+    // no-op
   }
 }

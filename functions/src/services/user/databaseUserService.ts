@@ -61,13 +61,7 @@ export class DatabaseUserService implements UserService {
       throw new https.HttpsError("not-found", "User not found.");
     }
     const claims = user.content.claims;
-    logger.info(
-      `DatabaseUserService.updateClaims(${userId}): Will set claims to ${JSON.stringify(claims)}.`,
-    );
     await this.auth.setCustomUserClaims(userId, claims);
-    logger.info(
-      `DatabaseUserService.updateClaims(${userId}): User claims updated.`,
-    );
   }
 
   // Invitation-related methods have been removed
@@ -76,8 +70,6 @@ export class DatabaseUserService implements UserService {
     userId: string,
     options: EnrollUserOptions,
   ): Promise<Document<User>> {
-    logger.info(`About to enroll user ${userId} directly.`);
-
     const user = await this.databaseService.runTransaction(
       async (collections, transaction) => {
         const user = await transaction.get(collections.users.doc(userId));
@@ -95,7 +87,9 @@ export class DatabaseUserService implements UserService {
           disabled: false,
           participantGroup: Math.random() < 0.5 ? 1 : 2, // This selects the participant group for a given user
           lastActiveDate: new Date(),
+          lastUploadDate: new Date(),
           dateOfEnrollment: new Date(),
+          extendedActivityNudgesOptIn: true,
         });
         transaction.set(userRef, userData);
 
@@ -110,10 +104,6 @@ export class DatabaseUserService implements UserService {
           content: userData,
         };
       },
-    );
-
-    logger.info(
-      `DatabaseUserService.enrollUserDirectly(${userId}): Created user object for public enrollment.`,
     );
 
     return user;
@@ -142,10 +132,6 @@ export class DatabaseUserService implements UserService {
       );
     }
 
-    logger.info(
-      `DatabaseUserService.finishUserEnrollment(${user.id}): Auth user found.`,
-    );
-
     // Skip copying invitation data since we're not using invitations
   }
 
@@ -163,10 +149,10 @@ export class DatabaseUserService implements UserService {
     );
   }
 
-  async updateLastActiveDate(userId: string): Promise<void> {
+  async updateLastUploadDate(userId: string): Promise<void> {
     return this.databaseService.runTransaction((collections, transaction) => {
       transaction.update(collections.users.doc(userId), {
-        lastActiveDate: dateConverter.encode(new Date()),
+        lastUploadDate: dateConverter.encode(new Date()),
       });
     });
   }
@@ -202,9 +188,6 @@ export class DatabaseUserService implements UserService {
           },
         });
       },
-    );
-    logger.info(
-      `User ${userId} marked their account for deletion at ${markedAt.toISOString()}`,
     );
   }
 
@@ -264,9 +247,6 @@ export class DatabaseUserService implements UserService {
         });
       },
     );
-    logger.info(
-      `User ${userId} marked their account for study withdrawal at ${withdrawnAt.toISOString()}`,
-    );
   }
 
   async markAccountForStudyReenrollment(
@@ -323,9 +303,6 @@ export class DatabaseUserService implements UserService {
         });
       },
     );
-    logger.info(
-      `User ${userId} re-enrolled in the study at ${reenrolledAt.toISOString()}`,
-    );
   }
 
   async deleteUser(userId: string): Promise<void> {
@@ -334,9 +311,7 @@ export class DatabaseUserService implements UserService {
         collections.users.doc(userId),
         writer,
       );
-      logger.info(`Deleted user with id '${userId}' recursively.`);
       await this.auth.deleteUser(userId);
-      logger.info(`Deleted user auth with id '${userId}'.`);
     });
   }
 
@@ -352,7 +327,6 @@ export class DatabaseUserService implements UserService {
           Object.keys(user.customClaims ?? {}).length === 0 &&
           new Date(user.metadata.lastSignInTime) < oneDayAgo
         ) {
-          logger.info(`Deleting expired account ${user.uid}`);
           promises.push(
             this.auth
               .deleteUser(user.uid)

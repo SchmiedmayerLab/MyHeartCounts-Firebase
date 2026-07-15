@@ -63,13 +63,15 @@ export class MockUserService implements UserService {
         disabled: false,
         dateOfBirth: new Date("1970-01-02"),
         lastActiveDate: new Date("2024-04-04"),
+        lastUploadDate: new Date("2024-04-04"),
         dateOfEnrollment: new Date("2024-04-02"),
         timeZone: "America/Los_Angeles",
+        extendedActivityNudgesOptIn: true,
       }),
     };
   }
 
-  updateLastActiveDate(_userId: string): Promise<void> {
+  updateLastUploadDate(_userId: string): Promise<void> {
     return Promise.resolve();
   }
 

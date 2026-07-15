@@ -10,13 +10,15 @@ import type { PendingHealthSampleDeletion } from "./pendingHealthSampleDeletion.
 import { FHIRObservationStatus } from "../../models/index.js";
 import { CollectionsService } from "../database/collections.js";
 
-const MAX_QUEUE_RETRIES = 10;
+const MAX_QUEUE_RETRIES = 3;
 const QUEUE_BATCH_SIZE = 500;
 const QUEUE_CONCURRENCY_LIMIT = 10;
-const MAX_BACKOFF_MS = 3_600_000;
+const MAX_BACKOFF_MS = 24 * 60 * 60 * 1000;
 
-const NOT_FOUND_BASE_DELAY_MS = 30_000;
-const TRANSIENT_ERROR_BASE_DELAY_MS = 60_000;
+// Retry schedule: enqueue waits 8h, then 16h between attempts, then 24h (capped);
+// 3 attempts span exactly 48h before the pending doc is dropped. Applies to both
+// NOT_FOUND (covers late-arriving uploads) and TRANSIENT_ERROR.
+const RETRY_BASE_DELAY_MS = 8 * 60 * 60 * 1000;
 
 const PERMITTED_COLLECTION_PATTERN =
   /^(?:HealthObservations|SensorKitObservations)_[A-Za-z][A-Za-z0-9]*$/;
@@ -26,6 +28,8 @@ const VALID_REASONS = new Set(["TRANSIENT_ERROR", "NOT_FOUND"]);
 const KNOWN_ERROR_CODES: Record<string | number, string> = {
   5: "NOT_FOUND",
   "not-found": "NOT_FOUND",
+  6: "ALREADY_EXISTS",
+  "already-exists": "ALREADY_EXISTS",
   4: "DEADLINE_EXCEEDED",
   "deadline-exceeded": "DEADLINE_EXCEEDED",
   8: "RESOURCE_EXHAUSTED",
@@ -65,11 +69,9 @@ export class HealthSampleDeletionQueueService {
     lastError: string | null;
   }): Promise<void> {
     const now = Timestamp.now();
-    const baseDelayMs =
-      params.reason === "NOT_FOUND" ?
-        NOT_FOUND_BASE_DELAY_MS
-      : TRANSIENT_ERROR_BASE_DELAY_MS;
-    const nextRetryAt = Timestamp.fromMillis(now.toMillis() + baseDelayMs);
+    const nextRetryAt = Timestamp.fromMillis(
+      now.toMillis() + RETRY_BASE_DELAY_MS,
+    );
 
     const sanitizedLastError =
       params.lastError !== null ?
@@ -89,9 +91,20 @@ export class HealthSampleDeletionQueueService {
       nextRetryAt,
     };
 
-    await this.collections
+    // Deterministic doc id keeps re-enqueues idempotent: a duplicate
+    // request collapses onto the existing pending doc instead of spawning
+    // a new row, so worker-managed retry state isn't reset to zero.
+    const pendingId = `${params.collection}__${params.documentId}`;
+    const ref = this.collections
       .pendingHealthSampleDeletions(params.userId)
-      .add(item);
+      .doc(pendingId);
+
+    try {
+      await ref.create(item);
+    } catch (error) {
+      if (sanitizeErrorForStorage(error) === "ALREADY_EXISTS") return;
+      throw error;
+    }
   }
 
   async processQueue(): Promise<{
@@ -109,7 +122,6 @@ export class HealthSampleDeletionQueueService {
       .get();
 
     if (snapshot.empty) {
-      logger.info("No pending health sample deletions to process");
       return {
         processed: 0,
         succeeded: 0,
@@ -118,10 +130,6 @@ export class HealthSampleDeletionQueueService {
         skipped: 0,
       };
     }
-
-    logger.info(`Processing ${snapshot.size} pending health sample deletions`, {
-      count: snapshot.size,
-    });
 
     let succeeded = 0;
     let requeued = 0;
@@ -156,11 +164,6 @@ export class HealthSampleDeletionQueueService {
         );
       }
     }
-
-    logger.info(
-      `Queue processing complete: ${succeeded} succeeded, ${requeued} requeued, ${deadLettered} dead-lettered, ${skipped} skipped`,
-      { processed: snapshot.size, succeeded, requeued, deadLettered, skipped },
-    );
 
     return {
       processed: snapshot.size,
@@ -257,37 +260,17 @@ export class HealthSampleDeletionQueueService {
       await doc.ref.delete();
       return "succeeded";
     } catch (error) {
+      const sanitizedError = sanitizeErrorForStorage(error);
       const newRetryCount = item.retryCount + 1;
 
       if (newRetryCount >= MAX_QUEUE_RETRIES) {
-        logger.error(
-          `Moving item to dead-letter after ${MAX_QUEUE_RETRIES} retries: '${item.documentId}' in '${item.collection}' for job '${item.jobId}'`,
-          {
-            jobId: item.jobId,
-            userId: ownerUserId,
-            collection: item.collection,
-            documentId: item.documentId,
-            retryCount: newRetryCount,
-            lastError: String(error),
-          },
-        );
-
-        await this.collections.failedHealthSampleDeletions(ownerUserId).add({
-          ...item,
-          retryCount: newRetryCount,
-          lastError: sanitizeErrorForStorage(error),
-          failedAt: Timestamp.now(),
-        });
+        // Exhausted retries: drop the pending doc rather than persist it.
         await doc.ref.delete();
         return "dead-lettered";
       }
 
-      const baseDelayMs =
-        item.reason === "NOT_FOUND" ?
-          NOT_FOUND_BASE_DELAY_MS
-        : TRANSIENT_ERROR_BASE_DELAY_MS;
       const backoffMs = Math.min(
-        baseDelayMs * Math.pow(2, newRetryCount),
+        RETRY_BASE_DELAY_MS * Math.pow(2, newRetryCount),
         MAX_BACKOFF_MS,
       );
       const nextRetryAt = Timestamp.fromMillis(
@@ -297,7 +280,7 @@ export class HealthSampleDeletionQueueService {
       await doc.ref.update({
         retryCount: newRetryCount,
         nextRetryAt,
-        lastError: sanitizeErrorForStorage(error),
+        lastError: sanitizedError,
       });
 
       return "requeued";

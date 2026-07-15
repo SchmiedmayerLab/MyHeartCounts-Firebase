@@ -1,5 +1,5 @@
 <!--
-This source file is part of the MyHeart Counts project
+This source file is part of the My Heart Counts project
 
 SPDX-FileCopyrightText: 2025, 2026 Stanford University and the project authors (see CONTRIBUTORS.md)
 SPDX-License-Identifier: MIT
@@ -10,7 +10,7 @@ SPDX-License-Identifier: MIT
 
 # My Heart Counts
 
-Firebase cloud hosting infrastructure for the Stanford MyHeart Counts project.
+Firebase cloud hosting infrastructure for the Stanford My Heart Counts project.
 
 The iOS Application can be found in the [StanfordBDHG/MyHeartCounts-iOS](https://github.com/StanfordBDHG/MyHeartCounts-iOS) repository, the repository for the data analysis side of this study can be found over at [StanfordBDHG/MyHeartCounts-DataAnalysis](https://github.com/StanfordBDHG/MyHeartCounts-DataAnalysis).
 
@@ -49,7 +49,7 @@ My Heart Counts Firebase makes extensive usage of both the Firestore Database (N
 |-|-|-|
 |`/feedback/{UUID}`|Collection for Participant-Submitted Feedback|`accountId`, `appBuildNumber`, `appVersion`, `date`, `deviceInfo` (`model`, `osVersion`, `systemName`), `message`, `timeZone` (`identifier`)|
 |`/waitlist/{REGION}_{EMAIL}`|Region-based waitlist entries for anonymous users|`region` (ISO 3166-1 alpha-2), `email`, `createdAt`|
-|`/users/{USER-ID}`|User Document|`biologicalSexAtBirth`, `bloodType`, `comorbidities` (Disease : year), `dateOfBirth`, `dateOfEnrollment`, `didOptInToTrial`, `disabled`, `fcmToken`, `futureStudies`, `heightInCM`, `householdIncomeUS`, `language`, `lastActiveDate`, `lastSignedConsentDate`, `lastSignedConsentVersion`, `latinoStatus`, `mhcGenderIdentity`, `mostRecentOnboardingStep`, `participantGroup`, `preferredNotificationTime`, `preferredWorkoutTypes`, `raceEthnicity`, `timeZone`, `usRegion`, `weightInKG`|
+|`/users/{USER-ID}`|User Document|See [User Document Fields](#user-document-fields) below|
 |`/users/{USER-ID}/questionnaireResponses/{UUID}`|FHIR questionnaire responses|See [FHIR questionnaireresponse documentation](https://build.fhir.org/questionnaireresponse.html)|
 |`/users/{USER-ID}/notificationBacklog/{UUID}`|Backlog of Notifications to send|`body`, `category`, `generatedAt`, `id`, `isLLMGenerated`, `timestamp`, `title`|
 |`/users/{USER-ID}/notificationHistory/{UUID}`|History of send notifications|`body`, `errorMessage`, `generatedAt`, `isLLMGenerated`, `originalTimestamp`, `processedTimestamp`, `status`, `title`|
@@ -57,6 +57,46 @@ My Heart Counts Firebase makes extensive usage of both the Firestore Database (N
 |`/users/{USER-ID}/SensorKitObservations_deviceUsageReport/{UUID}`|Debug Info about Sensor Kit Hardware Environment|FHIR Observation for custom MHC sample|See [FHIR observation documentation](https://hl7.org/fhir/R4/observation.html)|
 |`/users/{USER-ID}/HealthObservations_{HEALTHKIT.IDENTIFIER}/{UUID}`|FHIR Observation for given health kit type|See [FHIR observation documentation](https://hl7.org/fhir/R4/observation.html)|
 |`/users/{USER-ID}/HealthObservations_{SENSORKIT.IDENTIFIER}/{Timestamp}`|FHIR Observation for given sensor kit type|See [FHIR observation documentation](https://hl7.org/fhir/R4/observation.html)|
+
+#### User Document Fields
+
+The following table provides an overview of all fields in the `/users/{USER-ID}` document, their Firestore data types, and whether they are written by the client (iOS app) or the server (Cloud Functions).
+
+|Field|Data Type|Set By|Encoding|Description|
+|-|-|-|-|-|
+|`biologicalSexAtBirth`|int64|Client|[HKBiologicalSex](https://developer.apple.com/documentation/healthkit/hkbiologicalsex)|Biological sex at birth|
+|`bloodType`|int64|Client|[HKBloodType](https://developer.apple.com/documentation/healthkit/hkbloodtype)|Blood type|
+|`comorbidities`|map|Client||Map of disease name to year of diagnosis|
+|`dateOfBirth`|timestamp|Client||User's date of birth|
+|`dateOfEnrollment`|timestamp|Server||Timestamp of when the user enrolled into the study|
+|`didOptInToTrial`|boolean|Client||Whether the user opted into the physical activity trial|
+|`disabled`|boolean|Client||Whether the user account is disabled|
+|`educationUK`|string|Client||UK education level (e.g. `"doctoralDegree"`)|
+|`educationUS`|string|Client||US education level (e.g. `"bachelor"`)|
+|`fcmToken`|string|Client||Firebase Cloud Messaging token for push notifications|
+|`futureStudies`|boolean|Client||Whether the user consented to be contacted for future studies|
+|`heightInCM`|double|Client||User's height in centimeters|
+|`householdIncomeUK`|int64|Client||UK household income bracket|
+|`householdIncomeUS`|int64|Client||US household income bracket|
+|`language`|string|Client||User's preferred language (e.g. `"en"`)|
+|`lastActiveDate`|timestamp|Client||Timestamp of the user's last app activity|
+|`lastUploadDate`|timestamp|Server||Timestamp of the user's last data upload|
+|`lastSignedConsentDate`|timestamp|Client||Timestamp of the most recent consent signature|
+|`lastSignedConsentVersion`|string|Client||Version string of the most recently signed consent|
+|`latinoStatus`|int64|Client||Latino/Hispanic status|
+|`mhcGenderIdentity`|int64|Client||Gender identity|
+|`mostRecentOnboardingStep`|string|Client||Identifier of the last completed onboarding step|
+|`nhsNumber`|string|Client||UK National Health Service number|
+|`participantGroup`|int64|Server||Randomly assigned trial group (1 or 2)|
+|`preferredMeasurementSystem`|string|Client||User's preferred measurement system (e.g. metric, imperial)|
+|`preferredNotificationTime`|string|Client||Preferred time for notifications (e.g. `"09:00"`)|
+|`preferredWorkoutTypes`|string|Client||Comma-separated preferred workout types (e.g. `"walk,run"`)|
+|`raceEthnicity`|int64|Client||Race/ethnicity|
+|`stageOfChange`|string|Client||Transtheoretical model stage of change (e.g. `"a"`)|
+|`timeZone`|string|Client||IANA time zone identifier (e.g. `"America/New_York"`)|
+|`ukRegion`|string|Client||UK region|
+|`usRegion`|string|Client||US state/region code (e.g. `"FL"`)|
+|`weightInKG`|double|Client||User's weight in kilograms|
 
 ### Firebase Cloud Storage
 
@@ -92,7 +132,7 @@ To make this structure simpler to use, we provide different scripts as part of t
 |`npm run lint`|Lints both packages. Make sure to build before using this command. You may want to append `:fix` to fix existing issues automatically or `:strict` to make sure the command does not succeed with existing warnings or errors.|
 |`npm run prepare`|Combines cleaning, installing and building both packages.|
 |`npm run test:ci`|Tests the Firebase functions with emulators running and with test coverage collection active.|
-|`npm run serve:seeded`|Starts up the relevant emulators for MyHeart Counts and seeds them. Make sure to build the project first before executing this command.|
+|`npm run serve:seeded`|Starts up the relevant emulators for My Heart Counts and seeds them. Make sure to build the project first before executing this command.|
 
 For using the emulators for client applications, it is probably easiest to call `npm run prepare` whenever files could have changed (e.g. when changing branch or pulling new changes) and then calling `npm run serve:seeded` to start up the emulators in a seeded state. Both of these commands are performed in the root directory of this repository.
 
@@ -130,6 +170,20 @@ reuse annotate \
 ```
 
 Before submitting a new PR, make sure `reuse lint` does not throw any errors about missing copyright/licensing information.
+
+### Update Firestore Indexes
+
+If while developing the indexes in the remote firebase changed (e.g. App-Side Changes), you can use
+
+```bash
+firebase firestore:indexes > firestore.indexes.json
+```
+
+to update the local firebase index file.
+
+### Organisation while developing
+
+We are happy for any new features, bug fixes and enhancements in this repo at any time; you can find a selection of issue templates if you just want to notify us of an issue, otherwise open a PR to directly contribute to the source code. Either way, we ask that you mark your development branches and issues to help us stay organized.
 
 #### Prefixes in branches
 

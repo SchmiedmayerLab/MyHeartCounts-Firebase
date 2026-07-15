@@ -23,7 +23,6 @@ export const beforeUserCreatedFunction = beforeUserCreated(
     }
 
     const userId = event.data.uid;
-    logger.info(`${userId}: Start.`);
 
     const factory = getServiceFactory();
     const userService = factory.user();
@@ -37,20 +36,14 @@ export const beforeUserCreatedFunction = beforeUserCreated(
       );
     }
 
-    logger.info(`${userId}: Creating user document for ${event.data.email}`);
-
     try {
       // For MyHeartCounts, we'll use direct enrollment without invitations
       const userDoc = await userService.enrollUserDirectly(userId, {
         isSingleSignOn: event.credential !== undefined,
       });
 
-      logger.info(`${userId}: Finishing user enrollment.`);
-
       // Trigger any post-enrollment actions
       await factory.trigger().userEnrolled(userDoc);
-
-      logger.info(`${userId}: Successfully enrolled user.`);
 
       // Return empty claims - they'll be updated by userEnrolled trigger
       return { customClaims: {} };
@@ -80,13 +73,11 @@ export const beforeUserSignedInFunction = beforeUserSignedIn(
       const userService = getServiceFactory().user();
       const user = await userService.getUser(event.data.uid);
       if (user !== undefined) {
-        logger.info("beforeUserSignedIn finished successfully.");
         return {
           customClaims: user.content.claims,
           sessionClaims: user.content.claims,
         };
       }
-      logger.info("beforeUserSignedIn finished without user.");
       return { customClaims: {} };
     } catch (error) {
       logger.error(`beforeUserSignedIn finished with error: ${String(error)}`);

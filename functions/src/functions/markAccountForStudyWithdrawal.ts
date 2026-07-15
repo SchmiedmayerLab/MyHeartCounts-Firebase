@@ -3,7 +3,7 @@
 // SPDX-FileCopyrightText: 2026 Stanford University and the project authors (see CONTRIBUTORS.md)
 // SPDX-License-Identifier: MIT
 
-import { https, logger } from "firebase-functions/v2";
+import { https } from "firebase-functions/v2";
 import { z } from "zod";
 import { validatedOnCall, defaultServiceAccount } from "./helpers.js";
 import { getServiceFactory } from "../services/factory/getServiceFactory.js";
@@ -47,10 +47,6 @@ export const markAccountForStudyWithdrawal = validatedOnCall(
 
     const withdrawnAt = new Date();
     await userService.markAccountForStudyWithdrawal(userId, withdrawnAt);
-
-    logger.info(
-      `User ${userId} successfully marked their account for study withdrawal`,
-    );
 
     return {
       success: true,

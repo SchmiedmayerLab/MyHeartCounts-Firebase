@@ -174,9 +174,9 @@ describeWithEmulators("TriggerService", (env) => {
     it("should check if user needs questionnaire", async () => {
       const triggerService = env.factory.trigger();
 
-      // Make sure we use the latest user info and update last active date
+      // Make sure we use the latest user info and update last upload date
       // This will ensure the user exists in the database
-      await env.factory.user().updateLastActiveDate(patientId);
+      await env.factory.user().updateLastUploadDate(patientId);
 
       // This is a test for a private method, but we can test it through its effects
       await triggerService.sendWeeklySymptomQuestionnaires();

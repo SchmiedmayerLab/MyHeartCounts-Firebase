@@ -4,7 +4,6 @@
 // SPDX-License-Identifier: MIT
 
 import type { Response } from "express";
-import { logger } from "firebase-functions";
 import { https } from "firebase-functions/v2";
 import {
   type CallableFunction,
@@ -26,17 +25,10 @@ export const validatedOnCall = <Schema extends z.ZodTypeAny, Return>(
   options: CallableOptions = {
     invoker: "public",
   },
-  helperOptions?: { logRequestData?: boolean },
+  _helperOptions?: { logRequestData?: boolean },
 ): CallableFunction<z.input<Schema>, Promise<Return>> => {
   const wrappedHandler = async (request: CallableRequest): Promise<Return> => {
     try {
-      if (helperOptions?.logRequestData === false) {
-        logger.debug(`onCall(${name}) from user '${request.auth?.uid}'`);
-      } else {
-        logger.debug(
-          `onCall(${name}) from user '${request.auth?.uid}' with '${JSON.stringify(request.data)}'`,
-        );
-      }
       const validatedData = schema.parse(request.data) as z.output<Schema>;
       const validatedRequest: CallableRequest<z.output<Schema>> = {
         ...request,
@@ -44,9 +36,6 @@ export const validatedOnCall = <Schema extends z.ZodTypeAny, Return>(
       };
       return await handler(validatedRequest);
     } catch (error) {
-      logger.debug(
-        `onCall(${name}) from user '${request.auth?.uid}' failed with '${String(error)}'.`,
-      );
       if (error instanceof z.ZodError) {
         throw new https.HttpsError(
           "invalid-argument",
@@ -64,7 +53,7 @@ export const validatedOnCall = <Schema extends z.ZodTypeAny, Return>(
 };
 
 export const validatedOnRequest = <Schema extends z.ZodTypeAny>(
-  name: string,
+  _name: string,
   schema: Schema,
   handler: (
     request: Request,
@@ -77,12 +66,10 @@ export const validatedOnRequest = <Schema extends z.ZodTypeAny>(
 ): https.HttpsFunction =>
   onRequest(options, async (request, response) => {
     try {
-      logger.debug(`onRequest(${name}) with ${JSON.stringify(request.body)}`);
       const data = schema.parse(request.body) as z.output<Schema>;
       await handler(request, data, response);
       return;
     } catch (error) {
-      logger.debug(`onRequest(${name}) failed with ${String(error)}.`);
       if (error instanceof z.ZodError) {
         response.status(400).send({
           code: "invalid-argument",
