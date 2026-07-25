@@ -2,15 +2,15 @@
   "name": "myheartcounts-firebase",
   "version": "4.0.5",
   "license": "MIT",
-  "description": "Stanford Biodesign Digital Health MyHeart Counts open-source project",
+  "description": "My Heart Counts open-source project",
   "keywords": [
     "Stanford",
-    "Biodesign",
-    "My heart counts"
+    "SchmiedmayerLab",
+    "My Heart Counts"
   ],
   "repository": {
     "type": "git",
-    "url": "https://github.com/StanfordBDHG/MyHeartCounts-Firebase"
+    "url": "https://github.com/SchmiedmayerLab/MyHeartCounts-Firebase"
   },
   "dependencies": {
     "firebase-admin": "^13.7.0",
