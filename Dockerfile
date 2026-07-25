@@ -1,5 +1,5 @@
 #
-# This source file is part of the Stanford Biodesign Digital Health MyHeart Counts open-source project
+# This source file is part of the My Heart Counts open-source project
 # Based on the docker file found at https://github.com/vercel/next.js/blob/canary/examples/with-docker/Dockerfile.
 #
 # SPDX-FileCopyrightText: 2025 Stanford University and the project authors (see CONTRIBUTORS.md)

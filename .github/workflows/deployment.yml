@@ -46,21 +46,23 @@ jobs:
         uses: actions/checkout@v4
       - name: Determine Environment
         id: set-env
+        env:
+          REQUESTED_ENVIRONMENT: ${{ inputs.environment }}
         run: |
-          if [[ -z "${{ inputs.environment }}" ]]; then
-            echo "environment=staging" >> $GITHUB_OUTPUT
+          if [[ -z "$REQUESTED_ENVIRONMENT" ]]; then
+            echo "environment=staging" >> "$GITHUB_OUTPUT"
           else
-            echo "environment=${{ inputs.environment }}" >> $GITHUB_OUTPUT
+            echo "environment=$REQUESTED_ENVIRONMENT" >> "$GITHUB_OUTPUT"
           fi
       - name: Extract Region from Tag
         id: set-region
         run: |
-          if [[ "${{ github.ref }}" == refs/tags/region-* ]]; then
-            REGION="${{ github.ref_name }}"
+          if [[ "$GITHUB_REF" == refs/tags/region-* ]]; then
+            REGION="$GITHUB_REF_NAME"
             REGION="${REGION#region-}"
-            echo "region=$REGION" >> $GITHUB_OUTPUT
+            echo "region=$REGION" >> "$GITHUB_OUTPUT"
           else
-            echo "region=" >> $GITHUB_OUTPUT
+            echo "region=" >> "$GITHUB_OUTPUT"
           fi
 
   vars:
@@ -93,10 +95,11 @@ jobs:
     name: Deploy Firebase Project
     if: needs.determineenvironment.outputs.environment != 'production'
     needs: [buildandtest, determineenvironment, vars]
-    uses: StanfordBDHG/.github/.github/workflows/firebase-deploy.yml@v2
+    uses: SchmiedmayerLab/.github/.github/workflows/firebase-deploy.yml@v0.2
     permissions:
       contents: read
     with:
+      nodeVersion: '22'
       customcommand: "npm run prepare"
       environment: ${{ needs.determineenvironment.outputs.environment }}
       arguments: '--project ${{ needs.vars.outputs.FIREBASE_PROJECT_ID }}'
@@ -108,25 +111,30 @@ jobs:
     name: Deploy Firebase Project (Production US)
     if: needs.determineenvironment.outputs.environment == 'production'
     needs: [buildandtest, determineenvironment, vars]
-    uses: StanfordBDHG/.github/.github/workflows/firebase-deploy.yml@v2
+    uses: SchmiedmayerLab/.github/.github/workflows/firebase-deploy.yml@v0.2
     permissions:
       contents: read
     with:
+      nodeVersion: '22'
       customcommand: "npm run prepare"
       environment: production
       arguments: '--project ${{ needs.vars.outputs.FIREBASE_PROJECT_ID_PRODUCTION_US }}'
     secrets:
       GOOGLE_APPLICATION_CREDENTIALS_BASE64: ${{ secrets.GOOGLE_APPLICATION_CREDENTIALS_BASE64_PRODUCTION_US }}
 
-  # Deploy to UK after US succeeds
+  # Deploy to UK after US succeeds, once the UK project is configured.
   deployfirebase-production-uk:
     name: Deploy Firebase Project (Production UK)
-    if: needs.determineenvironment.outputs.environment == 'production'
+    if: >-
+      needs.determineenvironment.outputs.environment == 'production'
+      && needs.vars.outputs.FIREBASE_PROJECT_ID_PRODUCTION_UK != ''
+      && needs.vars.outputs.FIREBASE_PROJECT_ID_PRODUCTION_UK != 'TODO'
     needs: [deployfirebase-production-us, determineenvironment, vars]
-    uses: StanfordBDHG/.github/.github/workflows/firebase-deploy.yml@v2
+    uses: SchmiedmayerLab/.github/.github/workflows/firebase-deploy.yml@v0.2
     permissions:
       contents: read
     with:
+      nodeVersion: '22'
       customcommand: "npm run prepare"
       environment: production
       arguments: '--project ${{ needs.vars.outputs.FIREBASE_PROJECT_ID_PRODUCTION_UK }}'

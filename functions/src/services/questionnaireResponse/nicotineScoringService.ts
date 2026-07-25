@@ -42,7 +42,7 @@ export class DefaultNicotineScoreCalculator implements NicotineScoreCalculator {
   }
 
   private smokingStatusToScore(smokingStatus: string): number | null {
-    // Lookup table based on iOS NicotineExposureCategoryValues enum: https://github.com/StanfordBDHG/MyHeartCounts-iOS/blob/main/MyHeartCounts/Heart%20Health%20Dashboard/CustomHealthSample.swift
+    // Lookup table based on iOS NicotineExposureCategoryValues enum: https://github.com/SchmiedmayerLab/MyHeartCounts-iOS/blob/main/MyHeartCounts/Heart%20Health%20Dashboard/CustomHealthSample.swift
     switch (smokingStatus) {
       case "never-smoked/vaped":
         return 0;

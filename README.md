@@ -4,17 +4,17 @@ This source file is part of the My Heart Counts project
 SPDX-FileCopyrightText: 2025, 2026 Stanford University and the project authors (see CONTRIBUTORS.md)
 SPDX-License-Identifier: MIT
 -->
-[![Build and Test](https://github.com/StanfordBDHG/MyHeartCounts-Firebase/actions/workflows/build-and-test.yml/badge.svg?branch=main)](https://github.com/StanfordBDHG/MyHeartCounts-Firebase/actions/workflows/build-and-test.yml)
-[![CodeQL](https://github.com/StanfordBDHG/MyHeartCounts-Firebase/actions/workflows/codeql.yml/badge.svg?branch=main)](https://github.com/StanfordBDHG/MyHeartCounts-Firebase/actions/workflows/codeql.yml)
-[![Deployment](https://github.com/StanfordBDHG/MyHeartCounts-Firebase/actions/workflows/deployment.yml/badge.svg?branch=main)](https://github.com/StanfordBDHG/MyHeartCounts-Firebase/actions/workflows/deployment.yml)
+[![Build and Test](https://github.com/SchmiedmayerLab/MyHeartCounts-Firebase/actions/workflows/build-and-test.yml/badge.svg?branch=main)](https://github.com/SchmiedmayerLab/MyHeartCounts-Firebase/actions/workflows/build-and-test.yml)
+[![CodeQL](https://github.com/SchmiedmayerLab/MyHeartCounts-Firebase/actions/workflows/codeql.yml/badge.svg?branch=main)](https://github.com/SchmiedmayerLab/MyHeartCounts-Firebase/actions/workflows/codeql.yml)
+[![Deployment](https://github.com/SchmiedmayerLab/MyHeartCounts-Firebase/actions/workflows/deployment.yml/badge.svg?branch=main)](https://github.com/SchmiedmayerLab/MyHeartCounts-Firebase/actions/workflows/deployment.yml)
 
 # My Heart Counts
 
 Firebase cloud hosting infrastructure for the Stanford My Heart Counts project.
 
-The iOS Application can be found in the [StanfordBDHG/MyHeartCounts-iOS](https://github.com/StanfordBDHG/MyHeartCounts-iOS) repository, the repository for the data analysis side of this study can be found over at [StanfordBDHG/MyHeartCounts-DataAnalysis](https://github.com/StanfordBDHG/MyHeartCounts-DataAnalysis).
+The iOS Application can be found in the [SchmiedmayerLab/MyHeartCounts-iOS](https://github.com/SchmiedmayerLab/MyHeartCounts-iOS) repository, the repository for the data analysis side of this study can be found over at [SchmiedmayerLab/MyHeartCounts-DataAnalysis](https://github.com/SchmiedmayerLab/MyHeartCounts-DataAnalysis).
 
-The study itself with its contents is defined in [StanfordBDHG/MyHeartCounts-StudyDefinitions](https://github.com/StanfordBDHG/MyHeartCounts-StudyDefinitions).
+The study itself with its contents is defined in [SchmiedmayerLab/MyHeartCounts-StudyDefinitions](https://github.com/SchmiedmayerLab/MyHeartCounts-StudyDefinitions).
 
 Key features of the backend infrastructure include:
 - User account setup using blocking functions
@@ -102,7 +102,7 @@ The following table provides an overview of all fields in the `/users/{USER-ID}`
 
 |Path|Purpose|
 |-|-|
-|`/public/mhcStudyBundle.spezistudybundle.aar`|This it the Study definition bundle auto-build by the workflow in [MyHeartCounts-StudyDefinitions](https://github.com/StanfordBDHG/MyHeartCounts-StudyDefinitions/blob/main/.github/workflows/publish-study-definition.yml)|
+|`/public/mhcStudyBundle.spezistudybundle.aar`|This it the Study definition bundle auto-build by the workflow in [MyHeartCounts-StudyDefinitions](https://github.com/SchmiedmayerLab/MyHeartCounts-StudyDefinitions/blob/main/.github/workflows/publish-study-definition.yml)|
 |`/user/{USER-ID}/consent`|PDF Files of every consent the user gave (this could be multiple in the case of consent revisions or re-signup by the user.)|
 |`/user/{USER-ID}/historicalHealthSamples/{HEALTHKIT.IDENTIFIER}{UUID}.json.zstd`|We collect health samples that were recorded before the user enrolled into the app, compress them via zstd and store them as-is in the folder historicalHealthSamples for future analytics|
 |`/user/{USER-ID}/liveHealthSamples/{UUID}.json.zstd`|Most recorded ongoing (new) health samples get directly uploaded into the Firestore NoSQL Database - however, if a large amount of data has accumulated, we archive these samples for server-side decoding and upload them into liveHealthSamples. **This folder will be empty most of the time!** On Upload, the function [onArchivedLiveHealthSampleUploaded.ts](functions/src/functions/onArchivedLiveHealthSampleUploaded.ts) gets triggered which upon successful unpacking and storing into the Firestore Database deletes the live health sample archive.|
@@ -600,12 +600,15 @@ flowchart TD
 
 ### Contributing
 
-Contributions to this project are welcome. Please make sure to read the [contribution guidelines](https://github.com/StanfordBDHG/.github/blob/main/CONTRIBUTING.md) and the [contributor covenant code of conduct](https://github.com/StanfordBDHG/.github/blob/main/CODE_OF_CONDUCT.md) first.
-
+Contributions to this project are welcome. Please make sure to read the [contribution guidelines](https://github.com/SchmiedmayerLab/.github/blob/main/CONTRIBUTING.md) and the [contributor covenant code of conduct](https://github.com/SchmiedmayerLab/.github/blob/main/CODE_OF_CONDUCT.md) first.
 
 ## License
 
-This project is licensed under the MIT License. See [Licenses](https://github.com/StanfordBDHG/MyHeartCounts-iOS/tree/main/LICENSES) for more information.
+This project is licensed under the MIT License. See [Licenses](https://github.com/SchmiedmayerLab/MyHeartCounts-Firebase/tree/main/LICENSES) for more information.
 
-![Stanford Biodesign Footer](https://raw.githubusercontent.com/StanfordBDHG/.github/main/assets/biodesign-footer-light.png#gh-light-mode-only)
-![Stanford Biodesign Footer](https://raw.githubusercontent.com/StanfordBDHG/.github/main/assets/biodesign-footer-dark.png#gh-dark-mode-only)
+## Our Research
+
+For more information, visit the [Schmiedmayer Lab GitHub organization](https://github.com/SchmiedmayerLab).
+
+![Stanford and Stanford Medicine logos](https://raw.githubusercontent.com/SchmiedmayerLab/.github/main/assets/stanford-footer-light.png#gh-light-mode-only)
+![Stanford and Stanford Medicine logos](https://raw.githubusercontent.com/SchmiedmayerLab/.github/main/assets/stanford-footer-dark.png#gh-dark-mode-only)
