@@ -18,18 +18,25 @@ import {
   type Document,
   type DatabaseService,
 } from "../database/databaseService.js";
+import { type HealthProviderService } from "../healthProviders/healthProviderService.js";
 
 export class DatabaseUserService implements UserService {
   // Properties
 
   private readonly auth: Auth;
   private readonly databaseService: DatabaseService;
+  private readonly healthProviderService: HealthProviderService;
 
   // Constructor
 
-  constructor(auth: Auth, databaseService: DatabaseService) {
+  constructor(
+    auth: Auth,
+    databaseService: DatabaseService,
+    healthProviderService: HealthProviderService,
+  ) {
     this.auth = auth;
     this.databaseService = databaseService;
+    this.healthProviderService = healthProviderService;
   }
 
   // Auth
@@ -306,6 +313,11 @@ export class DatabaseUserService implements UserService {
   }
 
   async deleteUser(userId: string): Promise<void> {
+    // Tear down health-provider connections first: their provider-side webhook
+    // subscriptions and the root reverse-index entries live outside the user
+    // document tree, so `recursiveDelete(users/{uid})` alone would orphan them
+    // and leave providers POSTing webhooks for a deleted account.
+    await this.healthProviderService.disconnectAll(userId);
     await this.databaseService.bulkWrite(async (collections, writer) => {
       await collections.firestore.recursiveDelete(
         collections.users.doc(userId),

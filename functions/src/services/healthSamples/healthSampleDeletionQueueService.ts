@@ -21,7 +21,7 @@ const MAX_BACKOFF_MS = 24 * 60 * 60 * 1000;
 const RETRY_BASE_DELAY_MS = 8 * 60 * 60 * 1000;
 
 const PERMITTED_COLLECTION_PATTERN =
-  /^(?:HealthObservations|SensorKitObservations)_[A-Za-z][A-Za-z0-9]*$/;
+  /^(?:HealthObservations|SensorKitObservations|OuraObservations|FitbitObservations|WithingsObservations)_[A-Za-z][A-Za-z0-9]*$/;
 
 const VALID_REASONS = new Set(["TRANSIENT_ERROR", "NOT_FOUND"]);
 

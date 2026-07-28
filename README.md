@@ -57,6 +57,11 @@ My Heart Counts Firebase makes extensive usage of both the Firestore Database (N
 |`/users/{USER-ID}/SensorKitObservations_deviceUsageReport/{UUID}`|Debug Info about Sensor Kit Hardware Environment|FHIR Observation for custom MHC sample|See [FHIR observation documentation](https://hl7.org/fhir/R4/observation.html)|
 |`/users/{USER-ID}/HealthObservations_{HEALTHKIT.IDENTIFIER}/{UUID}`|FHIR Observation for given health kit type|See [FHIR observation documentation](https://hl7.org/fhir/R4/observation.html)|
 |`/users/{USER-ID}/HealthObservations_{SENSORKIT.IDENTIFIER}/{Timestamp}`|FHIR Observation for given sensor kit type|See [FHIR observation documentation](https://hl7.org/fhir/R4/observation.html)|
+|`/users/{USER-ID}/healthProviderTokens/{PROVIDER}`|**Server-only** OAuth tokens for a connected third-party provider (`oura`/`fitbit`/`withings`). Locked out of client access in `firestore.rules`.|`provider`, `accessToken`, `refreshToken`, `expiresAt`, `scopes`, `providerUserId`, `updatedAt`, `subscriptionId`|
+|`/users/{USER-ID}/healthProviderConnections/{PROVIDER}`|Client-readable connection status for a third-party provider (no secrets); server-written only.|`provider`, `status` (`connected`/`disconnected`/`error`), `scopes`, `connectedAt`, `lastSyncAt`, `lastSyncStatus`, `lastError`|
+|`/users/{USER-ID}/{OuraObservations,FitbitObservations,WithingsObservations}_{METRIC}/{PROVIDER}-{SAMPLE-ID}`|Normalized FHIR Observations pulled from a third-party provider. Metric is a curated core (e.g. `heartRate`, `restingHeartRate`, `steps`, `sleepDuration`, `oxygenSaturation`).|See [FHIR observation documentation](https://hl7.org/fhir/R4/observation.html)|
+|`/healthProviderAuthRequests/{STATE}`|**Server-only**, short-lived pending OAuth state (with PKCE verifier) spanning the redirect round-trip. Root collection, default-deny.|`provider`, `userId`, `state`, `redirectUri`, `codeVerifier`, `createdAt`, `expiresAt`|
+|`/healthProviderUserIndex/{PROVIDER}:{PROVIDER-USER-ID}`|**Server-only** reverse lookup mapping a provider's user id back to our `{USER-ID}`(s) for webhook routing. A shared provider account may map to more than one user. Root collection, default-deny.|`provider`, `providerUserId`, `userIds`|
 
 #### User Document Fields
 
@@ -107,6 +112,22 @@ The following table provides an overview of all fields in the `/users/{USER-ID}`
 |`/user/{USER-ID}/historicalHealthSamples/{HEALTHKIT.IDENTIFIER}{UUID}.json.zstd`|We collect health samples that were recorded before the user enrolled into the app, compress them via zstd and store them as-is in the folder historicalHealthSamples for future analytics|
 |`/user/{USER-ID}/liveHealthSamples/{UUID}.json.zstd`|Most recorded ongoing (new) health samples get directly uploaded into the Firestore NoSQL Database - however, if a large amount of data has accumulated, we archive these samples for server-side decoding and upload them into liveHealthSamples. **This folder will be empty most of the time!** On Upload, the function [onArchivedLiveHealthSampleUploaded.ts](functions/src/functions/onArchivedLiveHealthSampleUploaded.ts) gets triggered which upon successful unpacking and storing into the Firestore Database deletes the live health sample archive.|
 |`/user/{USER-ID}/SensorKit/{SENSORKIT.IDENTIFIER}/{UUID}.csv.zstd`|Samples from Apple's SensorKit Framework, sorted in sub-folders.|
+
+### Third-Party Health Data Providers (Oura, Fitbit, Withings)
+
+Participants can connect wearables from Oura, Fitbit and Withings. To avoid duplicating logic across the iOS and Android apps, **all** provider logic — OAuth token exchange/refresh, webhook handling, polling, and normalization to FHIR — lives in these Cloud Functions. The mobile apps only open a consent URL and read connection status.
+
+Each provider is a thin adapter (`functions/src/services/healthProviders/adapters/`) behind one shared orchestrator (`healthProviderService.ts`), so provider-specific quirks (Fitbit PKCE + rotating refresh tokens + HMAC-SHA1 webhook signatures; Withings `action=requesttoken` + Notify API + 3 h tokens; Oura app-level webhook subscriptions) stay isolated while the common flow is written once. Provider samples are normalized to the shared `FHIRObservation` model and stored in provider-scoped collections (see the Firestore table above); they flow through the existing health-sample deletion pipeline unchanged.
+
+**Connection flow (backend-hosted redirect):**
+
+1. App calls the `getHealthProviderAuthUrl` callable → backend mints a signed state (with a PKCE verifier where needed) and returns the provider authorization URL.
+2. App opens the URL in `ASWebAuthenticationSession` (iOS) / Chrome Custom Tab (Android). The provider redirects to the backend `healthProviderOAuthCallback` endpoint.
+3. The callback exchanges the code for tokens (client secrets never leave the server), stores them, registers the provider webhook subscription, and 302-redirects back into the app via a deep link.
+4. Provider data changes arrive at the per-provider `ouraWebhook` / `fitbitWebhook` / `withingsWebhook` endpoints, which fetch and store the changed window. Authenticity is enforced per provider by what each supports — Fitbit verifies an HMAC-SHA1 body signature; Oura and Withings verify the subscription handshake and rely on the secret callback URL, and because their notification bodies are otherwise unauthenticated the backend treats them as untrusted triggers and clamps the fetch window (never trusting caller-supplied timestamps). A daily `healthProviderBackfill` scheduled function catches gaps and pulls the initial 30-day history.
+5. App calls `disconnectHealthProvider` to revoke and remove a connection.
+
+**Secrets/config** (Secret Manager, per Firebase project — dev / staging / prod-US / prod-UK): `OURA_CLIENT_ID`/`OURA_CLIENT_SECRET`/`OURA_WEBHOOK_VERIFICATION_TOKEN`, `FITBIT_CLIENT_ID`/`FITBIT_CLIENT_SECRET`/`FITBIT_SUBSCRIBER_VERIFICATION_CODE`, `WITHINGS_CLIENT_ID`/`WITHINGS_CLIENT_SECRET`, plus the string params `HEALTH_PROVIDER_BASE_URL` (this deployment's function origin, used to build the callback/webhook URLs) and `HEALTH_PROVIDER_APP_REDIRECT_URL` (the app deep link). Each provider's developer console must register this environment's callback and webhook URLs.
 
 ## Development
 

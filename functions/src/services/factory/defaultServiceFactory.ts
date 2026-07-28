@@ -9,6 +9,7 @@ import { type ServiceFactory } from "./serviceFactory.js";
 import { Lazy } from "../../models/index.js";
 import { Credential } from "../credential/credential.js";
 import { FirestoreService } from "../database/firestoreService.js";
+import { HealthProviderService } from "../healthProviders/healthProviderService.js";
 import { DatabaseHistoryService } from "../history/databaseHistoryService.js";
 import { type HistoryService } from "../history/historyService.js";
 import {
@@ -95,12 +96,21 @@ export class DefaultServiceFactory implements ServiceFactory {
     () => new StaticDataService(this.databaseService.value),
   );
 
+  private readonly healthProviderService = new Lazy(
+    () => new HealthProviderService(this.databaseService.value),
+  );
+
   private readonly triggerService = new Lazy(
     () => new TriggerServiceImpl(this),
   );
 
   private readonly userService = new Lazy(
-    () => new DatabaseUserService(this.auth.value, this.databaseService.value),
+    () =>
+      new DatabaseUserService(
+        this.auth.value,
+        this.databaseService.value,
+        this.healthProviderService.value,
+      ),
   );
 
   // Methods - User
@@ -131,6 +141,12 @@ export class DefaultServiceFactory implements ServiceFactory {
 
   questionnaireResponse(): QuestionnaireResponseService {
     return this.questionnaireResponseService.value;
+  }
+
+  // Methods - Health providers
+
+  healthProvider(): HealthProviderService {
+    return this.healthProviderService.value;
   }
 
   // Methods - Trigger
