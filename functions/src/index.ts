@@ -45,6 +45,7 @@ export * from "./functions/updateUserInformation.js";
 export * from "./functions/planNudges.js";
 export * from "./functions/planPosttrialNudges.js";
 export * from "./functions/sendNudges.js";
+export * from "./functions/onFeedbackCreated.js";
 export * from "./functions/onUserQuestionnaireResponseWritten.js";
 export * from "./functions/onUserDocumentSnapshot.js";
 export * from "./functions/deleteHealthSamples.js";
