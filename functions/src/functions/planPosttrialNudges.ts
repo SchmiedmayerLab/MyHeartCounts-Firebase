@@ -134,7 +134,7 @@ export class PosttrialNudgeService {
   // Methods
 
   private mapComorbidityKeyToDisease(key: string): Disease | null {
-    // These are defined for iOS in https://github.com/StanfordBDHG/MyHeartCounts-iOS/blob/main/MyHeartCounts/Account/Demographics/Comorbidities.swift.
+    // These are defined for iOS in https://github.com/SchmiedmayerLab/MyHeartCounts-iOS/blob/main/MyHeartCounts/Account/Demographics/Comorbidities.swift.
     switch (key) {
       case "heartFailure":
         return Disease.HEART_FAILURE;
