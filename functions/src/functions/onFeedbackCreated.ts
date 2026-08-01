@@ -3,6 +3,7 @@
 // SPDX-FileCopyrightText: 2026 Stanford University and the project authors (see CONTRIBUTORS.md)
 // SPDX-License-Identifier: MIT
 
+import { Timestamp } from "firebase-admin/firestore";
 import { logger } from "firebase-functions";
 import { onDocumentCreated } from "firebase-functions/v2/firestore";
 import { createTransport } from "nodemailer";
@@ -17,6 +18,25 @@ import {
   getSmtpUsername,
 } from "../env.js";
 import { privilegedServiceAccount } from "./helpers.js";
+
+// Renders in the submitter's timezone when the feedback carries one, e.g.
+// "Jul 31, 2026, 12:33:47 PM PDT".
+const formatTimestamp = (
+  timestamp: Timestamp,
+  timeZone: string | undefined,
+): string => {
+  const date = timestamp.toDate();
+  try {
+    return new Intl.DateTimeFormat("en-US", {
+      dateStyle: "medium",
+      timeStyle: "long",
+      timeZone: timeZone ?? "UTC",
+    }).format(date);
+  } catch {
+    // Invalid IANA timezone name in the feedback document
+    return date.toISOString();
+  }
+};
 
 const formatFeedbackEmail = (
   feedbackId: string,
@@ -34,9 +54,13 @@ const formatFeedbackEmail = (
     `--- Feedback Content ---`,
   ];
 
+  const timeZone =
+    typeof rest.timeZone === "string" ? rest.timeZone : undefined;
   for (const [key, value] of Object.entries(rest)) {
     const formatted =
-      typeof value === "string" ? value : JSON.stringify(value, null, 2);
+      typeof value === "string" ? value
+      : value instanceof Timestamp ? formatTimestamp(value, timeZone)
+      : JSON.stringify(value, null, 2);
     lines.push(`${key}: ${formatted}`);
   }
 
