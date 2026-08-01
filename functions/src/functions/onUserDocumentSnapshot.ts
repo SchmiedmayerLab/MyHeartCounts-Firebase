@@ -111,7 +111,10 @@ export const captureUserDocumentSnapshot = async (
         DEBOUNCE_WINDOW_MS;
     // Within the window: collapse the burst by overwriting the most recent
     // snapshot in place; otherwise append a new snapshot.
-    transaction.set(withinWindow ? latest.ref : snapshotsRef.doc(), payload);
+    transaction.set(
+      withinWindow ? latest.ref : snapshotsRef.doc(randomUUID()),
+      payload,
+    );
   });
 };
 
