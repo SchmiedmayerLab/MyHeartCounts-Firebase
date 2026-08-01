@@ -16,7 +16,7 @@ import {
   getSmtpPort,
   getSmtpUsername,
 } from "../env.js";
-import { defaultServiceAccount } from "./helpers.js";
+import { privilegedServiceAccount } from "./helpers.js";
 
 const formatFeedbackEmail = (
   feedbackId: string,
@@ -46,7 +46,7 @@ const formatFeedbackEmail = (
 export const onFeedbackCreated = onDocumentCreated(
   {
     document: "feedback/{feedbackId}",
-    serviceAccount: defaultServiceAccount,
+    serviceAccount: privilegedServiceAccount,
     secrets: feedbackEmailSecretParams,
   },
   async (event) => {
