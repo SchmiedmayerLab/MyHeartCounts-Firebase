@@ -3,6 +3,7 @@
 // SPDX-FileCopyrightText: 2026 Stanford University and the project authors (see CONTRIBUTORS.md)
 // SPDX-License-Identifier: MIT
 
+import { randomUUID } from "crypto";
 import { isDeepStrictEqual } from "util";
 import admin from "firebase-admin";
 import { Timestamp } from "firebase-admin/firestore";
@@ -111,7 +112,10 @@ export const captureUserDocumentSnapshot = async (
         DEBOUNCE_WINDOW_MS;
     // Within the window: collapse the burst by overwriting the most recent
     // snapshot in place; otherwise append a new snapshot.
-    transaction.set(withinWindow ? latest.ref : snapshotsRef.doc(), payload);
+    transaction.set(
+      withinWindow ? latest.ref : snapshotsRef.doc(randomUUID()),
+      payload,
+    );
   });
 };
 
