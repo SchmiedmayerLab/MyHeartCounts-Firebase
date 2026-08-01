@@ -3,6 +3,7 @@
 // SPDX-FileCopyrightText: 2026 Stanford University and the project authors (see CONTRIBUTORS.md)
 // SPDX-License-Identifier: MIT
 
+import { randomUUID } from "crypto";
 import { isDeepStrictEqual } from "util";
 import admin from "firebase-admin";
 import { Timestamp } from "firebase-admin/firestore";
