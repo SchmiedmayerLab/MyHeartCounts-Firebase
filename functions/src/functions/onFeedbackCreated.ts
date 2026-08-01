@@ -17,7 +17,6 @@ import {
   getSmtpUsername,
 } from "../env.js";
 import { privilegedServiceAccount } from "./helpers.js";
-
 const formatFeedbackEmail = (
   feedbackId: string,
   data: Record<string, unknown>,

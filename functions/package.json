@@ -34,6 +34,7 @@
     "jspdf": "^4.2.1",
     "jspdf-autotable": "^5.0.2",
     "luxon": "^3.7.2",
+    "nodemailer": "^8.0.3",
     "openai": "^6.17.0",
     "zod": "^3.25.76"
   },
@@ -46,6 +47,7 @@
     "@types/luxon": "^3.4.2",
     "@types/mocha": "^10.0.7",
     "@types/node": "^22",
+    "@types/nodemailer": "^7.0.11",
     "@types/sinon": "^21.0.0",
     "@typescript-eslint/eslint-plugin": "^8.54.0",
     "@typescript-eslint/parser": "^8.54.0",
