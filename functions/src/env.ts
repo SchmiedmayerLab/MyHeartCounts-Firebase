@@ -6,7 +6,8 @@
 import { defineSecret } from "firebase-functions/params";
 
 enum SecretKey {
-  OPENAI_API_KEY = "OPENAI_API_KEY",
+  LLM_API_KEY = "LLM_API_KEY",
+  LLM_API_BASE_URL = "LLM_API_BASE_URL",
   SMTP_HOST = "SMTP_HOST",
   SMTP_PORT = "SMTP_PORT",
   SMTP_USERNAME = "SMTP_USERNAME",
@@ -15,13 +16,20 @@ enum SecretKey {
   FEEDBACK_COORDINATOR_EMAIL = "FEEDBACK_COORDINATOR_EMAIL",
 }
 
-const openaiApiKey = defineSecret(SecretKey.OPENAI_API_KEY);
+// The LLM used for nudge generation is reached through an OpenAI-compatible
+// API. Both the key and the base URL are kept as secrets so the backing
+// provider can be swapped without a code change.
+const llmApiKey = defineSecret(SecretKey.LLM_API_KEY);
+const llmApiBaseUrl = defineSecret(SecretKey.LLM_API_BASE_URL);
 
-export const getOpenaiApiKey = (): string => openaiApiKey.value();
+export const getLlmApiKey = (): string => llmApiKey.value();
 
-export const getOpenaiSecretKeys = (): string[] => [SecretKey.OPENAI_API_KEY];
+export const getLlmApiBaseUrl = (): string => llmApiBaseUrl.value();
 
-export const openaiApiKeyParam: ReturnType<typeof defineSecret> = openaiApiKey;
+export const llmSecretParams: Array<ReturnType<typeof defineSecret>> = [
+  llmApiKey,
+  llmApiBaseUrl,
+];
 
 const smtpHost = defineSecret(SecretKey.SMTP_HOST);
 const smtpPort = defineSecret(SecretKey.SMTP_PORT);
