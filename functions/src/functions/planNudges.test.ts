@@ -89,7 +89,7 @@ describeWithEmulators("function: planNudges", (env) => {
 
       const firstNudge = backlogSnapshot.docs[0].data();
       const firstNudgeDocId = backlogSnapshot.docs[0].id;
-      // Should fall back to nudge-predefined nudges when OpenAI API key is not available
+      // Should fall back to nudge-predefined nudges when the LLM API key is not available
       expect(firstNudge.category).to.equal("nudge-predefined");
       expect(firstNudge.title).to.be.a("string");
       expect(firstNudge.body).to.be.a("string");
@@ -133,7 +133,7 @@ describeWithEmulators("function: planNudges", (env) => {
       expect(backlogSnapshot.size).to.equal(7);
 
       const firstNudge = backlogSnapshot.docs[0].data();
-      // Should fall back to nudge-predefined nudges when OpenAI API key is not available
+      // Should fall back to nudge-predefined nudges when the LLM API key is not available
       expect(firstNudge.category).to.equal("nudge-predefined");
       expect(firstNudge.isLLMGenerated).to.not.be.true;
     });
@@ -253,7 +253,7 @@ describeWithEmulators("function: planNudges", (env) => {
       expect(backlogSnapshot.size).to.equal(0);
     });
 
-    it("handles OpenAI API failures gracefully (falls back to nudge-predefined)", async () => {
+    it("handles LLM API failures gracefully (falls back to nudge-predefined)", async () => {
       const enrollmentDate = new Date();
       enrollmentDate.setDate(enrollmentDate.getDate() - 14);
 
@@ -323,7 +323,7 @@ describeWithEmulators("function: planNudges", (env) => {
       expect(backlogSnapshot.size).to.equal(7);
 
       const firstNudge = backlogSnapshot.docs[0].data();
-      // Should fall back to nudge-predefined nudges when OpenAI API key is not available
+      // Should fall back to nudge-predefined nudges when the LLM API key is not available
       expect(firstNudge.category).to.equal("nudge-predefined");
       expect(firstNudge.isLLMGenerated).to.not.be.true;
 
