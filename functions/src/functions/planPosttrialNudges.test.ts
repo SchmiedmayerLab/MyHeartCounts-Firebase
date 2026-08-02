@@ -165,7 +165,7 @@ describeWithEmulators("function: planPosttrialNudges", (env) => {
   });
 
   describe("LLM failure — no fallback", () => {
-    it("creates 0 nudges when the OpenAI call fails (no predefined fallback)", async () => {
+    it("creates 0 nudges when the LLM call fails (no predefined fallback)", async () => {
       const userId = "posttrial-llm-failure";
       await env.firestore
         .collection("users")
