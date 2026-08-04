@@ -9,7 +9,7 @@ import { logger } from "firebase-functions";
 import { onSchedule } from "firebase-functions/v2/scheduler";
 import { DateTime } from "luxon";
 import OpenAI from "openai";
-import { getOpenaiApiKey, openaiApiKeyParam } from "../env.js";
+import { getLlmApiBaseUrl, getLlmApiKey, llmSecretParams } from "../env.js";
 import { privilegedServiceAccount } from "./helpers.js";
 import {
   getPredefinedNudgeMessages,
@@ -75,7 +75,9 @@ const mhcGenderIdentityMap: Partial<Record<number, string>> = {
   5: "other",
 };
 
-const LLM_MODEL = "gpt-5.2-2025-12-11";
+// Model ID as exposed by the configured LLM API gateway. Must be one of the
+// models the gateway API key has access to.
+const LLM_MODEL = "gpt-5.2";
 
 // Version of the LLM prompt template built in generateLLMNudges. Bump this
 // whenever the prompt wording changes so generated nudges can be traced back
@@ -438,11 +440,14 @@ export class NudgeService {
 
         const prompt = `Write 7 motivational messages that are of proper length to go in a push notification using a calm, encouraging, and professional tone, like that of a health coach to motivate a smartphone user to increase their daily physical activity, prioritizing movement that contributes to their step count. Also create a title for each of the push notifications that is a short summary/call to action of the push notification that is paired with it. Return the response as a JSON array with exactly 7 objects, each having "title" and "body" fields. If there is a disease context given, you can reference that disease in some of the nudges. When generating nudges, avoid the word 'healthy' and remove unnecessary qualifiers such as 'brisk' or 'deep'. Suggest only simple, low-risk forms of movement without adding extra exercises or medical disclaimers not provided. Keep messages concise, calm, and practical; focus on one clear activity with plain language. Keep recommendations practical, varied, and easy to integrate into daily routines. NEVER USE EM DASHES, EMOJIS OR ABBREVIATIONS FOR DISEASES IN THE NUDGE. Each nudge should be personalized to the following information: ${languageContext} ${genderContext} ${ageContext} ${diseaseContext} ${stageContext} ${educationContext} ${notificationTimeContext} Think carefully before delivering the prompts to ensure they are personalized to the information given (especially any given disease context) and give recommendations based on research backed motivational methods.`;
 
-        const openai = new OpenAI({
-          apiKey: getOpenaiApiKey(),
+        // The configured LLM endpoint is OpenAI-compatible, so the OpenAI SDK
+        // is used as the client with the base URL pointed at the gateway.
+        const llmClient = new OpenAI({
+          apiKey: getLlmApiKey(),
+          baseURL: getLlmApiBaseUrl(),
         });
 
-        const response = await openai.chat.completions.create({
+        const response = await llmClient.chat.completions.create({
           model: LLM_MODEL,
           messages: [
             {
@@ -494,7 +499,7 @@ export class NudgeService {
         const parsedNudges = parsedContent.nudges;
 
         if (!Array.isArray(parsedNudges) || parsedNudges.length !== 7) {
-          throw new Error("Invalid response format from OpenAI API");
+          throw new Error("Invalid response format from LLM API");
         }
 
         const usage = response.usage;
@@ -795,7 +800,7 @@ export const onScheduleDailyNudgeCreation = onSchedule(
   {
     schedule: "0 8 * * *",
     timeZone: "UTC",
-    secrets: [openaiApiKeyParam],
+    secrets: llmSecretParams,
     serviceAccount: privilegedServiceAccount,
   },
   async () => {

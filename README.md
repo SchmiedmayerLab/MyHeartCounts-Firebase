@@ -363,7 +363,7 @@ flowchart TD
     F --> G{Days since enrollment?}
     G -->|7 days| H[Generate predefined nudges]
     G -->|14 days, Group 1| H
-    G -->|14 days, Group 2| I[Call OpenAI GPT-5.2]
+    G -->|14 days, Group 2| I[Call LLM API gateway gpt-5.2]
 
     I --> J[Build personalized context]
     J -->|age, diseases, stage, education, language| K[LLM generates 7 nudges]

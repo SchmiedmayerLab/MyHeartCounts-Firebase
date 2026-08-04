@@ -9,7 +9,7 @@ import { logger } from "firebase-functions";
 import { onSchedule } from "firebase-functions/v2/scheduler";
 import { DateTime } from "luxon";
 import OpenAI from "openai";
-import { getOpenaiApiKey, openaiApiKeyParam } from "../env.js";
+import { getLlmApiBaseUrl, getLlmApiKey, llmSecretParams } from "../env.js";
 import { privilegedServiceAccount } from "./helpers.js";
 import { type BaseNudgeMessage } from "./nudgeMessages.js";
 
@@ -86,7 +86,8 @@ const AVAILABLE_WORKOUT_TYPES = [
   "yoga/pilates",
 ] as const;
 
-const LLM_MODEL = "gpt-5.4-mini-2026-03-17";
+// Model ID as exposed by the configured LLM API gateway.
+const LLM_MODEL = "gpt-5-mini";
 
 // Version of the LLM prompt template built in generateLLMNudge. Bump this
 // whenever the prompt wording changes so generated nudges can be traced back
@@ -619,11 +620,14 @@ export class PosttrialNudgeService {
         // Prompt: Just one nudge, include personalization context.
         const prompt = `Write 1 motivational message that is a proper length to go in a push notification using a calm, encouraging, and professional tone, like that of a health coach to motivate a smartphone user to increase their daily physical activity. Also create a title for the push notification that is a short summary/call to action of the push notification. Return the response as a JSON object with 'title' and 'body' fields. If there is a disease context given, you can reference that disease in the nudge. When generating the nudge, avoid the word 'healthy' and remove unnecessary qualifiers such as 'brisk' or 'deep'. Suggest only simple, low-risk forms of movement without adding extra exercises or medical disclaimers not provided. Keep the message concise, calm, and practical; focus on one clear activity with plain language. Keep the recommendation practical and easy to integrate into daily routines. NEVER USE EM DASHES, EMOJIS OR ABBREVIATIONS FOR DISEASES IN THE NUDGE. The nudge should be personalized to the following information: ${languageContext} ${genderContext} ${ageContext} ${diseaseContext} ${stageContext} ${educationContext} ${notificationTimeContext} ${activityTypeContext} ${previousNudgesContext} Think carefully before delivering the prompt to ensure it is personalized to the information given (especially any given disease context) and give recommendations based on research backed motivational methods${varietyClause}.`;
 
-        const openai = new OpenAI({
-          apiKey: getOpenaiApiKey(),
+        // The configured LLM endpoint is OpenAI-compatible, so the OpenAI SDK
+        // is used as the client with the base URL pointed at the gateway.
+        const llmClient = new OpenAI({
+          apiKey: getLlmApiKey(),
+          baseURL: getLlmApiBaseUrl(),
         });
 
-        const response = await openai.chat.completions.create({
+        const response = await llmClient.chat.completions.create({
           model: LLM_MODEL,
           messages: [
             {
@@ -664,7 +668,7 @@ export class PosttrialNudgeService {
           typeof parsedContent.title !== "string" ||
           typeof parsedContent.body !== "string"
         ) {
-          throw new Error("Invalid response format from OpenAI API");
+          throw new Error("Invalid response format from LLM API");
         }
 
         const usage = response.usage;
@@ -956,7 +960,7 @@ export const onScheduleDailyPosttrialNudgeCreation = onSchedule(
   {
     schedule: "30 8 * * *",
     timeZone: "UTC",
-    secrets: [openaiApiKeyParam],
+    secrets: llmSecretParams,
     serviceAccount: privilegedServiceAccount,
   },
   async () => {
