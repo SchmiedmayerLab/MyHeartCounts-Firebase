@@ -89,6 +89,8 @@ const AVAILABLE_WORKOUT_TYPES = [
 // Model ID as exposed by the configured LLM API gateway.
 const LLM_MODEL = "gpt-5-mini";
 
+const LLM_REQUEST_TIMEOUT_MS = 60_000;
+
 // Version of the LLM prompt template built in generateLLMNudge. Bump this
 // whenever the prompt wording changes so generated nudges can be traced back
 // to the exact prompt version that produced them.
@@ -625,6 +627,8 @@ export class PosttrialNudgeService {
         const llmClient = new OpenAI({
           apiKey: getLlmApiKey(),
           baseURL: getLlmApiBaseUrl(),
+          timeout: LLM_REQUEST_TIMEOUT_MS,
+          maxRetries: 0, // the enclosing attempt loop handles retries
         });
 
         const response = await llmClient.chat.completions.create({
@@ -960,6 +964,7 @@ export const onScheduleDailyPosttrialNudgeCreation = onSchedule(
   {
     schedule: "30 8 * * *",
     timeZone: "UTC",
+    timeoutSeconds: 1800,
     secrets: llmSecretParams,
     serviceAccount: privilegedServiceAccount,
   },
