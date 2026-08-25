@@ -90,3 +90,42 @@ One declared schema per sample-type table, enforced at write time; the pipeline 
 3. Lifecycle idea from the notes ("move data older than one month to the datalake, delete in live"): conflicts with "originals stay intact" and is a separate retention decision, not part of the export pipeline.
 4. The in-app `stats/` documents are supporting data and are never exported.
 5. Cross-account sample cross-check (enabled by the deterministic sample hash, not built in v1).
+
+
+
+Where does the manifest live?
+    Locking mechanism?
+How can we create the index?
+How can the client make the live of the pipeline easier?
+Folders per month? -> YYYY/MM files in bucket?
+How can the VM get the info of the current sharding?
+Pipeline could be aware of the sample identifier/version to make seperate processing for different source versions
+How do we identify duplicates? Unit/Number/Timestamp
+
+Data Setteling Time Range definition
+
+200-500 MB/File
+
+/v1/users/{externalUSERUUID}/YYYY/MM/type_source/
+
+
+narayan:
+
+/v1/YYYY/MM/sourceName_SampleIdentifier/
+
+SourceName_HKCategoryTypeIdentifierSleepAnalysis
+
+spec out each sample type fully (what fields do we get, which do we need in the export) including expected casted type
+
+Tabele:
+
+sampleUUID, externalUSERUUID, startDate, endDate, timeZone, normalizedData, value, source, sourceRevision[all]
+
+timeZone on historic data is null
+sampleUUID is one way hash of original referenced sample UUID
+
+status must be == final
+
+which time format?
+
+write temp parquet file per participant, final job merges all parquet files together
