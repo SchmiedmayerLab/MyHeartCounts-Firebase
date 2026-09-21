@@ -1,0 +1,86 @@
+{
+  "authored": "2026-09-01T15:43:05.693683028+02:00",
+  "extension": [
+    {
+      "extension": [
+        {
+          "url": "https://myheartcounts.stanford.edu/fhir/core/mhcAppRevision/version",
+          "valueString": "4.0.0"
+        },
+        {
+          "url": "https://myheartcounts.stanford.edu/fhir/core/mhcAppRevision/build",
+          "valueInteger": 1
+        },
+        {
+          "url": "https://myheartcounts.stanford.edu/fhir/core/mhcAppRevision/bundleIdentifier",
+          "valueString": "edu.stanford.MyHeartCounts"
+        },
+        {
+          "url": "https://myheartcounts.stanford.edu/fhir/core/mhcAppRevision/osVersion",
+          "valueString": "26.6.1"
+        }
+      ],
+      "url": "https://myheartcounts.stanford.edu/fhir/core/mhcAppRevision"
+    }
+  ],
+  "id": "14EBB94E-3047-4BFA-872F-734C10E57A03",
+  "identifier": {
+    "value": "14EBB94E-3047-4BFA-872F-734C10E57A03"
+  },
+  "item": [
+    {
+      "answer": [
+        {
+          "valueCoding": {
+            "code": "compute",
+            "display": "Weight + Height",
+            "system": "https://myheartcounts.stanford.edu/fhir/bmi-entry"
+          }
+        }
+      ],
+      "linkId": "mode"
+    },
+    {
+      "item": [
+        {
+          "answer": [
+            {
+              "valueQuantity": {
+                "code": "cm",
+                "system": "http://unitsofmeasure.org",
+                "unit": "cm",
+                "value": 187.95999999999998
+              }
+            }
+          ],
+          "linkId": "height"
+        },
+        {
+          "answer": [
+            {
+              "valueQuantity": {
+                "code": "kg",
+                "system": "http://unitsofmeasure.org",
+                "unit": "kg",
+                "value": 45.35923699999997
+              }
+            }
+          ],
+          "linkId": "weight"
+        }
+      ],
+      "linkId": "measurements"
+    },
+    {
+      "answer": [
+        {
+          "valueDecimal": 12.839108466748712
+        }
+      ],
+      "linkId": "bmi"
+    }
+  ],
+  "questionnaire": "https://myheartcounts.stanford.edu/fhir/survey/bmi",
+  "resourceType": "QuestionnaireResponse",
+  "status": "completed"
+}

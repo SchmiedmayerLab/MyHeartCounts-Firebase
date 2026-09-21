@@ -57,6 +57,7 @@ My Heart Counts Firebase makes extensive usage of both the Firestore Database (N
 |`/waitlist/{REGION}_{EMAIL}`|Region-based waitlist entries for anonymous users|`region` (ISO 3166-1 alpha-2), `email`, `createdAt`|
 |`/users/{USER-ID}`|User Document|See [User Document Fields](#user-document-fields) below|
 |`/users/{USER-ID}/questionnaireResponses/{UUID}`|FHIR questionnaire responses|See [FHIR questionnaireresponse documentation](https://build.fhir.org/questionnaireresponse.html)|
+|`/users/{USER-ID}/stats/{METRIC}/months/{YYYY-MM}`|Monthly health stats shown in the app dashboard; entries are grouped by data source (`com.apple.HealthKit` written by the app, `edu.stanford.MyHeartCounts.ManualEntry` written by the server from dashboard questionnaire responses)|`version`, `metric`, `samples`|
 |`/users/{USER-ID}/notificationBacklog/{UUID}`|Backlog of Notifications to send|`body`, `category`, `generatedAt`, `id`, `isLLMGenerated`, `timestamp`, `title`|
 |`/users/{USER-ID}/notificationHistory/{UUID}`|History of send notifications|`body`, `errorMessage`, `generatedAt`, `isLLMGenerated`, `originalTimestamp`, `processedTimestamp`, `status`, `title`|
 |`/users/{USER-ID}/notificationTracking/{UUID}`|Tracks the Notification Status|`event`, `notificationId`, `timeZone`, `timestamp`|
