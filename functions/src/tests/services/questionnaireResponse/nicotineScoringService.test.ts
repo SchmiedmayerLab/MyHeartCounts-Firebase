@@ -174,6 +174,53 @@ describe("NicotineScoringQuestionnaireResponseService", () => {
       expect(result).to.be.true;
     });
 
+    it("should return true for a versioned questionnaire canonical", async () => {
+      /* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-assignment */
+      const mockDatabaseService = {
+        getQuery: () => Promise.resolve([]),
+        runTransaction: () => Promise.resolve(),
+      } as any;
+      const mockCalculator = new DefaultNicotineScoreCalculator();
+
+      const service = new NicotineScoringQuestionnaireResponseService({
+        databaseService: mockDatabaseService,
+        scoreCalculator: mockCalculator,
+      });
+      /* eslint-enable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-assignment */
+
+      const mockResponse = {
+        id: "test-response-id",
+        path: "users/test-user/questionnaireResponses/test-response-id",
+        lastUpdate: new Date(),
+        content: new FHIRQuestionnaireResponse({
+          id: "test-response",
+          authored: new Date(),
+          questionnaire:
+            "https://myheartcounts.stanford.edu/fhir/survey/nicotineExposure|1.0.0",
+          item: [
+            {
+              linkId: "dcb2277e-fe96-4f45-844a-ef58a9516380",
+              answer: [
+                {
+                  valueCoding: {
+                    code: "never-smoked/vaped",
+                    display: "Never smoked/vaped",
+                    system: "urn:uuid:dd27d607-7d9c-4fa2-e28b-d90a40d628bf",
+                  },
+                },
+              ],
+            },
+          ],
+        }),
+      };
+
+      const result = await service.handle("test-user", mockResponse, {
+        isNew: true,
+      });
+
+      expect(result).to.be.true;
+    });
+
     it("should handle missing smoking status gracefully", async () => {
       /* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-assignment */
       const mockDatabaseService = {

@@ -39,7 +39,7 @@ export class HeartRiskNicotineScoringQuestionnaireResponseService extends Questi
       "https://myheartcounts.stanford.edu/fhir/survey/heartRisk",
     ];
 
-    if (!targetQuestionnaireUrls.includes(response.content.questionnaire)) {
+    if (!this.targetsQuestionnaire(response.content, targetQuestionnaireUrls)) {
       return false;
     }
 

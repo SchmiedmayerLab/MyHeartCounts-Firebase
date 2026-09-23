@@ -86,7 +86,7 @@ export class NicotineScoringQuestionnaireResponseService extends QuestionnaireRe
       "https://myheartcounts.stanford.edu/fhir/survey/nicotineExposure",
     ];
 
-    if (!targetQuestionnaireUrls.includes(response.content.questionnaire)) {
+    if (!this.targetsQuestionnaire(response.content, targetQuestionnaireUrls)) {
       return false;
     }
 
