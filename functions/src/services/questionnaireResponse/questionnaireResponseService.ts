@@ -6,6 +6,14 @@
 import type { FHIRQuestionnaireResponse } from "../../models/index.js";
 import type { Document } from "../database/databaseService.js";
 
+// Scoring keys on the instrument's url and ignores `|version`: the scored linkIds are stable across versions.
+export const questionnaireCanonicalUrl = (canonical: string): string | null => {
+  if (canonical.includes("#")) return null;
+  const [url, version, ...rest] = canonical.split("|");
+  if (url === "" || version === "" || rest.length > 0) return null;
+  return url;
+};
+
 export abstract class QuestionnaireResponseService {
   abstract handle(
     userId: string,
@@ -13,13 +21,11 @@ export abstract class QuestionnaireResponseService {
     options: { isNew: boolean },
   ): Promise<boolean>;
 
-  // A canonical reference is `url` or `url|version`; the instrument's identity is the url.
   protected targetsQuestionnaire(
     response: FHIRQuestionnaireResponse,
     targetUrls: string[],
   ): boolean {
-    const canonical = response.questionnaire;
-    if (typeof canonical !== "string" || canonical.length === 0) return false;
-    return targetUrls.includes(canonical.split("|", 1)[0]);
+    const url = questionnaireCanonicalUrl(response.questionnaire);
+    return url !== null && targetUrls.includes(url);
   }
 }
