@@ -1,0 +1,48 @@
+{
+  "authored": "2026-09-01T13:26:51.71353197+02:00",
+  "extension": [
+    {
+      "extension": [
+        {
+          "url": "https://myheartcounts.stanford.edu/fhir/core/mhcAppRevision/version",
+          "valueString": "4.0.0"
+        },
+        {
+          "url": "https://myheartcounts.stanford.edu/fhir/core/mhcAppRevision/build",
+          "valueInteger": 1
+        },
+        {
+          "url": "https://myheartcounts.stanford.edu/fhir/core/mhcAppRevision/bundleIdentifier",
+          "valueString": "edu.stanford.MyHeartCounts"
+        },
+        {
+          "url": "https://myheartcounts.stanford.edu/fhir/core/mhcAppRevision/osVersion",
+          "valueString": "26.6.1"
+        }
+      ],
+      "url": "https://myheartcounts.stanford.edu/fhir/core/mhcAppRevision"
+    }
+  ],
+  "id": "83B8260C-EA46-45B6-9139-79ABEFD31D29",
+  "identifier": {
+    "value": "83B8260C-EA46-45B6-9139-79ABEFD31D29"
+  },
+  "item": [
+    {
+      "answer": [
+        {
+          "valueQuantity": {
+            "code": "mg/dL",
+            "system": "http://unitsofmeasure.org",
+            "unit": "mg/dL",
+            "value": 50
+          }
+        }
+      ],
+      "linkId": "blood-glucose-fasting"
+    }
+  ],
+  "questionnaire": "https://myheartcounts.stanford.edu/fhir/survey/blood-glucose-fasting",
+  "resourceType": "QuestionnaireResponse",
+  "status": "completed"
+}
