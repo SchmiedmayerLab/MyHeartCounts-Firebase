@@ -5,7 +5,10 @@
 
 import { expect } from "chai";
 import { describe, it } from "mocha";
-import { FHIRQuestionnaireResponse } from "../../../models/index.js";
+import {
+  FHIRQuestionnaireResponse,
+  fhirQuestionnaireResponseConverter,
+} from "../../../models/index.js";
 import type { DatabaseService } from "../../../services/database/databaseService.js";
 import {
   DietScoreCalculator,
@@ -124,4 +127,79 @@ describe("QuestionnaireResponseService canonical matching", () => {
       }
     });
   }
+
+  it("should score a Grove questionnaire response as the app stores it", async () => {
+    const content = fhirQuestionnaireResponseConverter.value.schema.parse({
+      resourceType: "QuestionnaireResponse",
+      extension: [
+        {
+          url: "http://hl7.org/fhir/StructureDefinition/questionnaireresponse-completionMode",
+          valueCodeableConcept: {
+            coding: [
+              {
+                system:
+                  "http://terminology.hl7.org/CodeSystem/v3-ParticipationMode",
+                code: "ELECTRONIC",
+              },
+            ],
+          },
+        },
+        {
+          url: "https://grovealliance.org/fhir/questionnaire/StructureDefinition/grove-questionnaire-writer-context",
+          extension: [
+            { url: "applicationName", valueString: "My Heart Counts" },
+          ],
+        },
+      ],
+      identifier: {
+        system: `${survey}/nicotineExposure`,
+        value: "f4c1e7a2-5b0d-4d8e-9a3f-2c6b1e8d7a90",
+      },
+      questionnaire: `${survey}/nicotineExposure|0.0.0`,
+      status: "completed",
+      subject: {
+        identifier: {
+          system:
+            "https://myheartcounts.stanford.edu/fhir/identifiers/participant",
+          value: "test-user",
+        },
+        type: "Patient",
+      },
+      authored: "2026-08-28T08:32:00-07:00",
+      item: [
+        {
+          linkId: "dcb2277e-fe96-4f45-844a-ef58a9516380",
+          answer: [
+            {
+              valueCoding: {
+                system: "urn:uuid:049cbbd0-02fa-4fcd-83a7-65a112c1f607",
+                code: "never-smoked/vaped",
+              },
+            },
+          ],
+        },
+      ],
+    });
+    expect(content.authored.toISOString()).to.equal("2026-08-28T15:32:00.000Z");
+
+    const service = new NicotineScoringQuestionnaireResponseService({
+      databaseService: {
+        getQuery: () => Promise.resolve([]),
+        runTransaction: () => Promise.resolve(),
+      } as Partial<DatabaseService> as DatabaseService,
+      scoreCalculator: new DefaultNicotineScoreCalculator(),
+    });
+    const handled = await service.handle(
+      "test-user",
+      {
+        id: "f4c1e7a2-5b0d-4d8e-9a3f-2c6b1e8d7a90",
+        path: "users/test-user/questionnaireResponses/f4c1e7a2-5b0d-4d8e-9a3f-2c6b1e8d7a90",
+        lastUpdate: new Date(),
+        content,
+      },
+      { isNew: true },
+    );
+    // eslint-disable-next-line @typescript-eslint/no-unused-expressions
+    expect(handled).to.be.true;
+  });
 });
