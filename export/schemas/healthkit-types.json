@@ -1,0 +1,3411 @@
+{
+ "generated_from": {
+  "repo": "SchmiedmayerLab/grove-fhir",
+  "ref": "origin/main",
+  "commit": "e04ab86"
+ },
+ "grove_version": "0.6.0",
+ "fhir_version": "4.0.1",
+ "types": {
+  "HKCategoryTypeIdentifierAbdominalCramps": {
+   "status": "supported",
+   "title": "Abdominal Cramps",
+   "measurement_id": "symptom-abdominal-cramps",
+   "profile": "healthkit-symptom-abdominal-cramps",
+   "value_kind": "codeableConcept",
+   "unit": null,
+   "integer_only": false,
+   "effective": "Period",
+   "allowed_values": [
+    "not-present",
+    "present",
+    "mild",
+    "moderate",
+    "severe"
+   ],
+   "code": {
+    "system": "https://grovealliance.org/fhir/healthkit/CodeSystem/healthkit-measurement",
+    "code": "symptom-abdominal-cramps"
+   }
+  },
+  "HKCategoryTypeIdentifierAcne": {
+   "status": "supported",
+   "title": "Acne",
+   "measurement_id": "symptom-acne",
+   "profile": "healthkit-symptom-acne",
+   "value_kind": "codeableConcept",
+   "unit": null,
+   "integer_only": false,
+   "effective": "Period",
+   "allowed_values": [
+    "not-present",
+    "present",
+    "mild",
+    "moderate",
+    "severe"
+   ],
+   "code": {
+    "system": "https://grovealliance.org/fhir/healthkit/CodeSystem/healthkit-measurement",
+    "code": "symptom-acne"
+   }
+  },
+  "HKCategoryTypeIdentifierAppetiteChanges": {
+   "status": "supported",
+   "title": "Appetite Changes",
+   "measurement_id": "symptom-appetite-changes",
+   "profile": "healthkit-symptom-appetite-changes",
+   "value_kind": "codeableConcept",
+   "unit": null,
+   "integer_only": false,
+   "effective": "Period",
+   "allowed_values": [
+    "no-change",
+    "decreased",
+    "increased",
+    "change-unspecified"
+   ],
+   "code": {
+    "system": "https://grovealliance.org/fhir/healthkit/CodeSystem/healthkit-measurement",
+    "code": "symptom-appetite-changes"
+   }
+  },
+  "HKCategoryTypeIdentifierAppleStandHour": {
+   "status": "supported",
+   "title": "Apple Stand Hour",
+   "measurement_id": "apple-stand-hour",
+   "profile": "healthkit-apple-stand-hour",
+   "value_kind": "codeableConcept",
+   "unit": null,
+   "integer_only": false,
+   "effective": "Period",
+   "allowed_values": [
+    "stood",
+    "idle"
+   ],
+   "code": {
+    "system": "https://grovealliance.org/fhir/healthkit/CodeSystem/healthkit-measurement",
+    "code": "apple-stand-hour"
+   }
+  },
+  "HKCategoryTypeIdentifierAppleWalkingSteadinessEvent": {
+   "status": "supported",
+   "title": "Apple Walking Steadiness Event",
+   "measurement_id": "walking-steadiness-notification",
+   "profile": "healthkit-walking-steadiness-notification",
+   "value_kind": "codeableConcept",
+   "unit": null,
+   "integer_only": false,
+   "effective": "Period",
+   "allowed_values": [
+    "low",
+    "very-low"
+   ],
+   "code": {
+    "system": "https://grovealliance.org/fhir/healthkit/CodeSystem/healthkit-measurement",
+    "code": "walking-steadiness-notification"
+   }
+  },
+  "HKCategoryTypeIdentifierAudioExposureEvent": {
+   "status": "supported",
+   "title": "Audio Exposure Event",
+   "measurement_id": "environmental-audio-exposure-notification",
+   "profile": "healthkit-environmental-audio-exposure-notification",
+   "value_kind": "codeableConcept",
+   "unit": null,
+   "integer_only": false,
+   "effective": "Period",
+   "allowed_values": [
+    "momentary-limit"
+   ],
+   "code": {
+    "system": "https://grovealliance.org/fhir/healthkit/CodeSystem/healthkit-measurement",
+    "code": "environmental-audio-exposure-notification"
+   }
+  },
+  "HKCategoryTypeIdentifierBladderIncontinence": {
+   "status": "supported",
+   "title": "Bladder Incontinence",
+   "measurement_id": "bladder-incontinence",
+   "profile": "healthkit-bladder-incontinence",
+   "value_kind": "codeableConcept",
+   "unit": null,
+   "integer_only": false,
+   "effective": "dateTime",
+   "allowed_values": [
+    "not-present",
+    "present",
+    "mild",
+    "moderate",
+    "severe"
+   ],
+   "code": {
+    "system": "https://grovealliance.org/fhir/healthkit/CodeSystem/healthkit-measurement",
+    "code": "bladder-incontinence"
+   }
+  },
+  "HKCategoryTypeIdentifierBleedingAfterPregnancy": {
+   "status": "supported",
+   "title": "Bleeding After Pregnancy",
+   "measurement_id": "bleeding-after-pregnancy",
+   "profile": "healthkit-bleeding-after-pregnancy",
+   "value_kind": "codeableConcept",
+   "unit": null,
+   "integer_only": false,
+   "effective": "dateTime",
+   "allowed_values": [
+    "unspecified",
+    "light",
+    "medium",
+    "heavy",
+    "none"
+   ],
+   "code": {
+    "system": "https://grovealliance.org/fhir/healthkit/CodeSystem/healthkit-measurement",
+    "code": "bleeding-after-pregnancy"
+   }
+  },
+  "HKCategoryTypeIdentifierBleedingDuringPregnancy": {
+   "status": "supported",
+   "title": "Bleeding During Pregnancy",
+   "measurement_id": "bleeding-during-pregnancy",
+   "profile": "healthkit-bleeding-during-pregnancy",
+   "value_kind": "codeableConcept",
+   "unit": null,
+   "integer_only": false,
+   "effective": "dateTime",
+   "allowed_values": [
+    "unspecified",
+    "light",
+    "medium",
+    "heavy",
+    "none"
+   ],
+   "code": {
+    "system": "https://grovealliance.org/fhir/healthkit/CodeSystem/healthkit-measurement",
+    "code": "bleeding-during-pregnancy"
+   }
+  },
+  "HKCategoryTypeIdentifierBloating": {
+   "status": "supported",
+   "title": "Bloating",
+   "measurement_id": "symptom-bloating",
+   "profile": "healthkit-symptom-bloating",
+   "value_kind": "codeableConcept",
+   "unit": null,
+   "integer_only": false,
+   "effective": "Period",
+   "allowed_values": [
+    "not-present",
+    "present",
+    "mild",
+    "moderate",
+    "severe"
+   ],
+   "code": {
+    "system": "https://grovealliance.org/fhir/healthkit/CodeSystem/healthkit-measurement",
+    "code": "symptom-bloating"
+   }
+  },
+  "HKCategoryTypeIdentifierBreastPain": {
+   "status": "supported",
+   "title": "Breast Pain",
+   "measurement_id": "symptom-breast-pain",
+   "profile": "healthkit-symptom-breast-pain",
+   "value_kind": "codeableConcept",
+   "unit": null,
+   "integer_only": false,
+   "effective": "Period",
+   "allowed_values": [
+    "not-present",
+    "present",
+    "mild",
+    "moderate",
+    "severe"
+   ],
+   "code": {
+    "system": "https://grovealliance.org/fhir/healthkit/CodeSystem/healthkit-measurement",
+    "code": "symptom-breast-pain"
+   }
+  },
+  "HKCategoryTypeIdentifierCervicalMucusQuality": {
+   "status": "supported",
+   "title": "Cervical Mucus Quality",
+   "measurement_id": "cervical-mucus-quality",
+   "profile": "grove-mobile-cervical-mucus-quality",
+   "value_kind": "codeableConcept",
+   "unit": null,
+   "integer_only": false,
+   "effective": "dateTime",
+   "allowed_values": [
+    "dry",
+    "sticky",
+    "creamy",
+    "watery",
+    "egg-white",
+    "unusual",
+    "unknown"
+   ],
+   "code": {
+    "system": "https://grovealliance.org/fhir/mobile/CodeSystem/grove-mobile-measurement",
+    "code": "cervical-mucus-quality"
+   }
+  },
+  "HKCategoryTypeIdentifierChestTightnessOrPain": {
+   "status": "supported",
+   "title": "Chest Tightness/Pain",
+   "measurement_id": "symptom-chest-tightness-or-pain",
+   "profile": "healthkit-symptom-chest-tightness-or-pain",
+   "value_kind": "codeableConcept",
+   "unit": null,
+   "integer_only": false,
+   "effective": "Period",
+   "allowed_values": [
+    "not-present",
+    "present",
+    "mild",
+    "moderate",
+    "severe"
+   ],
+   "code": {
+    "system": "https://grovealliance.org/fhir/healthkit/CodeSystem/healthkit-measurement",
+    "code": "symptom-chest-tightness-or-pain"
+   }
+  },
+  "HKCategoryTypeIdentifierChills": {
+   "status": "supported",
+   "title": "Chills",
+   "measurement_id": "symptom-chills",
+   "profile": "healthkit-symptom-chills",
+   "value_kind": "codeableConcept",
+   "unit": null,
+   "integer_only": false,
+   "effective": "Period",
+   "allowed_values": [
+    "not-present",
+    "present",
+    "mild",
+    "moderate",
+    "severe"
+   ],
+   "code": {
+    "system": "https://grovealliance.org/fhir/healthkit/CodeSystem/healthkit-measurement",
+    "code": "symptom-chills"
+   }
+  },
+  "HKCategoryTypeIdentifierConstipation": {
+   "status": "supported",
+   "title": "Constipation",
+   "measurement_id": "symptom-constipation",
+   "profile": "healthkit-symptom-constipation",
+   "value_kind": "codeableConcept",
+   "unit": null,
+   "integer_only": false,
+   "effective": "Period",
+   "allowed_values": [
+    "not-present",
+    "present",
+    "mild",
+    "moderate",
+    "severe"
+   ],
+   "code": {
+    "system": "https://grovealliance.org/fhir/healthkit/CodeSystem/healthkit-measurement",
+    "code": "symptom-constipation"
+   }
+  },
+  "HKCategoryTypeIdentifierContraceptive": {
+   "status": "supported",
+   "title": "Contraceptive",
+   "measurement_id": "contraceptive-use",
+   "profile": "healthkit-contraceptive-use",
+   "value_kind": "codeableConcept",
+   "unit": null,
+   "integer_only": false,
+   "effective": "Period",
+   "allowed_values": [
+    "unspecified",
+    "implant",
+    "injection",
+    "intrauterine-device",
+    "intravaginal-ring",
+    "oral",
+    "patch"
+   ],
+   "code": {
+    "system": "http://loinc.org",
+    "code": "8659-5"
+   }
+  },
+  "HKCategoryTypeIdentifierCoughing": {
+   "status": "supported",
+   "title": "Coughing",
+   "measurement_id": "symptom-coughing",
+   "profile": "healthkit-symptom-coughing",
+   "value_kind": "codeableConcept",
+   "unit": null,
+   "integer_only": false,
+   "effective": "Period",
+   "allowed_values": [
+    "not-present",
+    "present",
+    "mild",
+    "moderate",
+    "severe"
+   ],
+   "code": {
+    "system": "https://grovealliance.org/fhir/healthkit/CodeSystem/healthkit-measurement",
+    "code": "symptom-coughing"
+   }
+  },
+  "HKCategoryTypeIdentifierDiarrhea": {
+   "status": "supported",
+   "title": "Diarrhea",
+   "measurement_id": "symptom-diarrhea",
+   "profile": "healthkit-symptom-diarrhea",
+   "value_kind": "codeableConcept",
+   "unit": null,
+   "integer_only": false,
+   "effective": "Period",
+   "allowed_values": [
+    "not-present",
+    "present",
+    "mild",
+    "moderate",
+    "severe"
+   ],
+   "code": {
+    "system": "https://grovealliance.org/fhir/healthkit/CodeSystem/healthkit-measurement",
+    "code": "symptom-diarrhea"
+   }
+  },
+  "HKCategoryTypeIdentifierDizziness": {
+   "status": "supported",
+   "title": "Dizziness",
+   "measurement_id": "symptom-dizziness",
+   "profile": "healthkit-symptom-dizziness",
+   "value_kind": "codeableConcept",
+   "unit": null,
+   "integer_only": false,
+   "effective": "Period",
+   "allowed_values": [
+    "not-present",
+    "present",
+    "mild",
+    "moderate",
+    "severe"
+   ],
+   "code": {
+    "system": "https://grovealliance.org/fhir/healthkit/CodeSystem/healthkit-measurement",
+    "code": "symptom-dizziness"
+   }
+  },
+  "HKCategoryTypeIdentifierDrySkin": {
+   "status": "supported",
+   "title": "Dry Skin",
+   "measurement_id": "symptom-dry-skin",
+   "profile": "healthkit-symptom-dry-skin",
+   "value_kind": "codeableConcept",
+   "unit": null,
+   "integer_only": false,
+   "effective": "Period",
+   "allowed_values": [
+    "not-present",
+    "present",
+    "mild",
+    "moderate",
+    "severe"
+   ],
+   "code": {
+    "system": "https://grovealliance.org/fhir/healthkit/CodeSystem/healthkit-measurement",
+    "code": "symptom-dry-skin"
+   }
+  },
+  "HKCategoryTypeIdentifierFainting": {
+   "status": "supported",
+   "title": "Fainting",
+   "measurement_id": "symptom-fainting",
+   "profile": "healthkit-symptom-fainting",
+   "value_kind": "codeableConcept",
+   "unit": null,
+   "integer_only": false,
+   "effective": "Period",
+   "allowed_values": [
+    "not-present",
+    "present",
+    "mild",
+    "moderate",
+    "severe"
+   ],
+   "code": {
+    "system": "https://grovealliance.org/fhir/healthkit/CodeSystem/healthkit-measurement",
+    "code": "symptom-fainting"
+   }
+  },
+  "HKCategoryTypeIdentifierFatigue": {
+   "status": "supported",
+   "title": "Fatigue",
+   "measurement_id": "symptom-fatigue",
+   "profile": "healthkit-symptom-fatigue",
+   "value_kind": "codeableConcept",
+   "unit": null,
+   "integer_only": false,
+   "effective": "Period",
+   "allowed_values": [
+    "not-present",
+    "present",
+    "mild",
+    "moderate",
+    "severe"
+   ],
+   "code": {
+    "system": "https://grovealliance.org/fhir/healthkit/CodeSystem/healthkit-measurement",
+    "code": "symptom-fatigue"
+   }
+  },
+  "HKCategoryTypeIdentifierFever": {
+   "status": "supported",
+   "title": "Fever",
+   "measurement_id": "symptom-fever",
+   "profile": "healthkit-symptom-fever",
+   "value_kind": "codeableConcept",
+   "unit": null,
+   "integer_only": false,
+   "effective": "Period",
+   "allowed_values": [
+    "not-present",
+    "present",
+    "mild",
+    "moderate",
+    "severe"
+   ],
+   "code": {
+    "system": "https://grovealliance.org/fhir/healthkit/CodeSystem/healthkit-measurement",
+    "code": "symptom-fever"
+   }
+  },
+  "HKCategoryTypeIdentifierGeneralizedBodyAche": {
+   "status": "supported",
+   "title": "Generalized Body Ache",
+   "measurement_id": "symptom-generalized-body-ache",
+   "profile": "healthkit-symptom-generalized-body-ache",
+   "value_kind": "codeableConcept",
+   "unit": null,
+   "integer_only": false,
+   "effective": "Period",
+   "allowed_values": [
+    "not-present",
+    "present",
+    "mild",
+    "moderate",
+    "severe"
+   ],
+   "code": {
+    "system": "https://grovealliance.org/fhir/healthkit/CodeSystem/healthkit-measurement",
+    "code": "symptom-generalized-body-ache"
+   }
+  },
+  "HKCategoryTypeIdentifierHairLoss": {
+   "status": "supported",
+   "title": "Hair Loss",
+   "measurement_id": "symptom-hair-loss",
+   "profile": "healthkit-symptom-hair-loss",
+   "value_kind": "codeableConcept",
+   "unit": null,
+   "integer_only": false,
+   "effective": "Period",
+   "allowed_values": [
+    "not-present",
+    "present",
+    "mild",
+    "moderate",
+    "severe"
+   ],
+   "code": {
+    "system": "https://grovealliance.org/fhir/healthkit/CodeSystem/healthkit-measurement",
+    "code": "symptom-hair-loss"
+   }
+  },
+  "HKCategoryTypeIdentifierHandwashingEvent": {
+   "status": "supported",
+   "title": "Handwashing Event",
+   "measurement_id": "handwashing-session",
+   "profile": "healthkit-handwashing-session",
+   "value_kind": "quantity",
+   "unit": "s",
+   "integer_only": false,
+   "effective": "Period",
+   "allowed_values": null,
+   "code": {
+    "system": "https://grovealliance.org/fhir/healthkit/CodeSystem/healthkit-measurement",
+    "code": "handwashing-session"
+   }
+  },
+  "HKCategoryTypeIdentifierHeadache": {
+   "status": "supported",
+   "title": "Headache",
+   "measurement_id": "symptom-headache",
+   "profile": "healthkit-symptom-headache",
+   "value_kind": "codeableConcept",
+   "unit": null,
+   "integer_only": false,
+   "effective": "Period",
+   "allowed_values": [
+    "not-present",
+    "present",
+    "mild",
+    "moderate",
+    "severe"
+   ],
+   "code": {
+    "system": "https://grovealliance.org/fhir/healthkit/CodeSystem/healthkit-measurement",
+    "code": "symptom-headache"
+   }
+  },
+  "HKCategoryTypeIdentifierHeadphoneAudioExposureEvent": {
+   "status": "supported",
+   "title": "Headphone Audio Exposure Event",
+   "measurement_id": "headphone-audio-exposure-notification",
+   "profile": "healthkit-headphone-audio-exposure-notification",
+   "value_kind": "codeableConcept",
+   "unit": null,
+   "integer_only": false,
+   "effective": "Period",
+   "allowed_values": [
+    "seven-day-limit"
+   ],
+   "code": {
+    "system": "https://grovealliance.org/fhir/healthkit/CodeSystem/healthkit-measurement",
+    "code": "headphone-audio-exposure-notification"
+   }
+  },
+  "HKCategoryTypeIdentifierHeartburn": {
+   "status": "supported",
+   "title": "Heartburn",
+   "measurement_id": "symptom-heartburn",
+   "profile": "healthkit-symptom-heartburn",
+   "value_kind": "codeableConcept",
+   "unit": null,
+   "integer_only": false,
+   "effective": "Period",
+   "allowed_values": [
+    "not-present",
+    "present",
+    "mild",
+    "moderate",
+    "severe"
+   ],
+   "code": {
+    "system": "https://grovealliance.org/fhir/healthkit/CodeSystem/healthkit-measurement",
+    "code": "symptom-heartburn"
+   }
+  },
+  "HKCategoryTypeIdentifierHighHeartRateEvent": {
+   "status": "supported",
+   "title": "High Heart Rate Event",
+   "measurement_id": "high-heart-rate-notification",
+   "profile": "healthkit-high-heart-rate-notification",
+   "value_kind": "codeableConcept",
+   "unit": null,
+   "integer_only": false,
+   "effective": "Period",
+   "allowed_values": [
+    "occurred"
+   ],
+   "code": {
+    "system": "https://grovealliance.org/fhir/healthkit/CodeSystem/healthkit-measurement",
+    "code": "high-heart-rate-notification"
+   }
+  },
+  "HKCategoryTypeIdentifierHotFlashes": {
+   "status": "supported",
+   "title": "Hot Flashes",
+   "measurement_id": "symptom-hot-flashes",
+   "profile": "healthkit-symptom-hot-flashes",
+   "value_kind": "codeableConcept",
+   "unit": null,
+   "integer_only": false,
+   "effective": "Period",
+   "allowed_values": [
+    "not-present",
+    "present",
+    "mild",
+    "moderate",
+    "severe"
+   ],
+   "code": {
+    "system": "https://grovealliance.org/fhir/healthkit/CodeSystem/healthkit-measurement",
+    "code": "symptom-hot-flashes"
+   }
+  },
+  "HKCategoryTypeIdentifierHypertensionEvent": {
+   "status": "supported",
+   "title": "Hypertension Event",
+   "measurement_id": "hypertension-notification",
+   "profile": "healthkit-hypertension-notification",
+   "value_kind": "codeableConcept",
+   "unit": null,
+   "integer_only": false,
+   "effective": "Period",
+   "allowed_values": [
+    "occurred"
+   ],
+   "code": {
+    "system": "https://grovealliance.org/fhir/healthkit/CodeSystem/healthkit-measurement",
+    "code": "hypertension-notification"
+   }
+  },
+  "HKCategoryTypeIdentifierInfrequentMenstrualCycles": {
+   "status": "supported",
+   "title": "Infrequent Menstrual Cycles",
+   "measurement_id": "infrequent-menstrual-cycles",
+   "profile": "healthkit-infrequent-menstrual-cycles",
+   "value_kind": "codeableConcept",
+   "unit": null,
+   "integer_only": false,
+   "effective": "Period",
+   "allowed_values": [
+    "present",
+    "not-present"
+   ],
+   "code": {
+    "system": "https://grovealliance.org/fhir/healthkit/CodeSystem/healthkit-measurement",
+    "code": "infrequent-menstrual-cycles"
+   }
+  },
+  "HKCategoryTypeIdentifierIntermenstrualBleeding": {
+   "status": "supported",
+   "title": "Intermenstrual Bleeding",
+   "measurement_id": "intermenstrual-bleeding",
+   "profile": "grove-mobile-intermenstrual-bleeding",
+   "value_kind": "codeableConcept",
+   "unit": null,
+   "integer_only": false,
+   "effective": "dateTime",
+   "allowed_values": [
+    "present"
+   ],
+   "code": {
+    "system": "https://grovealliance.org/fhir/mobile/CodeSystem/grove-mobile-measurement",
+    "code": "intermenstrual-bleeding"
+   }
+  },
+  "HKCategoryTypeIdentifierIrregularHeartRhythmEvent": {
+   "status": "supported",
+   "title": "Irregular Heart Rhythm Event",
+   "measurement_id": "irregular-heart-rhythm-notification",
+   "profile": "healthkit-irregular-heart-rhythm-notification",
+   "value_kind": "codeableConcept",
+   "unit": null,
+   "integer_only": false,
+   "effective": "Period",
+   "allowed_values": [
+    "occurred"
+   ],
+   "code": {
+    "system": "https://grovealliance.org/fhir/healthkit/CodeSystem/healthkit-measurement",
+    "code": "irregular-heart-rhythm-notification"
+   }
+  },
+  "HKCategoryTypeIdentifierIrregularMenstrualCycles": {
+   "status": "supported",
+   "title": "Irregular Menstrual Cycles",
+   "measurement_id": "irregular-menstrual-cycles",
+   "profile": "healthkit-irregular-menstrual-cycles",
+   "value_kind": "codeableConcept",
+   "unit": null,
+   "integer_only": false,
+   "effective": "Period",
+   "allowed_values": [
+    "present",
+    "not-present"
+   ],
+   "code": {
+    "system": "https://grovealliance.org/fhir/healthkit/CodeSystem/healthkit-measurement",
+    "code": "irregular-menstrual-cycles"
+   }
+  },
+  "HKCategoryTypeIdentifierLactation": {
+   "status": "supported",
+   "title": "Lactation",
+   "measurement_id": "lactation-status",
+   "profile": "healthkit-lactation-status",
+   "value_kind": "codeableConcept",
+   "unit": null,
+   "integer_only": false,
+   "effective": "Period",
+   "allowed_values": [
+    "lactating"
+   ],
+   "code": {
+    "system": "http://loinc.org",
+    "code": "63895-7"
+   }
+  },
+  "HKCategoryTypeIdentifierLossOfSmell": {
+   "status": "supported",
+   "title": "Loss of Smell",
+   "measurement_id": "symptom-loss-of-smell",
+   "profile": "healthkit-symptom-loss-of-smell",
+   "value_kind": "codeableConcept",
+   "unit": null,
+   "integer_only": false,
+   "effective": "Period",
+   "allowed_values": [
+    "not-present",
+    "present",
+    "mild",
+    "moderate",
+    "severe"
+   ],
+   "code": {
+    "system": "https://grovealliance.org/fhir/healthkit/CodeSystem/healthkit-measurement",
+    "code": "symptom-loss-of-smell"
+   }
+  },
+  "HKCategoryTypeIdentifierLossOfTaste": {
+   "status": "supported",
+   "title": "Loss of Taste",
+   "measurement_id": "symptom-loss-of-taste",
+   "profile": "healthkit-symptom-loss-of-taste",
+   "value_kind": "codeableConcept",
+   "unit": null,
+   "integer_only": false,
+   "effective": "Period",
+   "allowed_values": [
+    "not-present",
+    "present",
+    "mild",
+    "moderate",
+    "severe"
+   ],
+   "code": {
+    "system": "https://grovealliance.org/fhir/healthkit/CodeSystem/healthkit-measurement",
+    "code": "symptom-loss-of-taste"
+   }
+  },
+  "HKCategoryTypeIdentifierLowCardioFitnessEvent": {
+   "status": "supported",
+   "title": "Low Cardio Fitness Event",
+   "measurement_id": "low-cardio-fitness-notification",
+   "profile": "healthkit-low-cardio-fitness-notification",
+   "value_kind": "codeableConcept",
+   "unit": null,
+   "integer_only": false,
+   "effective": "Period",
+   "allowed_values": [
+    "low-fitness"
+   ],
+   "code": {
+    "system": "https://grovealliance.org/fhir/healthkit/CodeSystem/healthkit-measurement",
+    "code": "low-cardio-fitness-notification"
+   }
+  },
+  "HKCategoryTypeIdentifierLowHeartRateEvent": {
+   "status": "supported",
+   "title": "Low Heart Rate Event",
+   "measurement_id": "low-heart-rate-notification",
+   "profile": "healthkit-low-heart-rate-notification",
+   "value_kind": "codeableConcept",
+   "unit": null,
+   "integer_only": false,
+   "effective": "Period",
+   "allowed_values": [
+    "occurred"
+   ],
+   "code": {
+    "system": "https://grovealliance.org/fhir/healthkit/CodeSystem/healthkit-measurement",
+    "code": "low-heart-rate-notification"
+   }
+  },
+  "HKCategoryTypeIdentifierLowerBackPain": {
+   "status": "supported",
+   "title": "Lower Back Pain",
+   "measurement_id": "symptom-lower-back-pain",
+   "profile": "healthkit-symptom-lower-back-pain",
+   "value_kind": "codeableConcept",
+   "unit": null,
+   "integer_only": false,
+   "effective": "Period",
+   "allowed_values": [
+    "not-present",
+    "present",
+    "mild",
+    "moderate",
+    "severe"
+   ],
+   "code": {
+    "system": "https://grovealliance.org/fhir/healthkit/CodeSystem/healthkit-measurement",
+    "code": "symptom-lower-back-pain"
+   }
+  },
+  "HKCategoryTypeIdentifierMemoryLapse": {
+   "status": "supported",
+   "title": "Memory Lapse",
+   "measurement_id": "symptom-memory-lapse",
+   "profile": "healthkit-symptom-memory-lapse",
+   "value_kind": "codeableConcept",
+   "unit": null,
+   "integer_only": false,
+   "effective": "Period",
+   "allowed_values": [
+    "not-present",
+    "present",
+    "mild",
+    "moderate",
+    "severe"
+   ],
+   "code": {
+    "system": "https://grovealliance.org/fhir/healthkit/CodeSystem/healthkit-measurement",
+    "code": "symptom-memory-lapse"
+   }
+  },
+  "HKCategoryTypeIdentifierMenstrualFlow": {
+   "status": "supported",
+   "title": "Menstrual Flow",
+   "measurement_id": "menstruation-flow",
+   "profile": "grove-mobile-menstruation-flow",
+   "value_kind": "codeableConcept",
+   "unit": null,
+   "integer_only": false,
+   "effective": "dateTime",
+   "allowed_values": [
+    "unspecified",
+    "light",
+    "medium",
+    "heavy",
+    "none"
+   ],
+   "code": {
+    "system": "https://grovealliance.org/fhir/mobile/CodeSystem/grove-mobile-measurement",
+    "code": "menstruation-flow"
+   }
+  },
+  "HKCategoryTypeIdentifierMindfulSession": {
+   "status": "supported",
+   "title": "Mindful Session",
+   "measurement_id": "mindfulness-session",
+   "profile": "grove-mobile-mindfulness-session",
+   "value_kind": "quantity",
+   "unit": "min",
+   "integer_only": false,
+   "effective": "Period",
+   "allowed_values": null,
+   "code": {
+    "system": "https://grovealliance.org/fhir/mobile/CodeSystem/grove-mobile-measurement",
+    "code": "mindfulness-session-duration"
+   }
+  },
+  "HKCategoryTypeIdentifierMoodChanges": {
+   "status": "supported",
+   "title": "Mood Changes",
+   "measurement_id": "symptom-mood-changes",
+   "profile": "healthkit-symptom-mood-changes",
+   "value_kind": "codeableConcept",
+   "unit": null,
+   "integer_only": false,
+   "effective": "Period",
+   "allowed_values": [
+    "not-present",
+    "present"
+   ],
+   "code": {
+    "system": "https://grovealliance.org/fhir/healthkit/CodeSystem/healthkit-measurement",
+    "code": "symptom-mood-changes"
+   }
+  },
+  "HKCategoryTypeIdentifierNausea": {
+   "status": "supported",
+   "title": "Nausea",
+   "measurement_id": "symptom-nausea",
+   "profile": "healthkit-symptom-nausea",
+   "value_kind": "codeableConcept",
+   "unit": null,
+   "integer_only": false,
+   "effective": "Period",
+   "allowed_values": [
+    "not-present",
+    "present",
+    "mild",
+    "moderate",
+    "severe"
+   ],
+   "code": {
+    "system": "http://loinc.org",
+    "code": "81660-3"
+   }
+  },
+  "HKCategoryTypeIdentifierNightSweats": {
+   "status": "supported",
+   "title": "Night Sweats",
+   "measurement_id": "symptom-night-sweats",
+   "profile": "healthkit-symptom-night-sweats",
+   "value_kind": "codeableConcept",
+   "unit": null,
+   "integer_only": false,
+   "effective": "Period",
+   "allowed_values": [
+    "not-present",
+    "present",
+    "mild",
+    "moderate",
+    "severe"
+   ],
+   "code": {
+    "system": "https://grovealliance.org/fhir/healthkit/CodeSystem/healthkit-measurement",
+    "code": "symptom-night-sweats"
+   }
+  },
+  "HKCategoryTypeIdentifierOvulationTestResult": {
+   "status": "supported",
+   "title": "Ovulation Test Result",
+   "measurement_id": "ovulation-test-result",
+   "profile": "grove-mobile-ovulation-test-result",
+   "value_kind": "codeableConcept",
+   "unit": null,
+   "integer_only": false,
+   "effective": "dateTime",
+   "allowed_values": [
+    "negative",
+    "high-fertility",
+    "luteinizing-hormone-surge",
+    "indeterminate"
+   ],
+   "code": {
+    "system": "https://grovealliance.org/fhir/mobile/CodeSystem/grove-mobile-measurement",
+    "code": "ovulation-test-result"
+   }
+  },
+  "HKCategoryTypeIdentifierPelvicPain": {
+   "status": "supported",
+   "title": "Pelvic Pain",
+   "measurement_id": "symptom-pelvic-pain",
+   "profile": "healthkit-symptom-pelvic-pain",
+   "value_kind": "codeableConcept",
+   "unit": null,
+   "integer_only": false,
+   "effective": "Period",
+   "allowed_values": [
+    "not-present",
+    "present",
+    "mild",
+    "moderate",
+    "severe"
+   ],
+   "code": {
+    "system": "https://grovealliance.org/fhir/healthkit/CodeSystem/healthkit-measurement",
+    "code": "symptom-pelvic-pain"
+   }
+  },
+  "HKCategoryTypeIdentifierPersistentIntermenstrualBleeding": {
+   "status": "supported",
+   "title": "Persistent Intermenstrual Bleeding",
+   "measurement_id": "persistent-intermenstrual-bleeding",
+   "profile": "healthkit-persistent-intermenstrual-bleeding",
+   "value_kind": "codeableConcept",
+   "unit": null,
+   "integer_only": false,
+   "effective": "Period",
+   "allowed_values": [
+    "present",
+    "not-present"
+   ],
+   "code": {
+    "system": "https://grovealliance.org/fhir/healthkit/CodeSystem/healthkit-measurement",
+    "code": "persistent-intermenstrual-bleeding"
+   }
+  },
+  "HKCategoryTypeIdentifierPregnancy": {
+   "status": "supported",
+   "title": "Pregnancy",
+   "measurement_id": "pregnancy-status",
+   "profile": "healthkit-pregnancy-status",
+   "value_kind": "codeableConcept",
+   "unit": null,
+   "integer_only": false,
+   "effective": "Period",
+   "allowed_values": [
+    "pregnant"
+   ],
+   "code": {
+    "system": "http://loinc.org",
+    "code": "82810-3"
+   }
+  },
+  "HKCategoryTypeIdentifierPregnancyTestResult": {
+   "status": "supported",
+   "title": "Pregnancy Test Result",
+   "measurement_id": "pregnancy-test-result",
+   "profile": "healthkit-pregnancy-test-result",
+   "value_kind": "codeableConcept",
+   "unit": null,
+   "integer_only": false,
+   "effective": "dateTime",
+   "allowed_values": [
+    "negative",
+    "positive",
+    "indeterminate"
+   ],
+   "code": {
+    "system": "http://loinc.org",
+    "code": "2106-3"
+   }
+  },
+  "HKCategoryTypeIdentifierProgesteroneTestResult": {
+   "status": "supported",
+   "title": "Progesterone Test Result",
+   "measurement_id": "progesterone-test-result",
+   "profile": "healthkit-progesterone-test-result",
+   "value_kind": "codeableConcept",
+   "unit": null,
+   "integer_only": false,
+   "effective": "dateTime",
+   "allowed_values": [
+    "negative",
+    "positive",
+    "indeterminate"
+   ],
+   "code": {
+    "system": "https://grovealliance.org/fhir/healthkit/CodeSystem/healthkit-measurement",
+    "code": "progesterone-test-result"
+   }
+  },
+  "HKCategoryTypeIdentifierProlongedMenstrualPeriods": {
+   "status": "supported",
+   "title": "Prolonged Menstrual Periods",
+   "measurement_id": "prolonged-menstrual-periods",
+   "profile": "healthkit-prolonged-menstrual-periods",
+   "value_kind": "codeableConcept",
+   "unit": null,
+   "integer_only": false,
+   "effective": "Period",
+   "allowed_values": [
+    "present",
+    "not-present"
+   ],
+   "code": {
+    "system": "https://grovealliance.org/fhir/healthkit/CodeSystem/healthkit-measurement",
+    "code": "prolonged-menstrual-periods"
+   }
+  },
+  "HKCategoryTypeIdentifierRapidPoundingOrFlutteringHeartbeat": {
+   "status": "supported",
+   "title": "Rapid/Pounding/Fluttering Heartbeat",
+   "measurement_id": "symptom-rapid-pounding-or-fluttering-heartbeat",
+   "profile": "healthkit-symptom-rapid-pounding-or-fluttering-heartbeat",
+   "value_kind": "codeableConcept",
+   "unit": null,
+   "integer_only": false,
+   "effective": "Period",
+   "allowed_values": [
+    "not-present",
+    "present",
+    "mild",
+    "moderate",
+    "severe"
+   ],
+   "code": {
+    "system": "https://grovealliance.org/fhir/healthkit/CodeSystem/healthkit-measurement",
+    "code": "symptom-rapid-pounding-or-fluttering-heartbeat"
+   }
+  },
+  "HKCategoryTypeIdentifierRunnyNose": {
+   "status": "supported",
+   "title": "Runny Nose",
+   "measurement_id": "symptom-runny-nose",
+   "profile": "healthkit-symptom-runny-nose",
+   "value_kind": "codeableConcept",
+   "unit": null,
+   "integer_only": false,
+   "effective": "Period",
+   "allowed_values": [
+    "not-present",
+    "present",
+    "mild",
+    "moderate",
+    "severe"
+   ],
+   "code": {
+    "system": "https://grovealliance.org/fhir/healthkit/CodeSystem/healthkit-measurement",
+    "code": "symptom-runny-nose"
+   }
+  },
+  "HKCategoryTypeIdentifierSexualActivity": {
+   "status": "supported",
+   "title": "Sexual Activity",
+   "measurement_id": "sexual-activity",
+   "profile": "grove-mobile-sexual-activity",
+   "value_kind": "codeableConcept",
+   "unit": null,
+   "integer_only": false,
+   "effective": "dateTime",
+   "allowed_values": [
+    "protected",
+    "unprotected",
+    "unknown"
+   ],
+   "code": {
+    "system": "https://grovealliance.org/fhir/mobile/CodeSystem/grove-mobile-measurement",
+    "code": "sexual-activity"
+   }
+  },
+  "HKCategoryTypeIdentifierShortnessOfBreath": {
+   "status": "supported",
+   "title": "Shortness of Breath",
+   "measurement_id": "symptom-shortness-of-breath",
+   "profile": "healthkit-symptom-shortness-of-breath",
+   "value_kind": "codeableConcept",
+   "unit": null,
+   "integer_only": false,
+   "effective": "Period",
+   "allowed_values": [
+    "not-present",
+    "present",
+    "mild",
+    "moderate",
+    "severe"
+   ],
+   "code": {
+    "system": "https://grovealliance.org/fhir/healthkit/CodeSystem/healthkit-measurement",
+    "code": "symptom-shortness-of-breath"
+   }
+  },
+  "HKCategoryTypeIdentifierSinusCongestion": {
+   "status": "supported",
+   "title": "Sinus Congestion",
+   "measurement_id": "symptom-sinus-congestion",
+   "profile": "healthkit-symptom-sinus-congestion",
+   "value_kind": "codeableConcept",
+   "unit": null,
+   "integer_only": false,
+   "effective": "Period",
+   "allowed_values": [
+    "not-present",
+    "present",
+    "mild",
+    "moderate",
+    "severe"
+   ],
+   "code": {
+    "system": "https://grovealliance.org/fhir/healthkit/CodeSystem/healthkit-measurement",
+    "code": "symptom-sinus-congestion"
+   }
+  },
+  "HKCategoryTypeIdentifierSkippedHeartbeat": {
+   "status": "supported",
+   "title": "Skipped Heartbeat",
+   "measurement_id": "symptom-skipped-heartbeat",
+   "profile": "healthkit-symptom-skipped-heartbeat",
+   "value_kind": "codeableConcept",
+   "unit": null,
+   "integer_only": false,
+   "effective": "Period",
+   "allowed_values": [
+    "not-present",
+    "present",
+    "mild",
+    "moderate",
+    "severe"
+   ],
+   "code": {
+    "system": "https://grovealliance.org/fhir/healthkit/CodeSystem/healthkit-measurement",
+    "code": "symptom-skipped-heartbeat"
+   }
+  },
+  "HKCategoryTypeIdentifierSleepAnalysis": {
+   "status": "supported",
+   "title": "Sleep Analysis",
+   "measurement_id": "sleep-stage",
+   "profile": "grove-mobile-sleep-stage",
+   "value_kind": "codeableConcept",
+   "unit": null,
+   "integer_only": false,
+   "effective": "Period",
+   "allowed_values": [
+    "awake",
+    "in-bed",
+    "out-of-bed",
+    "asleep-unspecified",
+    "light",
+    "deep",
+    "rem",
+    "unknown"
+   ],
+   "code": {
+    "system": "https://grovealliance.org/fhir/mobile/CodeSystem/grove-mobile-measurement",
+    "code": "sleep-stage"
+   }
+  },
+  "HKCategoryTypeIdentifierSleepApneaEvent": {
+   "status": "supported",
+   "title": "Sleep Apnea Event",
+   "measurement_id": "sleep-apnea-notification",
+   "profile": "healthkit-sleep-apnea-notification",
+   "value_kind": "codeableConcept",
+   "unit": null,
+   "integer_only": false,
+   "effective": "Period",
+   "allowed_values": [
+    "occurred"
+   ],
+   "code": {
+    "system": "https://grovealliance.org/fhir/healthkit/CodeSystem/healthkit-measurement",
+    "code": "sleep-apnea-notification"
+   }
+  },
+  "HKCategoryTypeIdentifierSleepChanges": {
+   "status": "supported",
+   "title": "Sleep Changes",
+   "measurement_id": "symptom-sleep-changes",
+   "profile": "healthkit-symptom-sleep-changes",
+   "value_kind": "codeableConcept",
+   "unit": null,
+   "integer_only": false,
+   "effective": "Period",
+   "allowed_values": [
+    "not-present",
+    "present"
+   ],
+   "code": {
+    "system": "https://grovealliance.org/fhir/healthkit/CodeSystem/healthkit-measurement",
+    "code": "symptom-sleep-changes"
+   }
+  },
+  "HKCategoryTypeIdentifierSoreThroat": {
+   "status": "supported",
+   "title": "Sore Throat",
+   "measurement_id": "symptom-sore-throat",
+   "profile": "healthkit-symptom-sore-throat",
+   "value_kind": "codeableConcept",
+   "unit": null,
+   "integer_only": false,
+   "effective": "Period",
+   "allowed_values": [
+    "not-present",
+    "present",
+    "mild",
+    "moderate",
+    "severe"
+   ],
+   "code": {
+    "system": "https://grovealliance.org/fhir/healthkit/CodeSystem/healthkit-measurement",
+    "code": "symptom-sore-throat"
+   }
+  },
+  "HKCategoryTypeIdentifierToothbrushingEvent": {
+   "status": "supported",
+   "title": "Toothbrushing Event",
+   "measurement_id": "toothbrushing-session",
+   "profile": "healthkit-toothbrushing-session",
+   "value_kind": "quantity",
+   "unit": "s",
+   "integer_only": false,
+   "effective": "Period",
+   "allowed_values": null,
+   "code": {
+    "system": "https://grovealliance.org/fhir/healthkit/CodeSystem/healthkit-measurement",
+    "code": "toothbrushing-session"
+   }
+  },
+  "HKCategoryTypeIdentifierVaginalDryness": {
+   "status": "supported",
+   "title": "Vaginal Dryness",
+   "measurement_id": "vaginal-dryness",
+   "profile": "healthkit-vaginal-dryness",
+   "value_kind": "codeableConcept",
+   "unit": null,
+   "integer_only": false,
+   "effective": "dateTime",
+   "allowed_values": [
+    "not-present",
+    "present",
+    "mild",
+    "moderate",
+    "severe"
+   ],
+   "code": {
+    "system": "https://grovealliance.org/fhir/healthkit/CodeSystem/healthkit-measurement",
+    "code": "vaginal-dryness"
+   }
+  },
+  "HKCategoryTypeIdentifierVomiting": {
+   "status": "supported",
+   "title": "Vomiting",
+   "measurement_id": "symptom-vomiting",
+   "profile": "healthkit-symptom-vomiting",
+   "value_kind": "codeableConcept",
+   "unit": null,
+   "integer_only": false,
+   "effective": "Period",
+   "allowed_values": [
+    "not-present",
+    "present",
+    "mild",
+    "moderate",
+    "severe"
+   ],
+   "code": {
+    "system": "https://grovealliance.org/fhir/healthkit/CodeSystem/healthkit-measurement",
+    "code": "symptom-vomiting"
+   }
+  },
+  "HKCategoryTypeIdentifierWheezing": {
+   "status": "supported",
+   "title": "Wheezing",
+   "measurement_id": "symptom-wheezing",
+   "profile": "healthkit-symptom-wheezing",
+   "value_kind": "codeableConcept",
+   "unit": null,
+   "integer_only": false,
+   "effective": "Period",
+   "allowed_values": [
+    "not-present",
+    "present",
+    "mild",
+    "moderate",
+    "severe"
+   ],
+   "code": {
+    "system": "https://grovealliance.org/fhir/healthkit/CodeSystem/healthkit-measurement",
+    "code": "symptom-wheezing"
+   }
+  },
+  "HKCharacteristicTypeIdentifierActivityMoveMode": {
+   "status": "intentionally-unsupported",
+   "title": "Activity Move Mode"
+  },
+  "HKCharacteristicTypeIdentifierBiologicalSex": {
+   "status": "supported",
+   "title": "Biological Sex",
+   "measurement_id": "biological-sex",
+   "profile": "healthkit-biological-sex",
+   "value_kind": "codeableConcept",
+   "unit": null,
+   "integer_only": false,
+   "effective": "dateTime",
+   "allowed_values": [
+    "female",
+    "male",
+    "other"
+   ],
+   "code": {
+    "system": "http://loinc.org",
+    "code": "46098-0"
+   }
+  },
+  "HKCharacteristicTypeIdentifierBloodType": {
+   "status": "supported",
+   "title": "Blood Type",
+   "measurement_id": "blood-type",
+   "profile": "healthkit-blood-type",
+   "value_kind": "codeableConcept",
+   "unit": null,
+   "integer_only": false,
+   "effective": "dateTime",
+   "allowed_values": [
+    "a-positive",
+    "a-negative",
+    "b-positive",
+    "b-negative",
+    "ab-positive",
+    "ab-negative",
+    "o-positive",
+    "o-negative"
+   ],
+   "code": {
+    "system": "http://loinc.org",
+    "code": "882-1"
+   }
+  },
+  "HKCharacteristicTypeIdentifierDateOfBirth": {
+   "status": "supported",
+   "title": "Date of Birth",
+   "measurement_id": "date-of-birth",
+   "profile": "healthkit-date-of-birth",
+   "value_kind": "dateTime",
+   "unit": null,
+   "integer_only": false,
+   "effective": "dateTime",
+   "allowed_values": null,
+   "code": {
+    "system": "http://loinc.org",
+    "code": "21112-8"
+   }
+  },
+  "HKCharacteristicTypeIdentifierFitzpatrickSkinType": {
+   "status": "supported",
+   "title": "Fitzpatrick Skin Type",
+   "measurement_id": "fitzpatrick-skin-type",
+   "profile": "healthkit-fitzpatrick-skin-type",
+   "value_kind": "codeableConcept",
+   "unit": null,
+   "integer_only": false,
+   "effective": "dateTime",
+   "allowed_values": [
+    "type-i",
+    "type-ii",
+    "type-iii",
+    "type-iv",
+    "type-v",
+    "type-vi"
+   ],
+   "code": {
+    "system": "http://loinc.org",
+    "code": "66555-4"
+   }
+  },
+  "HKCharacteristicTypeIdentifierWheelchairUse": {
+   "status": "supported",
+   "title": "Wheelchair Use",
+   "measurement_id": "wheelchair-use",
+   "profile": "healthkit-wheelchair-use",
+   "value_kind": "codeableConcept",
+   "unit": null,
+   "integer_only": false,
+   "effective": "dateTime",
+   "allowed_values": [
+    "uses-wheelchair",
+    "does-not-use-wheelchair"
+   ],
+   "code": {
+    "system": "https://grovealliance.org/fhir/healthkit/CodeSystem/healthkit-measurement",
+    "code": "wheelchair-use"
+   }
+  },
+  "HKClinicalTypeIdentifierAllergyRecord": {
+   "status": "platform-exclusive",
+   "title": "Allergy Record"
+  },
+  "HKClinicalTypeIdentifierClinicalNoteRecord": {
+   "status": "platform-exclusive",
+   "title": "Clinical Note Record"
+  },
+  "HKClinicalTypeIdentifierConditionRecord": {
+   "status": "platform-exclusive",
+   "title": "Condition Record"
+  },
+  "HKClinicalTypeIdentifierCoverageRecord": {
+   "status": "platform-exclusive",
+   "title": "Coverage Record"
+  },
+  "HKClinicalTypeIdentifierImmunizationRecord": {
+   "status": "platform-exclusive",
+   "title": "Immunization Record"
+  },
+  "HKClinicalTypeIdentifierLabResultRecord": {
+   "status": "platform-exclusive",
+   "title": "Lab Result Record"
+  },
+  "HKClinicalTypeIdentifierMedicationRecord": {
+   "status": "platform-exclusive",
+   "title": "Medication Record"
+  },
+  "HKClinicalTypeIdentifierProcedureRecord": {
+   "status": "platform-exclusive",
+   "title": "Procedure Record"
+  },
+  "HKClinicalTypeIdentifierVitalSignRecord": {
+   "status": "platform-exclusive",
+   "title": "Vital Sign Record"
+  },
+  "HKCorrelationTypeIdentifierBloodPressure": {
+   "status": "supported",
+   "title": "Blood Pressure",
+   "measurement_id": "blood-pressure",
+   "profile": "grove-mobile-blood-pressure",
+   "value_kind": "components",
+   "unit": null,
+   "integer_only": false,
+   "effective": "dateTime",
+   "allowed_values": null,
+   "code": {
+    "system": "http://loinc.org",
+    "code": "85354-9"
+   }
+  },
+  "HKCorrelationTypeIdentifierFood": {
+   "status": "supported",
+   "title": "Food",
+   "measurement_id": "food-correlation",
+   "profile": "healthkit-food-correlation",
+   "value_kind": "grouping",
+   "unit": null,
+   "integer_only": false,
+   "effective": "Period",
+   "allowed_values": null,
+   "code": {
+    "system": "https://grovealliance.org/fhir/healthkit/CodeSystem/healthkit-measurement",
+    "code": "food-correlation"
+   }
+  },
+  "HKDataTypeIdentifierAudiogram": {
+   "status": "supported",
+   "title": "Audiogram",
+   "measurement_id": "audiogram-panel",
+   "profile": "healthkit-audiogram-panel",
+   "value_kind": "components",
+   "unit": null,
+   "integer_only": false,
+   "effective": "dateTime",
+   "allowed_values": null,
+   "code": {
+    "system": "http://loinc.org",
+    "code": "89015-2"
+   }
+  },
+  "HKDataTypeIdentifierElectrocardiogram": {
+   "status": "supported",
+   "title": "ECG",
+   "measurement_id": "electrocardiogram",
+   "value_kind": "unmodeled",
+   "measurement_ids": [
+    "electrocardiogram"
+   ]
+  },
+  "HKDataTypeIdentifierHeartbeatSeries": {
+   "status": "platform-exclusive",
+   "title": "Heartbeat Series"
+  },
+  "HKDataTypeStateOfMind": {
+   "status": "supported",
+   "title": "State of Mind",
+   "measurement_id": "state-of-mind",
+   "profile": "healthkit-state-of-mind",
+   "value_kind": "quantity",
+   "unit": "1",
+   "integer_only": false,
+   "effective": "Period",
+   "allowed_values": null,
+   "code": {
+    "system": "https://grovealliance.org/fhir/healthkit/CodeSystem/healthkit-measurement",
+    "code": "state-of-mind"
+   }
+  },
+  "HKDataTypeUserAnnotatedMedicationConcept": {
+   "status": "platform-exclusive",
+   "title": "User Annotated Medication Concept"
+  },
+  "HKDocumentTypeIdentifierCDA": {
+   "status": "platform-exclusive",
+   "title": "CDA Document"
+  },
+  "HKMedicationDoseEventTypeIdentifierMedicationDoseEvent": {
+   "status": "platform-exclusive",
+   "title": "Medication Dose Event"
+  },
+  "HKQuantityTypeIdentifierActiveEnergyBurned": {
+   "status": "supported",
+   "title": "Active Energy Burned",
+   "measurement_id": "active-energy",
+   "profile": "grove-mobile-active-energy",
+   "value_kind": "quantity",
+   "unit": "kcal",
+   "integer_only": false,
+   "effective": "Period",
+   "allowed_values": null,
+   "code": {
+    "system": "https://grovealliance.org/fhir/mobile/CodeSystem/grove-mobile-measurement",
+    "code": "active-energy-burned"
+   }
+  },
+  "HKQuantityTypeIdentifierAppleExerciseTime": {
+   "status": "supported",
+   "title": "Apple Exercise Time",
+   "measurement_id": "apple-exercise-time",
+   "profile": "healthkit-apple-exercise-time",
+   "value_kind": "quantity",
+   "unit": "min",
+   "integer_only": false,
+   "effective": "Period",
+   "allowed_values": null,
+   "code": {
+    "system": "https://grovealliance.org/fhir/healthkit/CodeSystem/healthkit-measurement",
+    "code": "apple-exercise-time"
+   }
+  },
+  "HKQuantityTypeIdentifierAppleMoveTime": {
+   "status": "supported",
+   "title": "Apple Move Time",
+   "measurement_id": "apple-move-time",
+   "profile": "healthkit-apple-move-time",
+   "value_kind": "quantity",
+   "unit": "min",
+   "integer_only": false,
+   "effective": "Period",
+   "allowed_values": null,
+   "code": {
+    "system": "https://grovealliance.org/fhir/healthkit/CodeSystem/healthkit-measurement",
+    "code": "apple-move-time"
+   }
+  },
+  "HKQuantityTypeIdentifierAppleSleepingBreathingDisturbances": {
+   "status": "supported",
+   "title": "Apple Sleeping Breathing Disturbances",
+   "measurement_id": "sleeping-breathing-disturbances",
+   "profile": "healthkit-sleeping-breathing-disturbances",
+   "value_kind": "quantity",
+   "unit": "/h",
+   "integer_only": false,
+   "effective": "Period",
+   "allowed_values": null,
+   "code": {
+    "system": "https://grovealliance.org/fhir/healthkit/CodeSystem/healthkit-measurement",
+    "code": "sleeping-breathing-disturbances"
+   }
+  },
+  "HKQuantityTypeIdentifierAppleSleepingWristTemperature": {
+   "status": "supported",
+   "title": "Apple Sleeping Wrist Temperature",
+   "measurement_id": "skin-temperature",
+   "profile": "grove-mobile-skin-temperature",
+   "value_kind": "quantity",
+   "unit": "Cel",
+   "integer_only": false,
+   "effective": "dateTime",
+   "allowed_values": null,
+   "code": {
+    "system": "http://loinc.org",
+    "code": "61008-9"
+   }
+  },
+  "HKQuantityTypeIdentifierAppleStandTime": {
+   "status": "supported",
+   "title": "Apple Stand Time",
+   "measurement_id": "apple-stand-time",
+   "profile": "healthkit-apple-stand-time",
+   "value_kind": "quantity",
+   "unit": "min",
+   "integer_only": false,
+   "effective": "Period",
+   "allowed_values": null,
+   "code": {
+    "system": "https://grovealliance.org/fhir/healthkit/CodeSystem/healthkit-measurement",
+    "code": "apple-stand-time"
+   }
+  },
+  "HKQuantityTypeIdentifierAppleWalkingSteadiness": {
+   "status": "supported",
+   "title": "Apple Walking Steadiness",
+   "measurement_id": "walking-steadiness",
+   "profile": "healthkit-walking-steadiness",
+   "value_kind": "quantity",
+   "unit": "%",
+   "integer_only": false,
+   "effective": "Period",
+   "allowed_values": null,
+   "code": {
+    "system": "https://grovealliance.org/fhir/healthkit/CodeSystem/healthkit-measurement",
+    "code": "walking-steadiness"
+   }
+  },
+  "HKQuantityTypeIdentifierAtrialFibrillationBurden": {
+   "status": "supported",
+   "title": "AFib Burden",
+   "measurement_id": "atrial-fibrillation-burden",
+   "profile": "healthkit-atrial-fibrillation-burden",
+   "value_kind": "quantity",
+   "unit": "%",
+   "integer_only": false,
+   "effective": "Period",
+   "allowed_values": null,
+   "code": {
+    "system": "https://grovealliance.org/fhir/healthkit/CodeSystem/healthkit-measurement",
+    "code": "atrial-fibrillation-burden"
+   }
+  },
+  "HKQuantityTypeIdentifierBasalBodyTemperature": {
+   "status": "supported",
+   "title": "Basal Body Temperature",
+   "measurement_id": "basal-body-temperature",
+   "profile": "grove-mobile-basal-body-temperature",
+   "value_kind": "quantity",
+   "unit": "Cel",
+   "integer_only": false,
+   "effective": "dateTime",
+   "allowed_values": null,
+   "code": {
+    "system": "https://grovealliance.org/fhir/mobile/CodeSystem/grove-mobile-measurement",
+    "code": "basal-body-temperature"
+   }
+  },
+  "HKQuantityTypeIdentifierBasalEnergyBurned": {
+   "status": "supported",
+   "title": "Basal Energy Burned",
+   "measurement_id": "basal-energy",
+   "profile": "grove-mobile-basal-energy",
+   "value_kind": "quantity",
+   "unit": "kcal",
+   "integer_only": false,
+   "effective": "Period",
+   "allowed_values": null,
+   "code": {
+    "system": "https://grovealliance.org/fhir/mobile/CodeSystem/grove-mobile-measurement",
+    "code": "basal-energy-burned"
+   }
+  },
+  "HKQuantityTypeIdentifierBloodAlcoholContent": {
+   "status": "supported",
+   "title": "Blood Alcohol Content",
+   "measurement_id": "blood-alcohol-content",
+   "profile": "healthkit-blood-alcohol-content",
+   "value_kind": "quantity",
+   "unit": "%",
+   "integer_only": false,
+   "effective": "dateTime",
+   "allowed_values": null,
+   "code": {
+    "system": "https://grovealliance.org/fhir/healthkit/CodeSystem/healthkit-measurement",
+    "code": "blood-alcohol-content"
+   }
+  },
+  "HKQuantityTypeIdentifierBloodGlucose": {
+   "status": "supported",
+   "title": "Blood Glucose",
+   "measurement_id": "blood-glucose-unspecified-specimen",
+   "profile": "grove-mobile-blood-glucose-unspecified-specimen",
+   "value_kind": "quantity",
+   "unit": "mg/dL",
+   "integer_only": false,
+   "effective": "dateTime",
+   "allowed_values": null,
+   "code": {
+    "system": "http://loinc.org",
+    "code": "2339-0"
+   }
+  },
+  "HKQuantityTypeIdentifierBloodPressureDiastolic": {
+   "status": "intentionally-unsupported",
+   "title": "Blood Pressure (Diastolic)"
+  },
+  "HKQuantityTypeIdentifierBloodPressureSystolic": {
+   "status": "intentionally-unsupported",
+   "title": "Blood Pressure (Systolic)"
+  },
+  "HKQuantityTypeIdentifierBodyFatPercentage": {
+   "status": "supported",
+   "title": "Body Fat Percentage",
+   "measurement_id": "body-fat-percentage",
+   "profile": "grove-mobile-body-fat-percentage",
+   "value_kind": "quantity",
+   "unit": "%",
+   "integer_only": false,
+   "effective": "dateTime",
+   "allowed_values": null,
+   "code": {
+    "system": "http://loinc.org",
+    "code": "41982-0"
+   }
+  },
+  "HKQuantityTypeIdentifierBodyMass": {
+   "status": "supported",
+   "title": "Body Mass",
+   "measurement_id": "body-weight",
+   "profile": "grove-mobile-body-weight",
+   "value_kind": "quantity",
+   "unit": "kg",
+   "integer_only": false,
+   "effective": "dateTime",
+   "allowed_values": null,
+   "code": {
+    "system": "http://loinc.org",
+    "code": "29463-7"
+   }
+  },
+  "HKQuantityTypeIdentifierBodyMassIndex": {
+   "status": "supported",
+   "title": "BMI",
+   "measurement_id": "body-mass-index",
+   "profile": "http://hl7.org/fhir/StructureDefinition/bmi",
+   "value_kind": "quantity",
+   "unit": "kg/m2",
+   "integer_only": false,
+   "effective": "dateTime",
+   "allowed_values": null,
+   "code": {
+    "system": "http://loinc.org",
+    "code": "39156-5"
+   }
+  },
+  "HKQuantityTypeIdentifierBodyTemperature": {
+   "status": "supported",
+   "title": "Body Temperature",
+   "measurement_id": "body-temperature",
+   "profile": "grove-mobile-body-temperature",
+   "value_kind": "quantity",
+   "unit": "Cel",
+   "integer_only": false,
+   "effective": "dateTime",
+   "allowed_values": null,
+   "code": {
+    "system": "http://loinc.org",
+    "code": "8310-5"
+   }
+  },
+  "HKQuantityTypeIdentifierCrossCountrySkiingSpeed": {
+   "status": "supported",
+   "title": "Cross Country Skiing Speed",
+   "measurement_id": "speed",
+   "profile": "grove-mobile-speed",
+   "value_kind": "quantity",
+   "unit": "m/s",
+   "integer_only": false,
+   "effective": "dateTime",
+   "allowed_values": null,
+   "code": {
+    "system": "https://grovealliance.org/fhir/mobile/CodeSystem/grove-mobile-measurement",
+    "code": "speed"
+   }
+  },
+  "HKQuantityTypeIdentifierCyclingCadence": {
+   "status": "supported",
+   "title": "Cycling Cadence",
+   "measurement_id": "cycling-cadence",
+   "profile": "grove-mobile-cycling-cadence",
+   "value_kind": "quantity",
+   "unit": "/min",
+   "integer_only": false,
+   "effective": "dateTime",
+   "allowed_values": null,
+   "code": {
+    "system": "https://grovealliance.org/fhir/mobile/CodeSystem/grove-mobile-measurement",
+    "code": "cycling-cadence"
+   }
+  },
+  "HKQuantityTypeIdentifierCyclingFunctionalThresholdPower": {
+   "status": "supported",
+   "title": "Cycling Functional Threshold Power",
+   "measurement_id": "cycling-functional-threshold-power",
+   "profile": "healthkit-cycling-functional-threshold-power",
+   "value_kind": "quantity",
+   "unit": "W",
+   "integer_only": false,
+   "effective": "dateTime",
+   "allowed_values": null,
+   "code": {
+    "system": "https://grovealliance.org/fhir/healthkit/CodeSystem/healthkit-measurement",
+    "code": "cycling-functional-threshold-power"
+   }
+  },
+  "HKQuantityTypeIdentifierCyclingPower": {
+   "status": "supported",
+   "title": "Cycling Power",
+   "measurement_id": "power",
+   "profile": "grove-mobile-power",
+   "value_kind": "quantity",
+   "unit": "W",
+   "integer_only": false,
+   "effective": "dateTime",
+   "allowed_values": null,
+   "code": {
+    "system": "https://grovealliance.org/fhir/mobile/CodeSystem/grove-mobile-measurement",
+    "code": "power"
+   }
+  },
+  "HKQuantityTypeIdentifierCyclingSpeed": {
+   "status": "supported",
+   "title": "Cycling Speed",
+   "measurement_id": "speed",
+   "profile": "grove-mobile-speed",
+   "value_kind": "quantity",
+   "unit": "m/s",
+   "integer_only": false,
+   "effective": "dateTime",
+   "allowed_values": null,
+   "code": {
+    "system": "https://grovealliance.org/fhir/mobile/CodeSystem/grove-mobile-measurement",
+    "code": "speed"
+   }
+  },
+  "HKQuantityTypeIdentifierDietaryBiotin": {
+   "status": "supported",
+   "title": "Dietary Biotin Intake",
+   "measurement_id": "dietary-biotin",
+   "profile": "grove-mobile-dietary-biotin",
+   "value_kind": "quantity",
+   "unit": "ug",
+   "integer_only": false,
+   "effective": "Period",
+   "allowed_values": null,
+   "code": {
+    "system": "https://grovealliance.org/fhir/mobile/CodeSystem/grove-mobile-measurement",
+    "code": "dietary-biotin"
+   }
+  },
+  "HKQuantityTypeIdentifierDietaryCaffeine": {
+   "status": "supported",
+   "title": "Dietary Caffeine Intake",
+   "measurement_id": "dietary-caffeine",
+   "profile": "grove-mobile-dietary-caffeine",
+   "value_kind": "quantity",
+   "unit": "mg",
+   "integer_only": false,
+   "effective": "Period",
+   "allowed_values": null,
+   "code": {
+    "system": "https://grovealliance.org/fhir/mobile/CodeSystem/grove-mobile-measurement",
+    "code": "dietary-caffeine"
+   }
+  },
+  "HKQuantityTypeIdentifierDietaryCalcium": {
+   "status": "supported",
+   "title": "Dietary Calcium Intake",
+   "measurement_id": "dietary-calcium",
+   "profile": "grove-mobile-dietary-calcium",
+   "value_kind": "quantity",
+   "unit": "mg",
+   "integer_only": false,
+   "effective": "Period",
+   "allowed_values": null,
+   "code": {
+    "system": "https://grovealliance.org/fhir/mobile/CodeSystem/grove-mobile-measurement",
+    "code": "dietary-calcium"
+   }
+  },
+  "HKQuantityTypeIdentifierDietaryCarbohydrates": {
+   "status": "supported",
+   "title": "Dietary Carbohydrates Intake",
+   "measurement_id": "dietary-carbohydrates",
+   "profile": "grove-mobile-dietary-carbohydrates",
+   "value_kind": "quantity",
+   "unit": "g",
+   "integer_only": false,
+   "effective": "Period",
+   "allowed_values": null,
+   "code": {
+    "system": "http://loinc.org",
+    "code": "9060-5"
+   }
+  },
+  "HKQuantityTypeIdentifierDietaryChloride": {
+   "status": "supported",
+   "title": "Dietary Chloride Intake",
+   "measurement_id": "dietary-chloride",
+   "profile": "grove-mobile-dietary-chloride",
+   "value_kind": "quantity",
+   "unit": "mg",
+   "integer_only": false,
+   "effective": "Period",
+   "allowed_values": null,
+   "code": {
+    "system": "https://grovealliance.org/fhir/mobile/CodeSystem/grove-mobile-measurement",
+    "code": "dietary-chloride"
+   }
+  },
+  "HKQuantityTypeIdentifierDietaryCholesterol": {
+   "status": "supported",
+   "title": "Dietary Cholesterol Intake",
+   "measurement_id": "dietary-cholesterol",
+   "profile": "grove-mobile-dietary-cholesterol",
+   "value_kind": "quantity",
+   "unit": "mg",
+   "integer_only": false,
+   "effective": "Period",
+   "allowed_values": null,
+   "code": {
+    "system": "https://grovealliance.org/fhir/mobile/CodeSystem/grove-mobile-measurement",
+    "code": "dietary-cholesterol"
+   }
+  },
+  "HKQuantityTypeIdentifierDietaryChromium": {
+   "status": "supported",
+   "title": "Dietary Chromium Intake",
+   "measurement_id": "dietary-chromium",
+   "profile": "grove-mobile-dietary-chromium",
+   "value_kind": "quantity",
+   "unit": "ug",
+   "integer_only": false,
+   "effective": "Period",
+   "allowed_values": null,
+   "code": {
+    "system": "https://grovealliance.org/fhir/mobile/CodeSystem/grove-mobile-measurement",
+    "code": "dietary-chromium"
+   }
+  },
+  "HKQuantityTypeIdentifierDietaryCopper": {
+   "status": "supported",
+   "title": "Dietary Copper Intake",
+   "measurement_id": "dietary-copper",
+   "profile": "grove-mobile-dietary-copper",
+   "value_kind": "quantity",
+   "unit": "ug",
+   "integer_only": false,
+   "effective": "Period",
+   "allowed_values": null,
+   "code": {
+    "system": "https://grovealliance.org/fhir/mobile/CodeSystem/grove-mobile-measurement",
+    "code": "dietary-copper"
+   }
+  },
+  "HKQuantityTypeIdentifierDietaryEnergyConsumed": {
+   "status": "supported",
+   "title": "Dietary Energy Consumed",
+   "measurement_id": "dietary-energy",
+   "profile": "grove-mobile-dietary-energy",
+   "value_kind": "quantity",
+   "unit": "kcal",
+   "integer_only": false,
+   "effective": "Period",
+   "allowed_values": null,
+   "code": {
+    "system": "http://loinc.org",
+    "code": "9052-2"
+   }
+  },
+  "HKQuantityTypeIdentifierDietaryFatMonounsaturated": {
+   "status": "supported",
+   "title": "Dietary Monounsaturated Fat Intake",
+   "measurement_id": "dietary-fat-monounsaturated",
+   "profile": "grove-mobile-dietary-fat-monounsaturated",
+   "value_kind": "quantity",
+   "unit": "g",
+   "integer_only": false,
+   "effective": "Period",
+   "allowed_values": null,
+   "code": {
+    "system": "https://grovealliance.org/fhir/mobile/CodeSystem/grove-mobile-measurement",
+    "code": "dietary-fat-monounsaturated"
+   }
+  },
+  "HKQuantityTypeIdentifierDietaryFatPolyunsaturated": {
+   "status": "supported",
+   "title": "Dietary Polyunsaturated Fat Intake",
+   "measurement_id": "dietary-fat-polyunsaturated",
+   "profile": "grove-mobile-dietary-fat-polyunsaturated",
+   "value_kind": "quantity",
+   "unit": "g",
+   "integer_only": false,
+   "effective": "Period",
+   "allowed_values": null,
+   "code": {
+    "system": "https://grovealliance.org/fhir/mobile/CodeSystem/grove-mobile-measurement",
+    "code": "dietary-fat-polyunsaturated"
+   }
+  },
+  "HKQuantityTypeIdentifierDietaryFatSaturated": {
+   "status": "supported",
+   "title": "Dietary Saturated Fat Intake",
+   "measurement_id": "dietary-fat-saturated",
+   "profile": "grove-mobile-dietary-fat-saturated",
+   "value_kind": "quantity",
+   "unit": "g",
+   "integer_only": false,
+   "effective": "Period",
+   "allowed_values": null,
+   "code": {
+    "system": "https://grovealliance.org/fhir/mobile/CodeSystem/grove-mobile-measurement",
+    "code": "dietary-fat-saturated"
+   }
+  },
+  "HKQuantityTypeIdentifierDietaryFatTotal": {
+   "status": "supported",
+   "title": "Dietary Total Fat Intake",
+   "measurement_id": "dietary-fat-total",
+   "profile": "grove-mobile-dietary-fat-total",
+   "value_kind": "quantity",
+   "unit": "g",
+   "integer_only": false,
+   "effective": "Period",
+   "allowed_values": null,
+   "code": {
+    "system": "http://loinc.org",
+    "code": "9067-0"
+   }
+  },
+  "HKQuantityTypeIdentifierDietaryFiber": {
+   "status": "supported",
+   "title": "Dietary Fiber Intake",
+   "measurement_id": "dietary-fiber",
+   "profile": "grove-mobile-dietary-fiber",
+   "value_kind": "quantity",
+   "unit": "g",
+   "integer_only": false,
+   "effective": "Period",
+   "allowed_values": null,
+   "code": {
+    "system": "https://grovealliance.org/fhir/mobile/CodeSystem/grove-mobile-measurement",
+    "code": "dietary-fiber"
+   }
+  },
+  "HKQuantityTypeIdentifierDietaryFolate": {
+   "status": "supported",
+   "title": "Dietary Folate Intake",
+   "measurement_id": "dietary-folate",
+   "profile": "grove-mobile-dietary-folate",
+   "value_kind": "quantity",
+   "unit": "ug",
+   "integer_only": false,
+   "effective": "Period",
+   "allowed_values": null,
+   "code": {
+    "system": "https://grovealliance.org/fhir/mobile/CodeSystem/grove-mobile-measurement",
+    "code": "dietary-folate"
+   }
+  },
+  "HKQuantityTypeIdentifierDietaryIodine": {
+   "status": "supported",
+   "title": "Dietary Iodine Intake",
+   "measurement_id": "dietary-iodine",
+   "profile": "grove-mobile-dietary-iodine",
+   "value_kind": "quantity",
+   "unit": "ug",
+   "integer_only": false,
+   "effective": "Period",
+   "allowed_values": null,
+   "code": {
+    "system": "https://grovealliance.org/fhir/mobile/CodeSystem/grove-mobile-measurement",
+    "code": "dietary-iodine"
+   }
+  },
+  "HKQuantityTypeIdentifierDietaryIron": {
+   "status": "supported",
+   "title": "Dietary Iron Intake",
+   "measurement_id": "dietary-iron",
+   "profile": "grove-mobile-dietary-iron",
+   "value_kind": "quantity",
+   "unit": "mg",
+   "integer_only": false,
+   "effective": "Period",
+   "allowed_values": null,
+   "code": {
+    "system": "https://grovealliance.org/fhir/mobile/CodeSystem/grove-mobile-measurement",
+    "code": "dietary-iron"
+   }
+  },
+  "HKQuantityTypeIdentifierDietaryMagnesium": {
+   "status": "supported",
+   "title": "Dietary Magnesium Intake",
+   "measurement_id": "dietary-magnesium",
+   "profile": "grove-mobile-dietary-magnesium",
+   "value_kind": "quantity",
+   "unit": "mg",
+   "integer_only": false,
+   "effective": "Period",
+   "allowed_values": null,
+   "code": {
+    "system": "https://grovealliance.org/fhir/mobile/CodeSystem/grove-mobile-measurement",
+    "code": "dietary-magnesium"
+   }
+  },
+  "HKQuantityTypeIdentifierDietaryManganese": {
+   "status": "supported",
+   "title": "Dietary Manganese Intake",
+   "measurement_id": "dietary-manganese",
+   "profile": "grove-mobile-dietary-manganese",
+   "value_kind": "quantity",
+   "unit": "mg",
+   "integer_only": false,
+   "effective": "Period",
+   "allowed_values": null,
+   "code": {
+    "system": "https://grovealliance.org/fhir/mobile/CodeSystem/grove-mobile-measurement",
+    "code": "dietary-manganese"
+   }
+  },
+  "HKQuantityTypeIdentifierDietaryMolybdenum": {
+   "status": "supported",
+   "title": "Dietary Molybdenum Intake",
+   "measurement_id": "dietary-molybdenum",
+   "profile": "grove-mobile-dietary-molybdenum",
+   "value_kind": "quantity",
+   "unit": "ug",
+   "integer_only": false,
+   "effective": "Period",
+   "allowed_values": null,
+   "code": {
+    "system": "https://grovealliance.org/fhir/mobile/CodeSystem/grove-mobile-measurement",
+    "code": "dietary-molybdenum"
+   }
+  },
+  "HKQuantityTypeIdentifierDietaryNiacin": {
+   "status": "supported",
+   "title": "Dietary Niacin Intake",
+   "measurement_id": "dietary-niacin",
+   "profile": "grove-mobile-dietary-niacin",
+   "value_kind": "quantity",
+   "unit": "mg",
+   "integer_only": false,
+   "effective": "Period",
+   "allowed_values": null,
+   "code": {
+    "system": "https://grovealliance.org/fhir/mobile/CodeSystem/grove-mobile-measurement",
+    "code": "dietary-niacin"
+   }
+  },
+  "HKQuantityTypeIdentifierDietaryPantothenicAcid": {
+   "status": "supported",
+   "title": "Dietary Pantothenic Acid Intake",
+   "measurement_id": "dietary-pantothenic-acid",
+   "profile": "grove-mobile-dietary-pantothenic-acid",
+   "value_kind": "quantity",
+   "unit": "mg",
+   "integer_only": false,
+   "effective": "Period",
+   "allowed_values": null,
+   "code": {
+    "system": "https://grovealliance.org/fhir/mobile/CodeSystem/grove-mobile-measurement",
+    "code": "dietary-pantothenic-acid"
+   }
+  },
+  "HKQuantityTypeIdentifierDietaryPhosphorus": {
+   "status": "supported",
+   "title": "Dietary Phosphorus Intake",
+   "measurement_id": "dietary-phosphorus",
+   "profile": "grove-mobile-dietary-phosphorus",
+   "value_kind": "quantity",
+   "unit": "mg",
+   "integer_only": false,
+   "effective": "Period",
+   "allowed_values": null,
+   "code": {
+    "system": "https://grovealliance.org/fhir/mobile/CodeSystem/grove-mobile-measurement",
+    "code": "dietary-phosphorus"
+   }
+  },
+  "HKQuantityTypeIdentifierDietaryPotassium": {
+   "status": "supported",
+   "title": "Dietary Potassium Intake",
+   "measurement_id": "dietary-potassium",
+   "profile": "grove-mobile-dietary-potassium",
+   "value_kind": "quantity",
+   "unit": "mg",
+   "integer_only": false,
+   "effective": "Period",
+   "allowed_values": null,
+   "code": {
+    "system": "https://grovealliance.org/fhir/mobile/CodeSystem/grove-mobile-measurement",
+    "code": "dietary-potassium"
+   }
+  },
+  "HKQuantityTypeIdentifierDietaryProtein": {
+   "status": "supported",
+   "title": "Dietary Protein Intake",
+   "measurement_id": "dietary-protein",
+   "profile": "grove-mobile-dietary-protein",
+   "value_kind": "quantity",
+   "unit": "g",
+   "integer_only": false,
+   "effective": "Period",
+   "allowed_values": null,
+   "code": {
+    "system": "http://loinc.org",
+    "code": "9080-3"
+   }
+  },
+  "HKQuantityTypeIdentifierDietaryRiboflavin": {
+   "status": "supported",
+   "title": "Dietary Riboflavin Intake",
+   "measurement_id": "dietary-riboflavin",
+   "profile": "grove-mobile-dietary-riboflavin",
+   "value_kind": "quantity",
+   "unit": "mg",
+   "integer_only": false,
+   "effective": "Period",
+   "allowed_values": null,
+   "code": {
+    "system": "https://grovealliance.org/fhir/mobile/CodeSystem/grove-mobile-measurement",
+    "code": "dietary-riboflavin"
+   }
+  },
+  "HKQuantityTypeIdentifierDietarySelenium": {
+   "status": "supported",
+   "title": "Dietary Selenium Intake",
+   "measurement_id": "dietary-selenium",
+   "profile": "grove-mobile-dietary-selenium",
+   "value_kind": "quantity",
+   "unit": "ug",
+   "integer_only": false,
+   "effective": "Period",
+   "allowed_values": null,
+   "code": {
+    "system": "https://grovealliance.org/fhir/mobile/CodeSystem/grove-mobile-measurement",
+    "code": "dietary-selenium"
+   }
+  },
+  "HKQuantityTypeIdentifierDietarySodium": {
+   "status": "supported",
+   "title": "Dietary Sodium Intake",
+   "measurement_id": "dietary-sodium",
+   "profile": "grove-mobile-dietary-sodium",
+   "value_kind": "quantity",
+   "unit": "mg",
+   "integer_only": false,
+   "effective": "Period",
+   "allowed_values": null,
+   "code": {
+    "system": "https://grovealliance.org/fhir/mobile/CodeSystem/grove-mobile-measurement",
+    "code": "dietary-sodium"
+   }
+  },
+  "HKQuantityTypeIdentifierDietarySugar": {
+   "status": "supported",
+   "title": "Dietary Sugar Intake",
+   "measurement_id": "dietary-sugar",
+   "profile": "grove-mobile-dietary-sugar",
+   "value_kind": "quantity",
+   "unit": "g",
+   "integer_only": false,
+   "effective": "Period",
+   "allowed_values": null,
+   "code": {
+    "system": "https://grovealliance.org/fhir/mobile/CodeSystem/grove-mobile-measurement",
+    "code": "dietary-sugar"
+   }
+  },
+  "HKQuantityTypeIdentifierDietaryThiamin": {
+   "status": "supported",
+   "title": "Dietary Thiamin Intake",
+   "measurement_id": "dietary-thiamin",
+   "profile": "grove-mobile-dietary-thiamin",
+   "value_kind": "quantity",
+   "unit": "mg",
+   "integer_only": false,
+   "effective": "Period",
+   "allowed_values": null,
+   "code": {
+    "system": "https://grovealliance.org/fhir/mobile/CodeSystem/grove-mobile-measurement",
+    "code": "dietary-thiamin"
+   }
+  },
+  "HKQuantityTypeIdentifierDietaryVitaminA": {
+   "status": "supported",
+   "title": "Dietary Vitamin A Intake",
+   "measurement_id": "dietary-vitamin-a",
+   "profile": "grove-mobile-dietary-vitamin-a",
+   "value_kind": "quantity",
+   "unit": "ug",
+   "integer_only": false,
+   "effective": "Period",
+   "allowed_values": null,
+   "code": {
+    "system": "https://grovealliance.org/fhir/mobile/CodeSystem/grove-mobile-measurement",
+    "code": "dietary-vitamin-a"
+   }
+  },
+  "HKQuantityTypeIdentifierDietaryVitaminB12": {
+   "status": "supported",
+   "title": "Dietary Vitamin B12 Intake",
+   "measurement_id": "dietary-vitamin-b12",
+   "profile": "grove-mobile-dietary-vitamin-b12",
+   "value_kind": "quantity",
+   "unit": "ug",
+   "integer_only": false,
+   "effective": "Period",
+   "allowed_values": null,
+   "code": {
+    "system": "https://grovealliance.org/fhir/mobile/CodeSystem/grove-mobile-measurement",
+    "code": "dietary-vitamin-b12"
+   }
+  },
+  "HKQuantityTypeIdentifierDietaryVitaminB6": {
+   "status": "supported",
+   "title": "Dietary Vitamin B6 Intake",
+   "measurement_id": "dietary-vitamin-b6",
+   "profile": "grove-mobile-dietary-vitamin-b6",
+   "value_kind": "quantity",
+   "unit": "mg",
+   "integer_only": false,
+   "effective": "Period",
+   "allowed_values": null,
+   "code": {
+    "system": "https://grovealliance.org/fhir/mobile/CodeSystem/grove-mobile-measurement",
+    "code": "dietary-vitamin-b6"
+   }
+  },
+  "HKQuantityTypeIdentifierDietaryVitaminC": {
+   "status": "supported",
+   "title": "Dietary Vitamin C Intake",
+   "measurement_id": "dietary-vitamin-c",
+   "profile": "grove-mobile-dietary-vitamin-c",
+   "value_kind": "quantity",
+   "unit": "mg",
+   "integer_only": false,
+   "effective": "Period",
+   "allowed_values": null,
+   "code": {
+    "system": "https://grovealliance.org/fhir/mobile/CodeSystem/grove-mobile-measurement",
+    "code": "dietary-vitamin-c"
+   }
+  },
+  "HKQuantityTypeIdentifierDietaryVitaminD": {
+   "status": "supported",
+   "title": "Dietary Vitamin D Intake",
+   "measurement_id": "dietary-vitamin-d",
+   "profile": "grove-mobile-dietary-vitamin-d",
+   "value_kind": "quantity",
+   "unit": "ug",
+   "integer_only": false,
+   "effective": "Period",
+   "allowed_values": null,
+   "code": {
+    "system": "https://grovealliance.org/fhir/mobile/CodeSystem/grove-mobile-measurement",
+    "code": "dietary-vitamin-d"
+   }
+  },
+  "HKQuantityTypeIdentifierDietaryVitaminE": {
+   "status": "supported",
+   "title": "Dietary Vitamin E Intake",
+   "measurement_id": "dietary-vitamin-e",
+   "profile": "grove-mobile-dietary-vitamin-e",
+   "value_kind": "quantity",
+   "unit": "mg",
+   "integer_only": false,
+   "effective": "Period",
+   "allowed_values": null,
+   "code": {
+    "system": "https://grovealliance.org/fhir/mobile/CodeSystem/grove-mobile-measurement",
+    "code": "dietary-vitamin-e"
+   }
+  },
+  "HKQuantityTypeIdentifierDietaryVitaminK": {
+   "status": "supported",
+   "title": "Dietary Vitamin K Intake",
+   "measurement_id": "dietary-vitamin-k",
+   "profile": "grove-mobile-dietary-vitamin-k",
+   "value_kind": "quantity",
+   "unit": "ug",
+   "integer_only": false,
+   "effective": "Period",
+   "allowed_values": null,
+   "code": {
+    "system": "https://grovealliance.org/fhir/mobile/CodeSystem/grove-mobile-measurement",
+    "code": "dietary-vitamin-k"
+   }
+  },
+  "HKQuantityTypeIdentifierDietaryWater": {
+   "status": "supported",
+   "title": "Dietary Water Intake",
+   "measurement_id": "fluid-intake",
+   "profile": "grove-mobile-fluid-intake",
+   "value_kind": "quantity",
+   "unit": "mL",
+   "integer_only": false,
+   "effective": "Period",
+   "allowed_values": null,
+   "code": {
+    "system": "http://loinc.org",
+    "code": "8985-4"
+   }
+  },
+  "HKQuantityTypeIdentifierDietaryZinc": {
+   "status": "supported",
+   "title": "Dietary Zinc Intake",
+   "measurement_id": "dietary-zinc",
+   "profile": "grove-mobile-dietary-zinc",
+   "value_kind": "quantity",
+   "unit": "mg",
+   "integer_only": false,
+   "effective": "Period",
+   "allowed_values": null,
+   "code": {
+    "system": "https://grovealliance.org/fhir/mobile/CodeSystem/grove-mobile-measurement",
+    "code": "dietary-zinc"
+   }
+  },
+  "HKQuantityTypeIdentifierDistanceCrossCountrySkiing": {
+   "status": "supported",
+   "title": "Cross-Country Skiing Distance",
+   "measurement_id": "distance",
+   "profile": "grove-mobile-distance",
+   "value_kind": "quantity",
+   "unit": "m",
+   "integer_only": false,
+   "effective": "Period",
+   "allowed_values": null,
+   "code": {
+    "system": "http://loinc.org",
+    "code": "103208-5"
+   }
+  },
+  "HKQuantityTypeIdentifierDistanceCycling": {
+   "status": "supported",
+   "title": "Cycling Distance",
+   "measurement_id": "distance",
+   "profile": "grove-mobile-distance",
+   "value_kind": "quantity",
+   "unit": "m",
+   "integer_only": false,
+   "effective": "Period",
+   "allowed_values": null,
+   "code": {
+    "system": "http://loinc.org",
+    "code": "103208-5"
+   }
+  },
+  "HKQuantityTypeIdentifierDistanceDownhillSnowSports": {
+   "status": "supported",
+   "title": "Downhill Snow Sports Distance",
+   "measurement_id": "distance",
+   "profile": "grove-mobile-distance",
+   "value_kind": "quantity",
+   "unit": "m",
+   "integer_only": false,
+   "effective": "Period",
+   "allowed_values": null,
+   "code": {
+    "system": "http://loinc.org",
+    "code": "103208-5"
+   }
+  },
+  "HKQuantityTypeIdentifierDistancePaddleSports": {
+   "status": "supported",
+   "title": "Paddle Sports Distance",
+   "measurement_id": "distance",
+   "profile": "grove-mobile-distance",
+   "value_kind": "quantity",
+   "unit": "m",
+   "integer_only": false,
+   "effective": "Period",
+   "allowed_values": null,
+   "code": {
+    "system": "http://loinc.org",
+    "code": "103208-5"
+   }
+  },
+  "HKQuantityTypeIdentifierDistanceRowing": {
+   "status": "supported",
+   "title": "Rowing Distance",
+   "measurement_id": "distance",
+   "profile": "grove-mobile-distance",
+   "value_kind": "quantity",
+   "unit": "m",
+   "integer_only": false,
+   "effective": "Period",
+   "allowed_values": null,
+   "code": {
+    "system": "http://loinc.org",
+    "code": "103208-5"
+   }
+  },
+  "HKQuantityTypeIdentifierDistanceSkatingSports": {
+   "status": "supported",
+   "title": "Skating Sports Distance",
+   "measurement_id": "distance",
+   "profile": "grove-mobile-distance",
+   "value_kind": "quantity",
+   "unit": "m",
+   "integer_only": false,
+   "effective": "Period",
+   "allowed_values": null,
+   "code": {
+    "system": "http://loinc.org",
+    "code": "103208-5"
+   }
+  },
+  "HKQuantityTypeIdentifierDistanceSwimming": {
+   "status": "supported",
+   "title": "Swimming Distance",
+   "measurement_id": "distance",
+   "profile": "grove-mobile-distance",
+   "value_kind": "quantity",
+   "unit": "m",
+   "integer_only": false,
+   "effective": "Period",
+   "allowed_values": null,
+   "code": {
+    "system": "http://loinc.org",
+    "code": "103208-5"
+   }
+  },
+  "HKQuantityTypeIdentifierDistanceWalkingRunning": {
+   "status": "supported",
+   "title": "Distance Walking/Running",
+   "measurement_id": "distance",
+   "profile": "grove-mobile-distance",
+   "value_kind": "quantity",
+   "unit": "m",
+   "integer_only": false,
+   "effective": "Period",
+   "allowed_values": null,
+   "code": {
+    "system": "http://loinc.org",
+    "code": "103208-5"
+   }
+  },
+  "HKQuantityTypeIdentifierDistanceWheelchair": {
+   "status": "supported",
+   "title": "Wheelchair Distance",
+   "measurement_id": "distance",
+   "profile": "grove-mobile-distance",
+   "value_kind": "quantity",
+   "unit": "m",
+   "integer_only": false,
+   "effective": "Period",
+   "allowed_values": null,
+   "code": {
+    "system": "http://loinc.org",
+    "code": "103208-5"
+   }
+  },
+  "HKQuantityTypeIdentifierElectrodermalActivity": {
+   "status": "supported",
+   "title": "Electrodermal Activity",
+   "measurement_id": "electrodermal-activity",
+   "profile": "grove-mobile-electrodermal-activity",
+   "value_kind": "quantity",
+   "unit": "uS",
+   "integer_only": false,
+   "effective": "dateTime",
+   "allowed_values": null,
+   "code": {
+    "system": "https://grovealliance.org/fhir/mobile/CodeSystem/grove-mobile-measurement",
+    "code": "electrodermal-activity"
+   }
+  },
+  "HKQuantityTypeIdentifierEnvironmentalAudioExposure": {
+   "status": "supported",
+   "title": "Environmental Audio Exposure",
+   "measurement_id": "environmental-audio-exposure",
+   "profile": "healthkit-environmental-audio-exposure",
+   "value_kind": "quantity",
+   "unit": "dB[SPL]",
+   "integer_only": false,
+   "effective": "Period",
+   "allowed_values": null,
+   "code": {
+    "system": "https://grovealliance.org/fhir/healthkit/CodeSystem/healthkit-measurement",
+    "code": "environmental-audio-exposure"
+   }
+  },
+  "HKQuantityTypeIdentifierEnvironmentalSoundReduction": {
+   "status": "supported",
+   "title": "Environmental Sound Reduction",
+   "measurement_id": "environmental-sound-reduction",
+   "profile": "healthkit-environmental-sound-reduction",
+   "value_kind": "quantity",
+   "unit": "dB[SPL]",
+   "integer_only": false,
+   "effective": "Period",
+   "allowed_values": null,
+   "code": {
+    "system": "https://grovealliance.org/fhir/healthkit/CodeSystem/healthkit-measurement",
+    "code": "environmental-sound-reduction"
+   }
+  },
+  "HKQuantityTypeIdentifierEstimatedWorkoutEffortScore": {
+   "status": "supported",
+   "title": "Estimated Workout Effort",
+   "measurement_id": "workout-effort-score",
+   "profile": "healthkit-workout-effort-score",
+   "value_kind": "quantity",
+   "unit": "{score}",
+   "integer_only": false,
+   "effective": "Period",
+   "allowed_values": null,
+   "code": {
+    "system": "https://grovealliance.org/fhir/healthkit/CodeSystem/healthkit-measurement",
+    "code": "workout-effort-score"
+   }
+  },
+  "HKQuantityTypeIdentifierFlightsClimbed": {
+   "status": "supported",
+   "title": "Flights Climbed",
+   "measurement_id": "flights-climbed",
+   "profile": "grove-mobile-flights-climbed",
+   "value_kind": "quantity",
+   "unit": "{flights}",
+   "integer_only": true,
+   "effective": "Period",
+   "allowed_values": null,
+   "code": {
+    "system": "http://loinc.org",
+    "code": "100304-5"
+   }
+  },
+  "HKQuantityTypeIdentifierForcedExpiratoryVolume1": {
+   "status": "supported",
+   "title": "Forced Expiratory Volume (1 sec)",
+   "measurement_id": "forced-expiratory-volume-1",
+   "profile": "healthkit-forced-expiratory-volume-1",
+   "value_kind": "quantity",
+   "unit": "L",
+   "integer_only": false,
+   "effective": "dateTime",
+   "allowed_values": null,
+   "code": {
+    "system": "http://loinc.org",
+    "code": "20150-9"
+   }
+  },
+  "HKQuantityTypeIdentifierForcedVitalCapacity": {
+   "status": "supported",
+   "title": "Forced Vital Capacity",
+   "measurement_id": "forced-vital-capacity",
+   "profile": "healthkit-forced-vital-capacity",
+   "value_kind": "quantity",
+   "unit": "L",
+   "integer_only": false,
+   "effective": "dateTime",
+   "allowed_values": null,
+   "code": {
+    "system": "http://loinc.org",
+    "code": "19868-9"
+   }
+  },
+  "HKQuantityTypeIdentifierHeadphoneAudioExposure": {
+   "status": "supported",
+   "title": "Headphone Audio Exposure",
+   "measurement_id": "headphone-audio-exposure",
+   "profile": "healthkit-headphone-audio-exposure",
+   "value_kind": "quantity",
+   "unit": "dB[SPL]",
+   "integer_only": false,
+   "effective": "Period",
+   "allowed_values": null,
+   "code": {
+    "system": "https://grovealliance.org/fhir/healthkit/CodeSystem/healthkit-measurement",
+    "code": "headphone-audio-exposure"
+   }
+  },
+  "HKQuantityTypeIdentifierHeartRate": {
+   "status": "supported",
+   "title": "Heart Rate",
+   "measurement_id": "heart-rate",
+   "profile": "grove-mobile-heart-rate",
+   "value_kind": "quantity",
+   "unit": "/min",
+   "integer_only": false,
+   "effective": "dateTime-or-Period",
+   "allowed_values": null,
+   "code": {
+    "system": "http://loinc.org",
+    "code": "8867-4"
+   }
+  },
+  "HKQuantityTypeIdentifierHeartRateRecoveryOneMinute": {
+   "status": "supported",
+   "title": "Heart Rate Recovery (1 min)",
+   "measurement_id": "heart-rate-recovery-one-minute",
+   "profile": "healthkit-heart-rate-recovery-one-minute",
+   "value_kind": "quantity",
+   "unit": "/min",
+   "integer_only": false,
+   "effective": "dateTime",
+   "allowed_values": null,
+   "code": {
+    "system": "https://grovealliance.org/fhir/healthkit/CodeSystem/healthkit-measurement",
+    "code": "heart-rate-recovery-one-minute"
+   }
+  },
+  "HKQuantityTypeIdentifierHeartRateVariabilitySDNN": {
+   "status": "supported",
+   "title": "Heart Rate Variability SDNN",
+   "measurement_id": "heart-rate-variability-sdnn",
+   "profile": "grove-mobile-heart-rate-variability-sdnn",
+   "value_kind": "quantity",
+   "unit": "ms",
+   "integer_only": false,
+   "effective": "dateTime",
+   "allowed_values": null,
+   "code": {
+    "system": "http://loinc.org",
+    "code": "112429-6"
+   }
+  },
+  "HKQuantityTypeIdentifierHeight": {
+   "status": "supported",
+   "title": "Height",
+   "measurement_id": "body-height",
+   "profile": "grove-mobile-body-height",
+   "value_kind": "quantity",
+   "unit": "cm",
+   "integer_only": false,
+   "effective": "dateTime",
+   "allowed_values": null,
+   "code": {
+    "system": "http://loinc.org",
+    "code": "8302-2"
+   }
+  },
+  "HKQuantityTypeIdentifierInhalerUsage": {
+   "status": "supported",
+   "title": "Inhaler Usage",
+   "measurement_id": "inhaler-usage",
+   "profile": "healthkit-inhaler-usage",
+   "value_kind": "quantity",
+   "unit": "{puff}",
+   "integer_only": true,
+   "effective": "Period",
+   "allowed_values": null,
+   "code": {
+    "system": "https://grovealliance.org/fhir/healthkit/CodeSystem/healthkit-measurement",
+    "code": "inhaler-usage"
+   }
+  },
+  "HKQuantityTypeIdentifierInsulinDelivery": {
+   "status": "supported",
+   "title": "Insulin Delivery",
+   "measurement_id": "insulin-delivery",
+   "profile": "healthkit-insulin-delivery",
+   "value_kind": "quantity",
+   "unit": "[iU]",
+   "integer_only": false,
+   "effective": "Period",
+   "allowed_values": null,
+   "code": {
+    "system": "https://grovealliance.org/fhir/healthkit/CodeSystem/healthkit-measurement",
+    "code": "insulin-delivery"
+   }
+  },
+  "HKQuantityTypeIdentifierLeanBodyMass": {
+   "status": "supported",
+   "title": "Lean Body Mass",
+   "measurement_id": "lean-body-mass",
+   "profile": "grove-mobile-lean-body-mass",
+   "value_kind": "quantity",
+   "unit": "kg",
+   "integer_only": false,
+   "effective": "dateTime",
+   "allowed_values": null,
+   "code": {
+    "system": "http://loinc.org",
+    "code": "91557-9"
+   }
+  },
+  "HKQuantityTypeIdentifierNikeFuel": {
+   "status": "intentionally-unsupported",
+   "title": "NikeFuel"
+  },
+  "HKQuantityTypeIdentifierNumberOfAlcoholicBeverages": {
+   "status": "supported",
+   "title": "Number of Alcoholic Beverages",
+   "measurement_id": "number-of-alcoholic-beverages",
+   "profile": "healthkit-number-of-alcoholic-beverages",
+   "value_kind": "quantity",
+   "unit": "{drinks}",
+   "integer_only": true,
+   "effective": "Period",
+   "allowed_values": null,
+   "code": {
+    "system": "https://grovealliance.org/fhir/healthkit/CodeSystem/healthkit-measurement",
+    "code": "number-of-alcoholic-beverages"
+   }
+  },
+  "HKQuantityTypeIdentifierNumberOfTimesFallen": {
+   "status": "supported",
+   "title": "Number of Times Fallen",
+   "measurement_id": "number-of-times-fallen",
+   "profile": "healthkit-number-of-times-fallen",
+   "value_kind": "quantity",
+   "unit": "{falls}",
+   "integer_only": true,
+   "effective": "Period",
+   "allowed_values": null,
+   "code": {
+    "system": "https://grovealliance.org/fhir/healthkit/CodeSystem/healthkit-measurement",
+    "code": "number-of-times-fallen"
+   }
+  },
+  "HKQuantityTypeIdentifierOxygenSaturation": {
+   "status": "supported",
+   "title": "Oxygen Saturation",
+   "measurement_id": "oxygen-saturation",
+   "profile": "grove-mobile-oxygen-saturation",
+   "value_kind": "quantity",
+   "unit": "%",
+   "integer_only": false,
+   "effective": "dateTime",
+   "allowed_values": null,
+   "code": {
+    "system": "http://loinc.org",
+    "code": "2708-6"
+   }
+  },
+  "HKQuantityTypeIdentifierPaddleSportsSpeed": {
+   "status": "supported",
+   "title": "Paddle Sports Speed",
+   "measurement_id": "speed",
+   "profile": "grove-mobile-speed",
+   "value_kind": "quantity",
+   "unit": "m/s",
+   "integer_only": false,
+   "effective": "dateTime",
+   "allowed_values": null,
+   "code": {
+    "system": "https://grovealliance.org/fhir/mobile/CodeSystem/grove-mobile-measurement",
+    "code": "speed"
+   }
+  },
+  "HKQuantityTypeIdentifierPeakExpiratoryFlowRate": {
+   "status": "supported",
+   "title": "Peak Expiratory Flow Rate",
+   "measurement_id": "peak-expiratory-flow-rate",
+   "profile": "healthkit-peak-expiratory-flow-rate",
+   "value_kind": "quantity",
+   "unit": "L/min",
+   "integer_only": false,
+   "effective": "dateTime",
+   "allowed_values": null,
+   "code": {
+    "system": "http://loinc.org",
+    "code": "33452-4"
+   }
+  },
+  "HKQuantityTypeIdentifierPeripheralPerfusionIndex": {
+   "status": "supported",
+   "title": "Peripheral Perfusion Index",
+   "measurement_id": "peripheral-perfusion-index",
+   "profile": "healthkit-peripheral-perfusion-index",
+   "value_kind": "quantity",
+   "unit": "%",
+   "integer_only": false,
+   "effective": "dateTime",
+   "allowed_values": null,
+   "code": {
+    "system": "http://loinc.org",
+    "code": "61006-3"
+   }
+  },
+  "HKQuantityTypeIdentifierPhysicalEffort": {
+   "status": "supported",
+   "title": "Physical Effort",
+   "measurement_id": "physical-effort",
+   "profile": "healthkit-physical-effort",
+   "value_kind": "quantity",
+   "unit": "kcal/kg/h",
+   "integer_only": false,
+   "effective": "Period",
+   "allowed_values": null,
+   "code": {
+    "system": "https://grovealliance.org/fhir/healthkit/CodeSystem/healthkit-measurement",
+    "code": "physical-effort"
+   }
+  },
+  "HKQuantityTypeIdentifierPushCount": {
+   "status": "supported",
+   "title": "Wheelchair Push Count",
+   "measurement_id": "wheelchair-push-count",
+   "profile": "grove-mobile-wheelchair-push-count",
+   "value_kind": "quantity",
+   "unit": "{pushes}",
+   "integer_only": true,
+   "effective": "Period",
+   "allowed_values": null,
+   "code": {
+    "system": "http://loinc.org",
+    "code": "96502-0"
+   }
+  },
+  "HKQuantityTypeIdentifierRespiratoryRate": {
+   "status": "supported",
+   "title": "Respiratory Rate",
+   "measurement_id": "respiratory-rate",
+   "profile": "grove-mobile-respiratory-rate",
+   "value_kind": "quantity",
+   "unit": "/min",
+   "integer_only": false,
+   "effective": "dateTime",
+   "allowed_values": null,
+   "code": {
+    "system": "http://loinc.org",
+    "code": "9279-1"
+   }
+  },
+  "HKQuantityTypeIdentifierRestingHeartRate": {
+   "status": "supported",
+   "title": "Resting Heart Rate",
+   "measurement_id": "resting-heart-rate",
+   "profile": "grove-mobile-resting-heart-rate",
+   "value_kind": "quantity",
+   "unit": "/min",
+   "integer_only": false,
+   "effective": "dateTime",
+   "allowed_values": null,
+   "code": {
+    "system": "http://loinc.org",
+    "code": "40443-4"
+   }
+  },
+  "HKQuantityTypeIdentifierRowingSpeed": {
+   "status": "supported",
+   "title": "Rowing Speed",
+   "measurement_id": "speed",
+   "profile": "grove-mobile-speed",
+   "value_kind": "quantity",
+   "unit": "m/s",
+   "integer_only": false,
+   "effective": "dateTime",
+   "allowed_values": null,
+   "code": {
+    "system": "https://grovealliance.org/fhir/mobile/CodeSystem/grove-mobile-measurement",
+    "code": "speed"
+   }
+  },
+  "HKQuantityTypeIdentifierRunningGroundContactTime": {
+   "status": "supported",
+   "title": "Ground Contact Time",
+   "measurement_id": "running-ground-contact-time",
+   "profile": "healthkit-running-ground-contact-time",
+   "value_kind": "quantity",
+   "unit": "ms",
+   "integer_only": false,
+   "effective": "dateTime",
+   "allowed_values": null,
+   "code": {
+    "system": "https://grovealliance.org/fhir/healthkit/CodeSystem/healthkit-measurement",
+    "code": "running-ground-contact-time"
+   }
+  },
+  "HKQuantityTypeIdentifierRunningPower": {
+   "status": "supported",
+   "title": "Running Power",
+   "measurement_id": "power",
+   "profile": "grove-mobile-power",
+   "value_kind": "quantity",
+   "unit": "W",
+   "integer_only": false,
+   "effective": "dateTime",
+   "allowed_values": null,
+   "code": {
+    "system": "https://grovealliance.org/fhir/mobile/CodeSystem/grove-mobile-measurement",
+    "code": "power"
+   }
+  },
+  "HKQuantityTypeIdentifierRunningSpeed": {
+   "status": "supported",
+   "title": "Running Speed",
+   "measurement_id": "speed",
+   "profile": "grove-mobile-speed",
+   "value_kind": "quantity",
+   "unit": "m/s",
+   "integer_only": false,
+   "effective": "dateTime",
+   "allowed_values": null,
+   "code": {
+    "system": "https://grovealliance.org/fhir/mobile/CodeSystem/grove-mobile-measurement",
+    "code": "speed"
+   }
+  },
+  "HKQuantityTypeIdentifierRunningStrideLength": {
+   "status": "supported",
+   "title": "Running Stride Length",
+   "measurement_id": "running-stride-length",
+   "profile": "healthkit-running-stride-length",
+   "value_kind": "quantity",
+   "unit": "m",
+   "integer_only": false,
+   "effective": "dateTime",
+   "allowed_values": null,
+   "code": {
+    "system": "https://grovealliance.org/fhir/healthkit/CodeSystem/healthkit-measurement",
+    "code": "running-stride-length"
+   }
+  },
+  "HKQuantityTypeIdentifierRunningVerticalOscillation": {
+   "status": "supported",
+   "title": "Running Vertical Oscillation",
+   "measurement_id": "running-vertical-oscillation",
+   "profile": "healthkit-running-vertical-oscillation",
+   "value_kind": "quantity",
+   "unit": "cm",
+   "integer_only": false,
+   "effective": "dateTime",
+   "allowed_values": null,
+   "code": {
+    "system": "https://grovealliance.org/fhir/healthkit/CodeSystem/healthkit-measurement",
+    "code": "running-vertical-oscillation"
+   }
+  },
+  "HKQuantityTypeIdentifierSixMinuteWalkTestDistance": {
+   "status": "supported",
+   "title": "6 Minute Walk Test Distance",
+   "measurement_id": "six-minute-walk-test-distance",
+   "profile": "healthkit-six-minute-walk-test-distance",
+   "value_kind": "quantity",
+   "unit": "m",
+   "integer_only": false,
+   "effective": "Period",
+   "allowed_values": null,
+   "code": {
+    "system": "http://loinc.org",
+    "code": "64098-7"
+   }
+  },
+  "HKQuantityTypeIdentifierStairAscentSpeed": {
+   "status": "supported",
+   "title": "Stair Ascent Speed",
+   "measurement_id": "stair-ascent-speed",
+   "profile": "healthkit-stair-ascent-speed",
+   "value_kind": "quantity",
+   "unit": "m/s",
+   "integer_only": false,
+   "effective": "dateTime",
+   "allowed_values": null,
+   "code": {
+    "system": "http://loinc.org",
+    "code": "112431-2"
+   }
+  },
+  "HKQuantityTypeIdentifierStairDescentSpeed": {
+   "status": "supported",
+   "title": "Stair Descent Speed",
+   "measurement_id": "stair-descent-speed",
+   "profile": "healthkit-stair-descent-speed",
+   "value_kind": "quantity",
+   "unit": "m/s",
+   "integer_only": false,
+   "effective": "dateTime",
+   "allowed_values": null,
+   "code": {
+    "system": "http://loinc.org",
+    "code": "112430-4"
+   }
+  },
+  "HKQuantityTypeIdentifierStepCount": {
+   "status": "supported",
+   "title": "Step Count",
+   "measurement_id": "step-count",
+   "profile": "grove-mobile-step-count",
+   "value_kind": "quantity",
+   "unit": "{steps}",
+   "integer_only": true,
+   "effective": "Period",
+   "allowed_values": null,
+   "code": {
+    "system": "https://grovealliance.org/fhir/mobile/CodeSystem/grove-mobile-measurement",
+    "code": "step-count-total"
+   }
+  },
+  "HKQuantityTypeIdentifierSwimmingStrokeCount": {
+   "status": "supported",
+   "title": "Swimming Stroke Count",
+   "measurement_id": "swimming-stroke-count",
+   "profile": "healthkit-swimming-stroke-count",
+   "value_kind": "quantity",
+   "unit": "{strokes}",
+   "integer_only": true,
+   "effective": "Period",
+   "allowed_values": null,
+   "code": {
+    "system": "https://grovealliance.org/fhir/healthkit/CodeSystem/healthkit-measurement",
+    "code": "swimming-stroke-count"
+   }
+  },
+  "HKQuantityTypeIdentifierTimeInDaylight": {
+   "status": "supported",
+   "title": "Time in Daylight",
+   "measurement_id": "time-in-daylight",
+   "profile": "healthkit-time-in-daylight",
+   "value_kind": "quantity",
+   "unit": "min",
+   "integer_only": false,
+   "effective": "Period",
+   "allowed_values": null,
+   "code": {
+    "system": "https://grovealliance.org/fhir/healthkit/CodeSystem/healthkit-measurement",
+    "code": "time-in-daylight"
+   }
+  },
+  "HKQuantityTypeIdentifierUVExposure": {
+   "status": "supported",
+   "title": "UV Exposure",
+   "measurement_id": "uv-exposure",
+   "profile": "healthkit-uv-exposure",
+   "value_kind": "quantity",
+   "unit": "{uvindex}",
+   "integer_only": false,
+   "effective": "Period",
+   "allowed_values": null,
+   "code": {
+    "system": "https://grovealliance.org/fhir/healthkit/CodeSystem/healthkit-measurement",
+    "code": "uv-exposure"
+   }
+  },
+  "HKQuantityTypeIdentifierUnderwaterDepth": {
+   "status": "supported",
+   "title": "Underwater Depth",
+   "measurement_id": "underwater-depth",
+   "profile": "healthkit-underwater-depth",
+   "value_kind": "quantity",
+   "unit": "m",
+   "integer_only": false,
+   "effective": "dateTime",
+   "allowed_values": null,
+   "code": {
+    "system": "https://grovealliance.org/fhir/healthkit/CodeSystem/healthkit-measurement",
+    "code": "underwater-depth"
+   }
+  },
+  "HKQuantityTypeIdentifierVO2Max": {
+   "status": "supported",
+   "title": "VO2Max",
+   "measurement_id": "vo2-max",
+   "profile": "grove-mobile-vo2-max",
+   "value_kind": "quantity",
+   "unit": "mL/kg/min",
+   "integer_only": false,
+   "effective": "dateTime",
+   "allowed_values": null,
+   "code": {
+    "system": "https://grovealliance.org/fhir/mobile/CodeSystem/grove-mobile-measurement",
+    "code": "vo2-max"
+   }
+  },
+  "HKQuantityTypeIdentifierWaistCircumference": {
+   "status": "supported",
+   "title": "Waist Circumference",
+   "measurement_id": "waist-circumference",
+   "profile": "healthkit-waist-circumference",
+   "value_kind": "quantity",
+   "unit": "cm",
+   "integer_only": false,
+   "effective": "dateTime",
+   "allowed_values": null,
+   "code": {
+    "system": "http://loinc.org",
+    "code": "8280-0"
+   }
+  },
+  "HKQuantityTypeIdentifierWalkingAsymmetryPercentage": {
+   "status": "supported",
+   "title": "Walking Asymmetry Percentage",
+   "measurement_id": "walking-asymmetry",
+   "profile": "healthkit-walking-asymmetry",
+   "value_kind": "quantity",
+   "unit": "%",
+   "integer_only": false,
+   "effective": "dateTime",
+   "allowed_values": null,
+   "code": {
+    "system": "http://loinc.org",
+    "code": "112432-0"
+   }
+  },
+  "HKQuantityTypeIdentifierWalkingDoubleSupportPercentage": {
+   "status": "supported",
+   "title": "Walking Double Support Percentage",
+   "measurement_id": "walking-double-support",
+   "profile": "healthkit-walking-double-support",
+   "value_kind": "quantity",
+   "unit": "%",
+   "integer_only": false,
+   "effective": "dateTime",
+   "allowed_values": null,
+   "code": {
+    "system": "http://loinc.org",
+    "code": "112434-6"
+   }
+  },
+  "HKQuantityTypeIdentifierWalkingHeartRateAverage": {
+   "status": "supported",
+   "title": "Walking Heart Rate Average",
+   "measurement_id": "walking-heart-rate-average",
+   "profile": "healthkit-walking-heart-rate-average",
+   "value_kind": "quantity",
+   "unit": "/min",
+   "integer_only": false,
+   "effective": "Period",
+   "allowed_values": null,
+   "code": {
+    "system": "https://grovealliance.org/fhir/healthkit/CodeSystem/healthkit-measurement",
+    "code": "walking-heart-rate-average"
+   }
+  },
+  "HKQuantityTypeIdentifierWalkingSpeed": {
+   "status": "supported",
+   "title": "Walking Speed",
+   "measurement_id": "walking-speed",
+   "profile": "healthkit-walking-speed",
+   "value_kind": "quantity",
+   "unit": "m/s",
+   "integer_only": false,
+   "effective": "dateTime",
+   "allowed_values": null,
+   "code": {
+    "system": "https://grovealliance.org/fhir/healthkit/CodeSystem/healthkit-measurement",
+    "code": "walking-speed"
+   }
+  },
+  "HKQuantityTypeIdentifierWalkingStepLength": {
+   "status": "supported",
+   "title": "Walking Step Length",
+   "measurement_id": "walking-step-length",
+   "profile": "healthkit-walking-step-length",
+   "value_kind": "quantity",
+   "unit": "cm",
+   "integer_only": false,
+   "effective": "dateTime",
+   "allowed_values": null,
+   "code": {
+    "system": "https://grovealliance.org/fhir/healthkit/CodeSystem/healthkit-measurement",
+    "code": "walking-step-length"
+   }
+  },
+  "HKQuantityTypeIdentifierWaterTemperature": {
+   "status": "supported",
+   "title": "Water Temperature",
+   "measurement_id": "water-temperature",
+   "profile": "healthkit-water-temperature",
+   "value_kind": "quantity",
+   "unit": "Cel",
+   "integer_only": false,
+   "effective": "dateTime",
+   "allowed_values": null,
+   "code": {
+    "system": "https://grovealliance.org/fhir/healthkit/CodeSystem/healthkit-measurement",
+    "code": "water-temperature"
+   }
+  },
+  "HKQuantityTypeIdentifierWorkoutEffortScore": {
+   "status": "supported",
+   "title": "Workout Effort",
+   "measurement_id": "workout-effort-score",
+   "profile": "healthkit-workout-effort-score",
+   "value_kind": "quantity",
+   "unit": "{score}",
+   "integer_only": false,
+   "effective": "Period",
+   "allowed_values": null,
+   "code": {
+    "system": "https://grovealliance.org/fhir/healthkit/CodeSystem/healthkit-measurement",
+    "code": "workout-effort-score"
+   }
+  },
+  "HKScoredAssessmentTypeIdentifierGAD7": {
+   "status": "supported",
+   "title": "GAD-7",
+   "measurement_id": "gad7-assessment",
+   "profile": "healthkit-gad7-assessment",
+   "value_kind": "quantity",
+   "unit": "{score}",
+   "integer_only": false,
+   "effective": "dateTime",
+   "allowed_values": null,
+   "code": {
+    "system": "http://loinc.org",
+    "code": "70274-6"
+   }
+  },
+  "HKScoredAssessmentTypeIdentifierPHQ9": {
+   "status": "supported",
+   "title": "PHQ-9",
+   "measurement_id": "phq9-assessment",
+   "profile": "healthkit-phq9-assessment",
+   "value_kind": "quantity",
+   "unit": "{score}",
+   "integer_only": false,
+   "effective": "dateTime",
+   "allowed_values": null,
+   "code": {
+    "system": "http://loinc.org",
+    "code": "44261-6"
+   }
+  },
+  "HKVisionPrescriptionTypeIdentifier": {
+   "status": "platform-exclusive",
+   "title": "Vision Prescription"
+  },
+  "HKWorkoutRouteTypeIdentifier": {
+   "status": "platform-exclusive",
+   "title": "Workout Route"
+  },
+  "HKWorkoutTypeIdentifier": {
+   "status": "supported",
+   "title": "Workout",
+   "measurement_id": "workout",
+   "value_kind": "unmodeled",
+   "measurement_ids": [
+    "workout",
+    "workout-segment"
+   ]
+  }
+ }
+}
