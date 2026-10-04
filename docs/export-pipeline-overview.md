@@ -7,7 +7,7 @@ SPDX-License-Identifier: MIT
 
 # Export Pipeline: High-Level Overview
 
-Scope for v1: **HealthKit records only** (from the storage archives and Firestore). SensorKit and questionnaires follow later as separate pipelines on the same framework. Companions: [data-routing.md](data-routing.md), [ios-datatypes.md](ios-datatypes.md). The data contract for every record is the [Grove FHIR standard](https://github.com/SchmiedmayerLab/grove-fhir); where this document restates a Grove rule, Grove wins.
+Scope for v1: **HealthKit records only** (from the storage archives and Firestore). SensorKit and questionnaires follow later as separate pipelines on the same framework. Companions: [export-pipeline-sketch.md](export-pipeline-sketch.md) (code structure), [data-routing.md](data-routing.md), [ios-datatypes.md](ios-datatypes.md). The data contract for every record is the [Grove FHIR standard](https://github.com/SchmiedmayerLab/grove-fhir); where this document restates a Grove rule, Grove wins.
 
 ## Goal
 
