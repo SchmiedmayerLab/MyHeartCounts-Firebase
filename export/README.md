@@ -5,11 +5,11 @@ SPDX-FileCopyrightText: 2026 Stanford University and the project authors (see CO
 SPDX-License-Identifier: MIT
 -->
 
-# MyHeart Counts Export Pipeline
+# MyHeart Counts Export Pipeline v0.0.1 alpha
 
 Scheduled, repeatable export of the collected HealthKit data into one-way anonymized, schema-enforced Parquet for research. Source data is never modified. Every stage is idempotent, so a run can be paused, killed or redone without loss or duplication.
 
-The data contract for every record is the [Grove FHIR standard](https://github.com/SchmiedmayerLab/grove-fhir): identities, retractions, units and time rules follow it. Until the app emits Grove itself, the pipeline upgrades the current upload shape to Grove in memory.
+The data contract for every record is the [Grove FHIR standard](https://github.com/SchmiedmayerLab/grove-fhir): identities, retractions, units and time rules follow it. Until the app emits Grove itself, the pipeline upgrades the current upload shape to Grove in memory. Not ideal, will be changed for the first real deployment. Currently the focus is to shape and test the output.
 
 ## How it works
 
@@ -59,6 +59,7 @@ One table per sample type with the same common columns, BigQuery-compatible type
 Per-type facts (measurement id, unit, effective kind, allowed values) come from the generated registry in [`schemas/`](schemas/README.md). The heart rate table adds `motion_context`.
 
 ## Running it
+This is currently for local testing, I will append more info here once we have a cloud running instance.
 
 ```sh
 cd export
@@ -127,5 +128,3 @@ uv run ruff check . && uv run ruff format --check .
 uv run pytest -q
 uv run python scripts/gen_registry.py /path/to/grove-fhir   # refresh schemas/healthkit-types.json
 ```
-
-Tests never touch real data. Fixtures are synthetic resources in the shape the app uploads.
