@@ -7,6 +7,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 from dataclasses import dataclass, field
 from functools import cache
@@ -39,10 +40,9 @@ COMMON_COLUMNS: list[tuple[str, pa.DataType, bool]] = [
     ("device_model", pa.string(), True),
     ("device_hardware", pa.string(), True),
     ("device_software", pa.string(), True),
+    ("device_firmware", pa.string(), True),
     ("source_bundle_hash", pa.string(), True),
     ("source_version", pa.string(), True),
-    ("source_product_type", pa.string(), True),
-    ("source_os_version", pa.string(), True),
     ("app_version", pa.string(), True),
     ("app_build", pa.string(), True),
     ("study_revision", pa.int64(), True),
@@ -74,6 +74,8 @@ class TypeSpec:
     allowed_values: tuple[str, ...] | None
     minimum: tuple[float, bool] | None = None
     maximum: tuple[float, bool] | None = None
+    code: tuple[str, str] | None = None
+    value_system: str | None = None
     extra_columns: tuple[tuple[str, pa.DataType], ...] = field(default_factory=tuple)
 
     @property
@@ -97,6 +99,7 @@ class Registry:
     def __init__(self, raw: dict) -> None:
         self.grove_version: str = raw["grove_version"]
         self.generated_from: dict = raw["generated_from"]
+        self.digest = _digest(raw)
         self._specs: dict[str, TypeSpec] = {}
         for sample_type, entry in raw["types"].items():
             self._specs[sample_type] = TypeSpec(
@@ -110,6 +113,8 @@ class Registry:
                 allowed_values=tuple(entry["allowed_values"]) if entry.get("allowed_values") else None,
                 minimum=_bound(entry.get("minimum")),
                 maximum=_bound(entry.get("maximum")),
+                code=(entry["code"]["system"], entry["code"]["code"]) if entry.get("code") else None,
+                value_system=entry.get("value_system"),
                 extra_columns=tuple(EXTRA_COLUMNS.get(sample_type, [])),
             )
 
@@ -133,6 +138,53 @@ def _bound(raw: dict | None) -> tuple[float, bool] | None:
     return float(raw["value"]), bool(raw.get("inclusive", True))
 
 
+def _digest(raw: dict) -> str:
+    return hashlib.sha256(json.dumps(raw, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+
+
 @cache
 def default_registry() -> Registry:
     return Registry.load()
+
+
+COVERAGE_PATH = Path(str(resources.files("mhc_export") / "schemas" / "coverage.json"))
+
+
+@dataclass(frozen=True)
+class Disposition:
+    disposition: str  # export | deferred | excluded
+    reason: str
+
+    @property
+    def exported(self) -> bool:
+        return self.disposition == "export"
+
+    @property
+    def label(self) -> str:
+        return f"{self.disposition}:{self.reason}"
+
+
+class Coverage:
+    """Which HealthKit types version 1 exports, decided against the study definition; everything else is skipped."""
+
+    def __init__(self, raw: dict) -> None:
+        self.digest = _digest(raw)
+        self.source: dict = raw.get("source") or {}
+        default = raw.get("default") or {"disposition": "excluded", "reason": "not_in_study"}
+        self._default = Disposition(default["disposition"], default["reason"])
+        self._types = {t: Disposition(v["disposition"], v["reason"]) for t, v in (raw.get("types") or {}).items()}
+
+    @classmethod
+    def load(cls, path: Path = COVERAGE_PATH) -> Coverage:
+        return cls(json.loads(path.read_text()))
+
+    def of(self, sample_type: str) -> Disposition:
+        return self._types.get(sample_type, self._default)
+
+    def exported_types(self) -> list[str]:
+        return sorted(t for t, d in self._types.items() if d.exported)
+
+
+@cache
+def default_coverage() -> Coverage:
+    return Coverage.load()

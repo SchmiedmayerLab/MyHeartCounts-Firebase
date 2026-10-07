@@ -79,3 +79,19 @@ def test_all_exportable_quantity_types_have_a_unit() -> None:
 def test_bmi_is_exportable_via_standard_profile() -> None:
     bmi = default_registry().get("HKQuantityTypeIdentifierBodyMassIndex")
     assert bmi is not None and bmi.exportable and bmi.unit == "kg/m2" and bmi.measurement_id == "body-mass-index"
+
+
+def test_coverage_exports_only_study_types() -> None:
+    from mhc_export.transform.specs import default_coverage
+
+    coverage = default_coverage()
+    reg = default_registry()
+    exported = coverage.exported_types()
+    assert len(exported) == 63 and "HKQuantityTypeIdentifierHeartRate" in exported
+    assert all(reg.get(t) is not None and reg.get(t).exportable for t in exported), (
+        "every exported type must be exportable"
+    )
+    assert coverage.of("HKDataTypeIdentifierElectrocardiogram").disposition == "deferred"
+    assert coverage.of("HKCharacteristicTypeIdentifierBiologicalSex").disposition == "excluded"
+    assert coverage.of("HKQuantityTypeIdentifierNikeFuel").label == "excluded:not_in_study"
+    assert coverage.source["study_revision"] == 44
