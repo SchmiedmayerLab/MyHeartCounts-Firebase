@@ -35,7 +35,10 @@ def parse_instant(text: str) -> tuple[int, int | None]:
         offset_min = 0
     else:
         sign = 1 if tz[0] == "+" else -1
-        offset_min = sign * (int(tz[1:3]) * 60 + int(tz[4:6]))
+        hours, minutes = int(tz[1:3]), int(tz[4:6])
+        if hours > 14 or minutes > 59 or (hours == 14 and minutes > 0):
+            raise TimeParseError(f"impossible offset: {text!r}")
+        offset_min = sign * (hours * 60 + minutes)
     try:
         naive = datetime(
             int(m.group("y")),
@@ -48,10 +51,11 @@ def parse_instant(text: str) -> tuple[int, int | None]:
         )
     except ValueError as exc:
         raise TimeParseError(f"invalid date: {text!r}") from exc
-    frac = (m.group("f") or "")[:9].ljust(9, "0")
-    ns = int(frac)
+    digits = m.group("f") or ""
+    ns = int(digits[:9].ljust(9, "0"))
+    beyond = digits[9:].strip("0")  # any nonzero digit past the nanosecond breaks a tie upward
     ms, rem = divmod(ns, 1_000_000)
-    if rem > 500_000 or (rem == 500_000 and ms % 2 == 1):
+    if rem > 500_000 or (rem == 500_000 and (beyond or ms % 2 == 1)):
         ms += 1
     epoch_ms = int(naive.timestamp()) * 1000 + ms - offset_min * 60_000
     return epoch_ms, offset_min
