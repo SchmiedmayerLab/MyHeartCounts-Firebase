@@ -206,22 +206,32 @@ class FirestoreLeaseStore:
         return unit_id.replace("/", "_")
 
     def seed(self, unit_ids: list[str]) -> int:
-        created = 0
+        """Create the missing lease documents; workers starting together may race, and losing a race is fine."""
         existing = {snap.id for snap in self._units.select([]).stream()}
-        batch = self._client.batch()
-        pending = 0
-        for unit_id in unit_ids:
-            if self._doc_id(unit_id) in existing:
-                continue
-            batch.create(self._units.document(self._doc_id(unit_id)), UnitLease(unit_id).to_doc())
-            created += 1
-            pending += 1
-            if pending == 400:
-                batch.commit()
-                batch, pending = self._client.batch(), 0
-        if pending:
-            batch.commit()
+        missing = [u for u in unit_ids if self._doc_id(u) not in existing]
+        created = 0
+        for start in range(0, len(missing), 400):
+            created += self._create_all(missing[start : start + 400])
         return created
+
+    def _create_all(self, unit_ids: list[str]) -> int:
+        from google.api_core.exceptions import AlreadyExists, Conflict
+
+        batch = self._client.batch()
+        for unit_id in unit_ids:
+            batch.create(self._units.document(self._doc_id(unit_id)), UnitLease(unit_id).to_doc())
+        try:
+            batch.commit()
+            return len(unit_ids)
+        except (AlreadyExists, Conflict):
+            created = 0
+            for unit_id in unit_ids:
+                try:
+                    self._units.document(self._doc_id(unit_id)).create(UnitLease(unit_id).to_doc())
+                    created += 1
+                except (AlreadyExists, Conflict):
+                    continue
+            return created
 
     def all(self) -> list[UnitLease]:
         return [UnitLease.from_doc(snap.to_dict()) for snap in self._units.stream()]

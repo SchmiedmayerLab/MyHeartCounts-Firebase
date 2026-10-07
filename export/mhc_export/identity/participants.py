@@ -7,7 +7,9 @@
 
 from __future__ import annotations
 
+import fcntl
 import json
+import os
 import uuid
 from pathlib import Path
 from typing import Protocol
@@ -18,19 +20,24 @@ class ParticipantLookup(Protocol):
 
 
 class LocalParticipantLookup:
-    """JSON file for local runs and tests."""
+    """JSON file for local runs and tests; creation rereads the file under a lock, so processes sharing it agree."""
 
     def __init__(self, path: Path) -> None:
         self.path = path
         self._map: dict[str, str] = json.loads(path.read_text()) if path.exists() else {}
 
     def get_or_create(self, uid: str) -> str:
-        if uid not in self._map:
-            self._map[uid] = str(uuid.uuid4())
-            self.path.parent.mkdir(parents=True, exist_ok=True)
-            tmp = self.path.with_suffix(".tmp")
-            tmp.write_text(json.dumps(self._map, indent=1, sort_keys=True))
-            tmp.replace(self.path)
+        if uid in self._map:
+            return self._map[uid]
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        with open(self.path.with_suffix(".lock"), "a") as lock:
+            fcntl.flock(lock, fcntl.LOCK_EX)
+            self._map = json.loads(self.path.read_text()) if self.path.exists() else {}
+            if uid not in self._map:
+                self._map[uid] = str(uuid.uuid4())
+                tmp = self.path.with_suffix(f".{os.getpid()}.tmp")
+                tmp.write_text(json.dumps(self._map, indent=1, sort_keys=True))
+                tmp.replace(self.path)
         return self._map[uid]
 
 
