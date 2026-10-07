@@ -13,8 +13,7 @@ import logging
 import sys
 import time
 from collections import Counter
-from collections.abc import Iterator
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from resource import RUSAGE_SELF, getrusage
 from typing import Any
 
@@ -22,8 +21,11 @@ import pyarrow as pa
 import pyarrow.compute as pc
 import pyarrow.parquet as pq
 
-from mhc_export.config import IdentityConfig
-from mhc_export.grove.view import parse_observation
+from mhc_export.config import GroveSettings, IdentityConfig
+from mhc_export.grove import event as grove_event
+from mhc_export.grove import healthkit as grove_healthkit
+from mhc_export.grove.event import EventConfig, GroveError, parse_event
+from mhc_export.grove.view import ObservationView, parse_observation
 from mhc_export.identity.participants import ParticipantLookup
 from mhc_export.io.blobstore import BlobStore
 from mhc_export.io.codec import CodecError, decode, decode_csv
@@ -31,8 +33,8 @@ from mhc_export.run.inputs import LEDGER_DIR
 from mhc_export.run.models import Unit, UnitResult, UploadKind
 from mhc_export.transform.dedup import dedup, dedup_conflicts, tuple_collisions
 from mhc_export.transform.project import ProjectContext, ProjectError, project
-from mhc_export.transform.specs import Registry
-from mhc_export.transform.tombstones import Tombstone, retraction_targets, tombstone_ids, tombstones_from_csv
+from mhc_export.transform.specs import Coverage, Registry, TypeSpec, default_coverage
+from mhc_export.transform.tombstones import Tombstone, tombstone_ids, tombstones_from_csv
 from mhc_export.transform.writer import RowBuffer, split_by_month, staging_uri, to_parquet_bytes
 
 log = logging.getLogger(__name__)
@@ -48,29 +50,13 @@ class Deps:
     run_id: str
     max_unit_rows: int = 5_000_000
     tolerate_unreadable: bool = False
+    coverage: Coverage = field(default_factory=default_coverage)
+    grove: GroveSettings = field(default_factory=GroveSettings)
 
 
-def _expand(resource: dict[str, Any]) -> Iterator[dict[str, Any]]:
-    """Grove exchange Bundles carry Observations as entries; everything else is one resource."""
-    if resource.get("resourceType") == "Bundle":
-        for entry in resource.get("entry") or []:
-            inner = (entry or {}).get("resource")
-            if isinstance(inner, dict) and inner.get("resourceType") in ("Observation", "DocumentReference"):
-                yield inner
-        return
-    yield resource
-
-
-# Grove conformance failures signal a misconfigured key or a broken producer, never an expected exclusion.
-FATAL_REASONS = frozenset(
-    {
-        "foreign_identity",
-        "duplicate_grove_identity",
-        "missing_grove_identity",
-        "bad_grove_identity",
-        "bad_writer_version",
-    }
-)
+# Projection failures that signal a broken producer, never an expected exclusion. Every GroveError is fatal too.
+FATAL_REASONS = frozenset({"bad_writer_version", "grove_value_system"})
+GROVE_REASONS = grove_event.REASONS | grove_healthkit.REASONS | {"grove_unexpected_active_event"}
 
 
 class UnitTooLarge(RuntimeError):
@@ -80,13 +66,14 @@ class UnitTooLarge(RuntimeError):
 def process_unit(unit: Unit, deps: Deps) -> UnitResult:
     started = time.monotonic()
     result = UnitResult(objects=len(unit.objects), bytes_in=sum(o.size for o in unit.objects))
+    disposition = deps.coverage.of(unit.sample_type)
+    if not disposition.exported:
+        result.skipped_reason = disposition.label
+        return result
     spec = deps.registry.get(unit.sample_type)
-    if spec is None:
-        result.skipped_reason = "unknown_type"
-        return result
-    if not spec.exportable:
-        result.skipped_reason = f"{spec.status}:{spec.value_kind}"
-        return result
+    if spec is None or not spec.exportable:
+        status = f"{spec.status}:{spec.value_kind}" if spec else "unknown"
+        raise RuntimeError(f"{unit.sample_type} is marked for export but the registry cannot export it ({status})")
 
     participant_id = deps.participants.get_or_create(unit.uid)
     identity = deps.identity.for_participant(participant_id)
@@ -95,14 +82,15 @@ def process_unit(unit: Unit, deps: Deps) -> UnitResult:
     fatal: Counter[str] = Counter()
     rows = RowBuffer(spec.arrow_schema)
     tombstones: list[Tombstone] = []
-    retracted: set[str] = set()
+    retracted_natives: set[str] = set()
+    event_cfg = EventConfig(deps.grove.deployment_root, deps.grove.producer_namespaces, deps.grove.participant_system)
     seq = 0
 
-    def take(resource: dict[str, Any], ctx: ProjectContext) -> None:
+    def take(view: ObservationView, ctx: ProjectContext) -> None:
         nonlocal seq
         result.rows_in += 1
         try:
-            projected = project(parse_observation(resource), spec, ctx, seq)
+            projected = project(view, spec, ctx, seq)
         except ProjectError as exc:
             if exc.reason in FATAL_REASONS:
                 _fatal(deps, fatal, exc.reason, f"{unit.unit_id}: {exc}")
@@ -124,7 +112,7 @@ def process_unit(unit: Unit, deps: Deps) -> UnitResult:
             blob = deps.store.read(obj.uri, obj.generation)
         except Exception as exc:  # noqa: BLE001 - any read failure fails the unit
             raise RuntimeError(f"read failed for {obj.uri}: {exc}") from exc
-        if obj.upload_kind == UploadKind.DELETIONS:
+        if obj.upload_kind == UploadKind.DELETIONS and _is_csv(obj.uri):
             try:
                 stones, malformed = tombstones_from_csv(decode_csv(blob))
             except CodecError as exc:
@@ -140,13 +128,34 @@ def process_unit(unit: Unit, deps: Deps) -> UnitResult:
             _fatal(deps, fatal, "unreadable_object", f"{obj.uri}@{obj.generation}: {exc}")
             continue
         del blob
-        ctx = ProjectContext(participant_id, identity, deps.run_id, obj.upload_kind, True, config=deps.identity)
-        for outer in resources:
-            if outer.get("resourceType") == "Bundle" and _is_retraction(outer):
-                retracted |= retraction_targets(outer)
+        ctx = ProjectContext(participant_id, identity, deps.run_id, obj.upload_kind, True)
+        legacy = deps.grove.accept_legacy and obj.upload_kind != UploadKind.DELETIONS
+        if not legacy and (rejected := sum(1 for r in resources if r.get("resourceType") != "Bundle")):
+            why = (
+                "deletions carry retraction events only"
+                if obj.upload_kind == UploadKind.DELETIONS
+                else ("legacy resources need --accept-legacy")
+            )
+            _fatal(deps, fatal, "grove_not_bundle", f"{obj.uri}: {rejected} elements are not Bundles; {why}", rejected)
+        for element in resources:
+            if element.get("resourceType") != "Bundle":
+                if not legacy:
+                    continue
+                view = parse_observation(element)
+                if view.shape == "grove":
+                    # Grove identities are only trusted after the exchange event around them was validated
+                    _fatal(deps, fatal, "grove_not_bundle", f"{obj.uri}: a Grove resource outside an exchange Bundle")
+                    continue
+                take(view, ctx)
                 continue
-            for resource in _expand(outer):
-                take(resource, ctx)
+            try:
+                natives, views = _read_event(element, obj.upload_kind, unit.uid, spec, deps.grove, event_cfg, warnings)
+            except GroveError as exc:
+                _fatal(deps, fatal, exc.reason, f"{obj.uri}@{obj.generation}: {exc.message}")
+                continue
+            retracted_natives.update(natives)
+            for view in views:
+                take(view, ctx)
 
     table = rows.to_table()  # releases the buffered chunks
     result.arrow_mb = int(pa.total_allocated_bytes() / (1024 * 1024))
@@ -154,7 +163,9 @@ def process_unit(unit: Unit, deps: Deps) -> UnitResult:
     table, result.dedup_removed = dedup(table)
 
     ids, bad_tombstones = tombstone_ids(tombstones, spec, identity)
-    ids |= retracted
+    grove_ids = {identity.source_output(spec.sample_type, n, spec.measurement_id or "") for n in retracted_natives}
+    result.grove_retractions = len(grove_ids)
+    ids |= grove_ids
     result.tombstones_seen = len(ids)
     if bad_tombstones:
         drops["bad_tombstone_uuid"] += bad_tombstones
@@ -259,12 +270,29 @@ def _finish_unit_sidecar(deps: Deps, unit: Unit, previous: list[str], planned: l
     deps.store.write(uri, json.dumps({"unit_id": unit.unit_id, "parts": planned}).encode(), overwrite=True)
 
 
-def _is_retraction(bundle: dict[str, Any]) -> bool:
-    for entry in bundle.get("entry") or []:
-        resource = (entry or {}).get("resource") or {}
-        if resource.get("resourceType") == "Provenance":
-            for activity in [resource.get("activity") or {}]:
-                for coding in activity.get("coding") or []:
-                    if coding.get("code") == "source-record-retracted":
-                        return True
-    return False
+def _is_csv(uri: str) -> bool:
+    return uri.removesuffix(".zstd").endswith(".csv")
+
+
+def _read_event(
+    bundle: dict[str, Any],
+    kind: UploadKind,
+    uid: str,
+    spec: TypeSpec,
+    settings: GroveSettings,
+    cfg: EventConfig,
+    warnings: Counter[str],
+) -> tuple[list[str], list[ObservationView]]:
+    """(HealthKit record ids a retraction names, Observation views of an active event); raises GroveError."""
+    graph = parse_event(bundle, cfg)
+    if graph.kind == "retraction":
+        natives, ignored = grove_healthkit.retracted_natives(graph, settings)
+        if ignored:
+            warnings["grove_retraction_target_ignored"] += ignored
+        return natives, []
+    if kind == UploadKind.DELETIONS:
+        raise GroveError("grove_unexpected_active_event", "a deletions object carries an active event")
+    found: list[str] = []
+    views = grove_healthkit.views_from_event(graph, uid=uid, spec=spec, settings=settings, warnings=found)
+    warnings.update(found)
+    return [], views

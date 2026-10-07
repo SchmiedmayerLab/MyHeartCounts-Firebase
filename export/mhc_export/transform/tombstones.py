@@ -3,7 +3,7 @@
 # SPDX-FileCopyrightText: 2026 Stanford University and the project authors (see CONTRIBUTORS.md)
 # SPDX-License-Identifier: MIT
 
-"""Deletion sources -> set of retracted source-output identities for one unit."""
+"""CSV deletion lists -> retracted source-output identities for one unit; Grove retractions are read in run/unit."""
 
 from __future__ import annotations
 
@@ -11,8 +11,6 @@ from dataclasses import dataclass
 
 from mhc_export.identity.grove_ids import HealthKitIdentity, IdentityError
 from mhc_export.transform.specs import TypeSpec
-
-GROVE_ROLE_SYSTEM = "https://grovealliance.org/fhir/mobile/CodeSystem/grove-identifier-role"
 
 
 @dataclass(frozen=True)
@@ -53,22 +51,3 @@ def tombstone_ids(tombstones: list[Tombstone], spec: TypeSpec, identity: HealthK
         except IdentityError:
             bad += 1
     return ids, bad
-
-
-def retraction_targets(bundle: dict) -> set[str]:
-    """Grove retraction Bundle -> source-output identities named by its Provenance targets."""
-    ids: set[str] = set()
-    for entry in bundle.get("entry") or []:
-        resource = (entry or {}).get("resource") or {}
-        if resource.get("resourceType") != "Provenance":
-            continue
-        for target in resource.get("target") or []:
-            ident = (target or {}).get("identifier") or {}
-            value = ident.get("value")
-            role = None
-            for coding in (ident.get("type") or {}).get("coding") or []:
-                if coding.get("system") == GROVE_ROLE_SYSTEM:
-                    role = coding.get("code")
-            if value and role == "source-output":
-                ids.add(value)
-    return ids

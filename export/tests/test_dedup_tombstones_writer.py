@@ -13,7 +13,7 @@ from mhc_export.identity.grove_ids import HealthKitIdentity
 from mhc_export.transform.dedup import dedup, tuple_collisions
 from mhc_export.transform.project import ProjectContext, project
 from mhc_export.transform.specs import default_registry
-from mhc_export.transform.tombstones import retraction_targets, tombstone_ids, tombstones_from_csv
+from mhc_export.transform.tombstones import tombstone_ids, tombstones_from_csv
 from mhc_export.transform.writer import (
     RowBuffer,
     read_parquet_metadata,
@@ -103,37 +103,6 @@ def test_tombstones(identity: HealthKitIdentity) -> None:
             "HKQuantityTypeIdentifierHeartRate", "bdac71f6-3398-4bdd-a56c-7bd50988d87a", "heart-rate"
         )
     }
-
-
-def test_retraction_targets() -> None:
-    role = "https://grovealliance.org/fhir/mobile/CodeSystem/grove-identifier-role"
-    bundle = {
-        "resourceType": "Bundle",
-        "entry": [
-            {
-                "resource": {
-                    "resourceType": "Provenance",
-                    "target": [
-                        {
-                            "type": "Observation",
-                            "identifier": {
-                                "type": {"coding": [{"system": role, "code": "source-output"}]},
-                                "value": "v0:k:1:X",
-                            },
-                        },
-                        {
-                            "type": "Device",
-                            "identifier": {
-                                "type": {"coding": [{"system": role, "code": "device-snapshot"}]},
-                                "value": "v0:k:1:Y",
-                            },
-                        },
-                    ],
-                }
-            }
-        ],
-    }
-    assert retraction_targets(bundle) == {"v0:k:1:X"}
 
 
 def test_writer_roundtrip_metadata_and_months(ctx: ProjectContext) -> None:

@@ -134,6 +134,7 @@ def test_run_local_end_to_end(tmp_path: Path) -> None:
             "--key-hex",
             TEST_KEY_HEX,
             "--allow-test-key",
+            "--accept-legacy",
         ]
     )
     assert rc == 0
@@ -147,7 +148,7 @@ def test_run_local_end_to_end(tmp_path: Path) -> None:
         "staging/r1/HKQuantityTypeIdentifierHeartRate/year=2025/month=12/user-abc__HKQuantityTypeIdentifierHeartRate.parquet",
         "staging/r1/HKQuantityTypeIdentifierHeartRate/year=2026/month=01/user-abc__HKQuantityTypeIdentifierHeartRate.parquet",
     ]
-    assert report["units"][f"{UID}:HKDataTypeIdentifierElectrocardiogram"]["skipped_reason"] == "supported:unmodeled"
+    assert report["units"][f"{UID}:HKDataTypeIdentifierElectrocardiogram"]["skipped_reason"].startswith("deferred:")
     table = pq.read_table(out / hr["parts"][0])
     assert table.num_rows == 4 and table.column("participant_id").unique().to_pylist() != [UID]
     participants = json.loads((out / "private" / "participants.json").read_text())
@@ -165,7 +166,34 @@ def test_run_local_end_to_end(tmp_path: Path) -> None:
             "--key-hex",
             TEST_KEY_HEX,
             "--allow-test-key",
+            "--accept-legacy",
         ]
     )
     assert rc2 == 0
     assert pq.read_table(out / hr["parts"][0]).equals(table)
+
+
+def test_json_deletions_are_planned_as_deletions() -> None:
+    from mhc_export.io.blobstore import ObjectInfo
+
+    hit = classify(
+        ObjectInfo(
+            "users/u1/healthDeletions/HKQuantityTypeIdentifierHeartRate_0123456789abcdef01234567.json.zstd",
+            9,
+            None,
+            None,
+            {},
+        )
+    )
+    assert (
+        hit
+        and hit[0] == "u1"
+        and hit[1] == "HKQuantityTypeIdentifierHeartRate"
+        and hit[2].upload_kind == UploadKind.DELETIONS
+    )
+    assert (
+        classify(
+            ObjectInfo("users/u1/liveHealthSamples/HKQuantityTypeIdentifierHeartRate_ab.csv.zstd", 9, None, None, {})
+        )
+        is None
+    )
