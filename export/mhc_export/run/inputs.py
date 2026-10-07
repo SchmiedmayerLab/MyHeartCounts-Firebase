@@ -169,7 +169,7 @@ def commit_ledger(state: BlobStore, state_prefix: str, run_id: str) -> int:
         if not unit_file.endswith(".parquet"):
             continue
         target = join(state_prefix, "ledger", sample_type, f"{run_id}__{unit_file}")
-        if not state.exists(target):
-            state.copy(info.uri, target, overwrite=False)
+        if not state.exists(target) or state.md5(target) != state.md5(info.uri):
+            state.copy(info.uri, target, overwrite=True)
             copied += 1
     return copied

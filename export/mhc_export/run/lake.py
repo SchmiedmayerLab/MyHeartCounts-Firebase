@@ -54,6 +54,7 @@ class CurrentPointer(BaseModel):
     rows: int
     committed_at: datetime
     previous_dataset: str | None = None
+    source: str | None = None  # what the committed run's plan listed
 
 
 def join(prefix: str, *parts: str) -> str:
@@ -98,4 +99,7 @@ def commit(lake: BlobStore, prefix: str, pointer: CurrentPointer, token: str | N
     try:
         lake.write_versioned(join(prefix, CURRENT_NAME), pointer.model_dump_json(indent=1).encode(), token)
     except BlobConflict as exc:
+        stored, _ = read_current(lake, prefix)
+        if stored == pointer:
+            return  # a retried write that had already landed
         raise LakeConflict("another run committed to this lake concurrently; nothing was published") from exc
