@@ -4,6 +4,8 @@
 # SPDX-License-Identifier: MIT
 
 import json
+import os
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
@@ -65,6 +67,7 @@ def test_plan_then_work_locally(tmp_path: Path) -> None:
         "--key-hex",
         TEST_KEY_HEX,
         "--allow-test-key",
+        "--accept-legacy",
     ]
     with pytest.raises(SystemExit, match="belongs to run r9"):
         main([*work, "--run-id", "other"])
@@ -126,6 +129,7 @@ def test_eligibility_excludes_withdrawn_deleted_and_missing_accounts(tmp_path: P
             "--key-hex",
             TEST_KEY_HEX,
             "--allow-test-key",
+            "--accept-legacy",
             "--user-flags",
             str(flags),
             "--phases",
@@ -140,10 +144,13 @@ def test_eligibility_excludes_withdrawn_deleted_and_missing_accounts(tmp_path: P
 def test_full_cli_chain_enforces_contiguous_windows(tmp_path: Path) -> None:
     src = tmp_path / "src"
     build_source(src)
+    uploaded = datetime(2025, 6, 1, tzinfo=UTC).timestamp()
+    for path in src.rglob("*"):
+        os.utime(path, (uploaded, uploaded))
     flags = _write_flags(tmp_path / "flags.json", {UID: {}})
     state = tmp_path / "state"
     lake = tmp_path / "lake"
-    key = ["--key-hex", TEST_KEY_HEX, "--allow-test-key", "--participants", str(tmp_path / "p.json")]
+    key = ["--key-hex", TEST_KEY_HEX, "--allow-test-key", "--accept-legacy", "--participants", str(tmp_path / "p.json")]
 
     def run(run_id: str, *window: str) -> int:
         manifest = state / "runs" / run_id / "manifest.jsonl"
@@ -209,11 +216,14 @@ def test_full_cli_chain_enforces_contiguous_windows(tmp_path: Path) -> None:
             ]
         )
 
-    assert run("r1", "--batch-end", "2999-01-01T00:00:00Z") == 0
-    assert json.loads((lake / "_current.json").read_text())["batch_end"].startswith("2999-01-01")
+    assert run("r1", "--batch-end", "2025-07-01T00:00:00Z") == 0
+    assert json.loads((lake / "_current.json").read_text())["batch_end"].startswith("2025-07-01")
     # the next run derives its start from the lake and promotes
-    assert run("r2", "--lake", str(lake), "--batch-end", "2999-02-01T00:00:00Z") == 0
+    assert run("r2", "--lake", str(lake), "--batch-end", "2025-08-01T00:00:00Z") == 0
     assert json.loads((lake / "_current.json").read_text())["run_id"] == "r2"
     # a run that leaves a gap is refused
     with pytest.raises(PromoteConflict, match="contiguous"):
-        run("r3", "--batch-start", "2999-03-01T00:00:00Z", "--batch-end", "2999-04-01T00:00:00Z")
+        run("r3", "--batch-start", "2025-09-01T00:00:00Z", "--batch-end", "2025-10-01T00:00:00Z")
+    # a window that ends in the future is refused at plan time
+    with pytest.raises(SystemExit, match="future"):
+        run("r4", "--lake", str(lake), "--batch-end", "2999-01-01T00:00:00Z")

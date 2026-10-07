@@ -22,7 +22,6 @@ from mhc_export.run.envelope import RunEnvelope
 from mhc_export.run.inputs import RunInputs, gather_inputs
 from mhc_export.run.promote import PromoteConflict, promote_run, sanitize_report
 from mhc_export.run.validate import PHI_PATTERNS, compacted_fingerprint, validate_run
-from mhc_export.transform.project import ProjectContext
 from mhc_export.transform.specs import default_registry
 from mhc_export.transform.writer import read_parquet_metadata
 from tests.conftest import pre_grove_heart_rate
@@ -95,6 +94,7 @@ def _run(tmp_path: Path, phases: str, extra: list[str] | None = None, multi: boo
             "--key-hex",
             TEST_KEY_HEX,
             "--allow-test-key",
+            "--accept-legacy",
             "--phases",
             phases,
         ]
@@ -599,6 +599,7 @@ def test_unreadable_input_fails_closed_unless_tolerated(tmp_path: Path) -> None:
             "--key-hex",
             TEST_KEY_HEX,
             "--allow-test-key",
+            "--accept-legacy",
             "--phases",
             "work",
         ]
@@ -618,6 +619,7 @@ def test_unreadable_input_fails_closed_unless_tolerated(tmp_path: Path) -> None:
             "--key-hex",
             TEST_KEY_HEX,
             "--allow-test-key",
+            "--accept-legacy",
             "--phases",
             "work,compact,validate",
             "--tolerate-fatal",
@@ -660,7 +662,7 @@ def test_promote_verifies_uploaded_content_against_validation(tmp_path: Path) ->
 
 
 def test_redo_removes_stale_parts_via_sidecar(tmp_path: Path) -> None:
-    from mhc_export.config import IdentityConfig
+    from mhc_export.config import GroveSettings, IdentityConfig
     from mhc_export.identity.participants import LocalParticipantLookup
     from mhc_export.run.unit import Deps, process_unit, unit_sidecar_uri
     from mhc_export.sources.bucket import plan_units
@@ -677,6 +679,7 @@ def test_redo_removes_stale_parts_via_sidecar(tmp_path: Path) -> None:
         participants=LocalParticipantLookup(tmp_path / "p.json"),
         staging_prefix="staging/r1",
         run_id="r1",
+        grove=GroveSettings(accept_legacy=True),
     )
     first = process_unit(unit, deps)
     assert len(first.parts) == 2 and store.exists(unit_sidecar_uri("staging/r1", unit))
@@ -686,88 +689,6 @@ def test_redo_removes_stale_parts_via_sidecar(tmp_path: Path) -> None:
     second = process_unit(unit2, deps)
     assert len(second.parts) == 1
     assert not store.exists([p for p in first.parts if p not in second.parts][0])
-
-
-def test_grove_identity_guards(ctx: ProjectContext) -> None:
-    from mhc_export.config import IdentityConfig
-    from mhc_export.grove.view import parse_observation
-    from mhc_export.transform.project import ProjectError, project
-    from tests.conftest import TEST_KEY
-
-    config = IdentityConfig(TEST_KEY, deployment_root="https://mhc.example/fhir")
-    guarded = ProjectContext(
-        ctx.participant_id, ctx.identity, ctx.run_id, ctx.upload_kind, ctx.from_archive, config=config
-    )
-    role = "https://grovealliance.org/fhir/mobile/CodeSystem/grove-identifier-role"
-    hk_id = ctx.identity
-    good_rec = hk_id.source_record(HR, "BDAC71F6-3398-4BDD-A56C-7BD50988D87A")
-    good_out = hk_id.source_output(HR, "BDAC71F6-3398-4BDD-A56C-7BD50988D87A", "heart-rate")
-
-    def obs(rec_sys: str, rec_val: str, out_sys: str, out_val: str, extra=None) -> dict:
-        ids = [
-            {"type": {"coding": [{"system": role, "code": "source-record"}]}, "system": rec_sys, "value": rec_val},
-            {"type": {"coding": [{"system": role, "code": "source-output"}]}, "system": out_sys, "value": out_val},
-        ] + (extra or [])
-        return {
-            "resourceType": "Observation",
-            "status": "final",
-            "identifier": ids,
-            "extension": [
-                {
-                    "url": "https://grovealliance.org/fhir/healthkit/StructureDefinition/healthkit-source-type",
-                    "valueCode": HR,
-                }
-            ],
-            "effectiveDateTime": "2026-08-07T16:03:37.797-07:00",
-            "valueQuantity": {
-                "value": 84,
-                "unit": "beats/minute",
-                "code": "/min",
-                "system": "http://unitsofmeasure.org",
-            },
-        }
-
-    spec = default_registry().get(HR)
-    ok = obs(hk_id.system("source-record"), good_rec, hk_id.system("source-output"), good_out)
-    assert project(parse_observation(ok), spec, guarded, 1).row["sample_id"] == good_out
-    foreign_key = obs(hk_id.system("source-record"), "v0:other:1:" + "A" * 43, hk_id.system("source-output"), good_out)
-    with pytest.raises(ProjectError, match="foreign_identity"):
-        project(parse_observation(foreign_key), spec, guarded, 1)
-    foreign_system = obs("https://elsewhere.example/sr", good_rec, hk_id.system("source-output"), good_out)
-    with pytest.raises(ProjectError, match="foreign_identity"):
-        project(parse_observation(foreign_system), spec, guarded, 1)
-    dup = obs(
-        hk_id.system("source-record"),
-        good_rec,
-        hk_id.system("source-output"),
-        good_out,
-        extra=[
-            {
-                "type": {"coding": [{"system": role, "code": "source-output"}]},
-                "system": hk_id.system("source-output"),
-                "value": good_out,
-            }
-        ],
-    )
-    with pytest.raises(ProjectError, match="duplicate_grove_identity"):
-        project(parse_observation(dup), spec, guarded, 1)
-    # an older epoch is accepted only when listed
-    from mhc_export.identity.grove_ids import GroveKey
-
-    old_key = GroveKey(TEST_KEY.secret, "test-key", 1)
-    newer = IdentityConfig(GroveKey(TEST_KEY.secret, "test-key", 2), deployment_root="https://mhc.example/fhir")
-    newer_ctx = ProjectContext(
-        ctx.participant_id, ctx.identity, ctx.run_id, ctx.upload_kind, ctx.from_archive, config=newer
-    )
-    with pytest.raises(ProjectError, match="foreign_identity"):
-        project(parse_observation(ok), spec, newer_ctx, 1)
-    rotated = IdentityConfig(
-        newer.key, deployment_root="https://mhc.example/fhir", accepted_epochs=((old_key.key_id, 1),)
-    )
-    rotated_ctx = ProjectContext(
-        ctx.participant_id, ctx.identity, ctx.run_id, ctx.upload_kind, ctx.from_archive, config=rotated
-    )
-    assert project(parse_observation(ok), spec, rotated_ctx, 1).row["sample_id"] == good_out
 
 
 def test_report_carries_identity_config_and_validation_checks_namespace(tmp_path: Path) -> None:

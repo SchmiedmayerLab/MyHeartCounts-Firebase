@@ -11,9 +11,10 @@ import pytest
 import zstandard
 
 from mhc_export.cli import build_parser, main
-from mhc_export.config import DEFAULT_DEPLOYMENT_ROOT, IdentityConfig
+from mhc_export.config import GroveSettings, IdentityConfig
+from mhc_export.grove.event import GroveError
 from mhc_export.grove.view import _decimal_text, parse_observation
-from mhc_export.identity.grove_ids import GroveKey, HealthKitIdentity, RepositoryScope
+from mhc_export.identity.grove_ids import GroveKey
 from mhc_export.identity.participants import LocalParticipantLookup
 from mhc_export.io.blobstore import LocalBlobStore, ObjectInfo, RoutedStore, sync_prefix
 from mhc_export.run.compact import compact_run
@@ -26,6 +27,7 @@ from mhc_export.sources.bucket import plan_units
 from mhc_export.transform.project import ProjectContext, ProjectError, project
 from mhc_export.transform.specs import default_registry
 from tests.conftest import TEST_KEY, pre_grove_heart_rate
+from tests.grove_hk import hk_event, native, observation, views
 from tests.test_unit_e2e import TEST_KEY_HEX, UID, build_source
 
 
@@ -51,8 +53,7 @@ def _validate(compacted: Path, report: dict, **kw):
 
 
 HR = "HKQuantityTypeIdentifierHeartRate"
-ROLE = "https://grovealliance.org/fhir/mobile/CodeSystem/grove-identifier-role"
-WRITER_VERSION = "https://grovealliance.org/fhir/mobile/StructureDefinition/grove-writer-record-version"
+SPO2 = "HKQuantityTypeIdentifierOxygenSaturation"
 REG = default_registry()
 
 
@@ -60,57 +61,21 @@ def _zstd(data: bytes) -> bytes:
     return zstandard.ZstdCompressor(write_content_size=False).compress(data)
 
 
-def grove_hr(
-    ident: HealthKitIdentity, uuid: str, *, writer: tuple[str, str] | None = None, version: str | None = None
-) -> dict:
-    ids = [
-        {
-            "type": {"coding": [{"system": ROLE, "code": "source-record"}]},
-            "system": ident.system("source-record"),
-            "value": ident.source_record(HR, uuid),
-        },
-        {
-            "type": {"coding": [{"system": ROLE, "code": "source-output"}]},
-            "system": ident.system("source-output"),
-            "value": ident.source_output(HR, uuid, "heart-rate"),
-        },
-    ]
-    if writer:
-        ids.append(
-            {"type": {"coding": [{"system": ROLE, "code": "writer-record"}]}, "system": writer[0], "value": writer[1]}
-        )
-    ext = [
-        {"url": "https://grovealliance.org/fhir/healthkit/StructureDefinition/healthkit-source-type", "valueCode": HR}
-    ]
-    if version is not None:
-        ext.append({"url": WRITER_VERSION, "valueString": version})
-    return {
-        "resourceType": "Observation",
-        "status": "final",
-        "identifier": ids,
-        "extension": ext,
-        "effectiveDateTime": "2025-12-10T10:00:00.000+01:00",
-        "valueQuantity": {"value": 61, "unit": "beats/minute", "code": "/min", "system": "http://unitsofmeasure.org"},
-    }
-
-
 def _ctx(config: IdentityConfig, participant: str = "p1") -> ProjectContext:
-    ident = config.for_participant(participant)
     from mhc_export.run.models import UploadKind
 
-    return ProjectContext(participant, ident, "r1", UploadKind.LIVE, True, config=config)
+    return ProjectContext(participant, config.for_participant(participant), "r1", UploadKind.LIVE, True)
 
 
 def test_run_with_only_foreign_identities_never_promotes(tmp_path: Path) -> None:
-    """A key mismatch between migration and export must not produce an empty, validated, promoted run."""
+    """Events minted under a producer namespace the run does not accept must not produce an empty, validated,
+    promoted run."""
     src = tmp_path / "src"
-    migrator = HealthKitIdentity(
-        GroveKey(TEST_KEY.secret, "migrator", 1), RepositoryScope("https://x/store", "p"), DEFAULT_DEPLOYMENT_ROOT
-    )
+    migrator = GroveKey(TEST_KEY.secret, "migrator", 1)
     batch = src / "u1" / "2025" / "12" / HR
     batch.mkdir(parents=True)
     (batch / "b1.json.zstd").write_bytes(
-        _zstd(orjson.dumps([grove_hr(migrator, f"{i:08x}-0000-4000-8000-000000000000") for i in range(3)]))
+        _zstd(orjson.dumps([hk_event("u1", native(i), key=migrator, seq=i + 1) for i in range(3)]))
     )
     out = tmp_path / "out"
     base = [
@@ -136,30 +101,29 @@ def test_run_with_only_foreign_identities_never_promotes(tmp_path: Path) -> None
     assert not (out / "lake" / "_current.json").exists()
 
 
-def test_malformed_grove_identity_is_rejected_per_record() -> None:
-    config = IdentityConfig(TEST_KEY)
-    ctx = _ctx(config)
-    obs = grove_hr(ctx.identity, "11111111-0000-4000-8000-000000000000")
-    obs["identifier"][1]["value"] = "v0:test-key:1:not-a-digest"
-    with pytest.raises(ProjectError) as exc:
-        project(parse_observation(obs), REG.get(HR), ctx, 1)
+def test_malformed_producer_identity_fails_the_event() -> None:
+    bundle = hk_event("u1", native(1))
+    observation(bundle)["identifier"][1]["value"] = "v0:store:1:not-a-digest"
+    with pytest.raises(GroveError) as exc:
+        views(bundle, "u1")
     assert exc.value.reason == "bad_grove_identity"
 
 
 @pytest.mark.parametrize("version", ["007", "-1", "1.5", " 3", "v2"])
 def test_non_canonical_writer_version_is_rejected(version: str) -> None:
-    config = IdentityConfig(TEST_KEY)
-    ctx = _ctx(config)
-    writer = (ctx.identity.system("writer-record"), "v0:test-key:1:" + "W" * 43)
-    obs = grove_hr(ctx.identity, "22222222-0000-4000-8000-000000000000", writer=writer, version=version)
+    ctx = _ctx(IdentityConfig(TEST_KEY))
+    (bad,) = views(hk_event("u1", native(2), writer=("sync-2", version)), "u1")
     with pytest.raises(ProjectError) as exc:
-        project(parse_observation(obs), REG.get(HR), ctx, 1)
+        project(bad, REG.get(HR), ctx, 1)
     assert exc.value.reason == "bad_writer_version"
-    good = grove_hr(ctx.identity, "22222222-0000-4000-8000-000000000000", writer=writer, version="12")
-    assert project(parse_observation(good), REG.get(HR), ctx, 1).row["writer_version"] == "12"
-    half = grove_hr(ctx.identity, "22222222-0000-4000-8000-000000000000", version="12")
+    (good,) = views(hk_event("u1", native(2), writer=("sync-2", "12")), "u1")
+    row = project(good, REG.get(HR), ctx, 1).row
+    assert row["writer_version"] == "12" and row["writer_record_id"].startswith("v0:store:1:")
+    half = hk_event("u1", native(2), writer=("sync-2", "12"))
+    obs = observation(half)
+    obs["extension"] = [e for e in obs["extension"] if not e["url"].endswith("grove-writer-record-version")]
     with pytest.raises(ProjectError, match="pair"):
-        project(parse_observation(half), REG.get(HR), ctx, 1)
+        project(views(half, "u1")[0], REG.get(HR), ctx, 1)
 
 
 def test_legacy_decimal_text_rejects_negatives() -> None:
@@ -188,17 +152,16 @@ def test_legacy_percent_is_scaled_to_percentage_points(ctx: ProjectContext) -> N
 
 
 def test_grove_percent_is_taken_as_points() -> None:
-    config = IdentityConfig(TEST_KEY)
-    ctx = _ctx(config)
-    sat_type = "HKQuantityTypeIdentifierOxygenSaturation"
-    obs = grove_hr(ctx.identity, "33333333-0000-4000-8000-000000000000")
-    obs["extension"][0]["valueCode"] = sat_type
-    obs["identifier"][0]["value"] = ctx.identity.source_record(sat_type, "33333333-0000-4000-8000-000000000000")
-    obs["identifier"][1]["value"] = ctx.identity.source_output(
-        sat_type, "33333333-0000-4000-8000-000000000000", "oxygen-saturation"
+    bundle = hk_event(
+        "u1",
+        native(3),
+        sample_type=SPO2,
+        measurement="oxygen-saturation",
+        code=("http://loinc.org", "2708-6"),
+        value={"valueQuantity": {"value": 97, "unit": "%", "code": "%", "system": "http://unitsofmeasure.org"}},
     )
-    obs["valueQuantity"] = {"value": 97, "unit": "%", "code": "%", "system": "http://unitsofmeasure.org"}
-    assert project(parse_observation(obs), REG.get(sat_type), ctx, 1).row["value"] == 97.0
+    (view,) = views(bundle, "u1", SPO2)
+    assert project(view, REG.get(SPO2), _ctx(IdentityConfig(TEST_KEY)), 1).row["value"] == 97.0
 
 
 def test_accept_epoch_is_parsed_strictly() -> None:
@@ -216,6 +179,7 @@ def test_accept_epoch_is_parsed_strictly() -> None:
                     "--key-hex",
                     TEST_KEY_HEX,
                     "--allow-test-key",
+                    "--accept-legacy",
                     "--accept-epoch",
                     bad,
                 ]
@@ -286,6 +250,7 @@ def _deps(tmp_path: Path, src: Path, store, **kw) -> Deps:
         participants=LocalParticipantLookup(tmp_path / "p.json"),
         staging_prefix="staging/r1",
         run_id="r1",
+        grove=GroveSettings(accept_legacy=True),
         **kw,
     )
 
@@ -340,6 +305,7 @@ def test_max_unit_rows_flag_fails_the_unit_early(tmp_path: Path) -> None:
             "--key-hex",
             TEST_KEY_HEX,
             "--allow-test-key",
+            "--accept-legacy",
             "--phases",
             "work",
             "--max-unit-rows",
@@ -385,6 +351,7 @@ def test_promote_treats_missing_checksums_as_conflicts(tmp_path: Path) -> None:
                 "--key-hex",
                 TEST_KEY_HEX,
                 "--allow-test-key",
+                "--accept-legacy",
                 "--phases",
                 "work,compact,validate",
             ]

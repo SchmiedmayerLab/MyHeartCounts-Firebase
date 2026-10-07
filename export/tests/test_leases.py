@@ -120,6 +120,7 @@ def test_two_worker_processes_share_one_manifest(tmp_path: Path) -> None:
         "--key-hex",
         TEST_KEY_HEX,
         "--allow-test-key",
+        "--accept-legacy",
         "--leases",
         leases,
     ]

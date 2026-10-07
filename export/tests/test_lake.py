@@ -70,6 +70,7 @@ def _run(src: Path, out: Path, run_id: str) -> int:
             "--key-hex",
             TEST_KEY_HEX,
             "--allow-test-key",
+            "--accept-legacy",
         ]
     )
 
@@ -159,6 +160,7 @@ def test_concurrent_promoters_cannot_both_commit(tmp_path: Path) -> None:
                     "--key-hex",
                     TEST_KEY_HEX,
                     "--allow-test-key",
+                    "--accept-legacy",
                     "--phases",
                     "work,compact,validate",
                 ]
@@ -211,6 +213,7 @@ def test_promote_refuses_when_the_base_moved(tmp_path: Path) -> None:
                 "--key-hex",
                 TEST_KEY_HEX,
                 "--allow-test-key",
+                "--accept-legacy",
                 "--phases",
                 "work,compact,validate",
             ]
