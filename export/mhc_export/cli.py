@@ -16,7 +16,14 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 from mhc_export import __version__
-from mhc_export.config import IdentityConfig, check_production, load_key, load_key_from_secret, new_key_hex
+from mhc_export.config import (
+    GroveSettings,
+    IdentityConfig,
+    check_production,
+    load_key,
+    load_key_from_secret,
+    new_key_hex,
+)
 from mhc_export.identity.grove_ids import IdentityError
 from mhc_export.identity.participants import LocalParticipantLookup
 from mhc_export.io.blobstore import BlobStore, LocalBlobStore, RoutedStore, read_uri, store_for, write_uri
@@ -40,7 +47,7 @@ from mhc_export.run.validate import validate_run
 from mhc_export.run.worker import assemble_report, report_from_leases, work_with_leases, worker_context
 from mhc_export.sources.bucket import apply_eligibility, plan_units
 from mhc_export.sources.users import FileUserFlags, FirestoreUserFlags
-from mhc_export.transform.specs import default_registry
+from mhc_export.transform.specs import default_coverage, default_registry
 
 log = logging.getLogger("mhc_export")
 
@@ -62,6 +69,48 @@ def _add_key_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--production", action="store_true", help="refuse local keys, the test key and file lookups")
 
 
+DEFAULT_MAX_UNIT_BYTES = 400_000_000
+
+
+def _add_shard_arg(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument(
+        "--max-unit-bytes",
+        type=int,
+        default=DEFAULT_MAX_UNIT_BYTES,
+        help="split a user's type into shards of at most this much compressed input (about 3M rows per 400 MB)",
+    )
+
+
+def _add_grove_args(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument(
+        "--producer-namespace",
+        action="append",
+        default=[],
+        help="KEY_ID:EPOCH under which the app mints its Grove identities (default store:1); repeatable",
+    )
+    parser.add_argument(
+        "--accept-legacy",
+        action="store_true",
+        help="also read pre-Grove resources (current dev data); refused with --production",
+    )
+
+
+def _parse_namespace(item: str, flag: str) -> tuple[str, int]:
+    key_id, sep, epoch = item.rpartition(":")
+    if not sep or not key_id or ":" in key_id or not epoch.isdigit() or int(epoch) < 1:
+        raise SystemExit(f"{flag} {item!r}: expected KEY_ID:EPOCH with a positive epoch")
+    return key_id, int(epoch)
+
+
+def _grove_settings(args: argparse.Namespace) -> GroveSettings:
+    if args.production and args.accept_legacy:
+        raise SystemExit("--accept-legacy is not allowed with --production: production reads migrated Grove data only")
+    namespaces = tuple(_parse_namespace(n, "--producer-namespace") for n in args.producer_namespace)
+    if namespaces:
+        return GroveSettings(producer_namespaces=namespaces, accept_legacy=args.accept_legacy)
+    return GroveSettings(accept_legacy=args.accept_legacy)
+
+
 def _identity_config(args: argparse.Namespace, *, project: str | None = None) -> IdentityConfig:
     if args.key_secret:
         key = load_key_from_secret(args.key_secret, key_id=args.key_id, epoch=args.key_epoch, project=project)
@@ -75,12 +124,7 @@ def _identity_config(args: argparse.Namespace, *, project: str | None = None) ->
             allow_test_key=args.allow_test_key,
         )
         source = "file" if args.key_file else "argument"
-    accepted = []
-    for item in args.accept_epoch:
-        key_id, sep, epoch = item.rpartition(":")
-        if not sep or not key_id or not epoch.isdigit() or int(epoch) < 1:
-            raise SystemExit(f"--accept-epoch {item!r}: expected KEY_ID:EPOCH with a positive epoch")
-        accepted.append((key_id, int(epoch)))
+    accepted = [_parse_namespace(item, "--accept-epoch") for item in args.accept_epoch]
     try:
         return IdentityConfig(key, key_source=source, accepted_epochs=tuple(accepted))
     except IdentityError as exc:
@@ -93,6 +137,7 @@ def cmd_new_key(_: argparse.Namespace) -> int:
 
 
 def cmd_run_local(args: argparse.Namespace) -> int:
+    grove = _grove_settings(args)
     identity = _identity_config(args)
     if args.production:
         check_production(identity, participants_source="file")
@@ -104,7 +149,7 @@ def cmd_run_local(args: argparse.Namespace) -> int:
     uids = set(args.uid) if args.uid else None
     types = set(args.sample_type) if args.sample_type else None
     # local file times are not upload times, so no creation-time window is applied here
-    planned = plan_units(source.list(""), uids=uids, sample_types=types)
+    planned = plan_units(source.list(""), uids=uids, sample_types=types, max_unit_bytes=args.max_unit_bytes)
     planned, eligibility = _apply_eligibility(planned, "file" if args.user_flags else "none", args.user_flags, None)
     units = planned[: args.limit_units] if args.limit_units else planned
     filtered = bool(uids or types or args.limit_units)
@@ -137,6 +182,7 @@ def cmd_run_local(args: argparse.Namespace) -> int:
         run_id=args.run_id,
         tolerate_unreadable=args.tolerate_fatal > 0,
         max_unit_rows=args.max_unit_rows,
+        grove=grove,
     )
     phases = set(args.phases.split(","))
     report_path = run_dir / "report.json"
@@ -301,6 +347,7 @@ def cmd_promote(args: argparse.Namespace) -> int:
         envelope=envelope,
         validation=validation,
         run_report=run_report,
+        production=args.production,
     )
     print(_promote_line(result, args.lake))
     return 0
@@ -375,6 +422,8 @@ def _summary_line(report: RunReport) -> str:
 def cmd_plan(args: argparse.Namespace) -> int:
     if args.lake and args.batch_start:
         raise SystemExit("--batch-start is derived from --lake; give one of them")
+    if args.batch_end and args.batch_end > datetime.now(UTC):
+        raise SystemExit("--batch-end is in the future: uploads created after this listing would be skipped for good")
     batch_start = args.batch_start
     if args.lake:
         batch_start = _watermark_end(_read_watermark(args.lake, args.project))
@@ -382,9 +431,20 @@ def cmd_plan(args: argparse.Namespace) -> int:
     uids = set(args.uid) if args.uid else None
     types = set(args.sample_type) if args.sample_type else None
     planned = plan_units(
-        store.list(args.source), uids=uids, sample_types=types, batch_start=batch_start, batch_end=args.batch_end
+        store.list(args.source),
+        uids=uids,
+        sample_types=types,
+        batch_start=batch_start,
+        batch_end=args.batch_end,
+        max_unit_bytes=args.max_unit_bytes,
     )
     units, eligibility = _apply_eligibility(planned, args.eligibility, args.user_flags, args.project)
+    listed_users = len({u.uid for u in planned})
+    if listed_users and eligibility.excluded_users.get("no_account", 0) == listed_users:
+        raise SystemExit(
+            f"none of the {listed_users} listed users has an account document; check --project and the "
+            "permissions on the users collection"
+        )
     manifest_bytes = dump_manifest(units)
     envelope = _make_envelope(
         run_id=args.run_id,
@@ -411,6 +471,17 @@ def cmd_plan(args: argparse.Namespace) -> int:
     )
     print(f"manifest: {args.manifest}\nenvelope: {envelope_uri}")
     return 0
+
+
+def _version_drift(envelope: RunEnvelope) -> str | None:
+    running = {
+        "package_version": __version__,
+        "registry_sha256": default_registry().digest,
+        "coverage_sha256": default_coverage().digest,
+    }
+    planned = {k: getattr(envelope, k) for k in running}
+    drift = [f"{k} {planned[k] or 'unset'} != {running[k]}" for k in running if planned[k] != running[k]]
+    return "; ".join(drift) or None
 
 
 def _apply_eligibility(units: list, mode: str, user_flags: str | None, project: str | None) -> tuple[list, Eligibility]:
@@ -458,6 +529,8 @@ def _make_envelope(
         registry_commit=str(registry.generated_from.get("commit", "")),
         package_version=__version__,
         created_at=datetime.now(tz=UTC),
+        registry_sha256=registry.digest,
+        coverage_sha256=default_coverage().digest,
     )
 
 
@@ -484,6 +557,7 @@ def _watermark_end(watermark: dict | None) -> datetime | None:
 
 
 def cmd_work(args: argparse.Namespace) -> int:
+    grove = _grove_settings(args)
     identity = _identity_config(args, project=args.project)
     participants_source = "file" if args.participants else "firestore"
     if args.production:
@@ -494,6 +568,8 @@ def cmd_work(args: argparse.Namespace) -> int:
         raise SystemExit(f"the envelope belongs to run {envelope.run_id}, not {args.run_id}")
     if envelope.manifest_sha256 != manifest_sha256(manifest_bytes):
         raise SystemExit("the manifest changed after planning")
+    if drift := _version_drift(envelope):
+        raise SystemExit(f"this worker differs from the plan: {drift}")
     manifest_units = load_manifest(manifest_bytes)
     units = manifest_units
     if args.unit_id:
@@ -524,6 +600,7 @@ def cmd_work(args: argparse.Namespace) -> int:
         run_id=args.run_id,
         tolerate_unreadable=args.tolerate_fatal > 0,
         max_unit_rows=args.max_unit_rows,
+        grove=grove,
     )
     if args.leases:
         if filtered:
@@ -610,7 +687,8 @@ def cmd_bq_load(args: argparse.Namespace) -> int:
     from mhc_export.run.bigquery import load_committed
 
     lake, prefix = _store(args.lake, args.project)
-    record = load_committed(lake, prefix, args.project, args.dataset, full=args.full)
+    nonce = datetime.now(UTC).isoformat() if args.full else ""
+    record = load_committed(lake, prefix, args.project, args.dataset, full=args.full, nonce=nonce)
     print(
         f"loaded {len(record['loads'])} partitions and deleted {len(record['deletes'])} for run {record['run_id']} "
         f"into {args.project}.{args.dataset}"
@@ -657,7 +735,9 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--tolerate-fatal", type=int, default=0, help="continue past this many unreadable inputs")
     p.add_argument("--max-unit-rows", type=int, default=5_000_000, help="fail a unit above this many rows")
     p.add_argument("--user-flags", help="JSON {uid: user document fields}; without it eligibility is unchecked")
+    _add_shard_arg(p)
     _add_key_args(p)
+    _add_grove_args(p)
     p.set_defaults(func=cmd_run_local)
 
     p = sub.add_parser("compact", help="rebuild every partition the run changes into files of about --target-bytes")
@@ -694,6 +774,12 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--report", required=True)
     p.add_argument("--envelope", required=True, help="run.json written by plan; the batch bounds come from it")
     p.add_argument("--state", required=True, help="private state location; promote refuses a lake that overlaps it")
+    p.add_argument(
+        "--production",
+        action="store_true",
+        help="also require the recorded run to be a production run: Secret Manager key, Firestore participants "
+        "and eligibility, no legacy input, a whole source bucket, at least one unit",
+    )
     p.add_argument("--project")
     p.set_defaults(func=cmd_promote)
 
@@ -712,6 +798,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--user-flags", help="JSON {uid: user document fields} for --eligibility file")
     p.add_argument("--project")
     p.add_argument("--force", action="store_true", help="overwrite an existing manifest and envelope")
+    _add_shard_arg(p)
     p.set_defaults(func=cmd_plan)
 
     p = sub.add_parser(
@@ -741,6 +828,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--lease-seconds", type=int, default=1800, help="lease time to live; renewed every third of it")
     p.add_argument("--max-attempts", type=int, default=3, help="attempts per unit before it fails for good")
     _add_key_args(p)
+    _add_grove_args(p)
     p.set_defaults(func=cmd_work)
 
     p = sub.add_parser("report", help="assemble the run report from the lease store once workers are finished")
@@ -761,7 +849,11 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--lake", required=True, help="gs:// lake with a committed dataset")
     p.add_argument("--project", required=True)
     p.add_argument("--dataset", required=True)
-    p.add_argument("--full", action="store_true", help="reload every partition, not only those the last run changed")
+    p.add_argument(
+        "--full",
+        action="store_true",
+        help="reload every partition, not only those that differ from what the destination holds",
+    )
     p.set_defaults(func=cmd_bq_load)
     return parser
 
