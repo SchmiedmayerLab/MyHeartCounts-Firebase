@@ -252,6 +252,24 @@ def _iso_us(epoch_us: int | None) -> str:
     )
 
 
+class SchemaDrift(ValueError):
+    pass
+
+
+def check_input_schemas(spec: TypeSpec, files: list[Path]) -> None:
+    """Inputs must carry exactly the type's columns; merging by name would fill a missing column with NULL."""
+    expected = [(f.name, f.type) for f in spec.arrow_schema]
+    for path in files:
+        found = [(f.name, f.type) for f in pq.read_schema(path)]
+        if found != expected:
+            missing = sorted({n for n, _ in expected} - {n for n, _ in found})
+            extra = sorted({n for n, _ in found} - {n for n, _ in expected})
+            raise SchemaDrift(
+                f"{path} does not match the {spec.sample_type} schema (missing {missing}, extra {extra}, or types "
+                "differ); rework the run with this package version, or rebuild the lake after a contract change"
+            )
+
+
 def compact_partition(
     partition: tuple[str, int, int],
     out_dir: Path,
@@ -269,6 +287,7 @@ def compact_partition(
     started = time.monotonic()
     sample_type, year, month = partition
     key = partition_key(sample_type, year, month)
+    check_input_schemas(spec, [*staged, *committed])
     con = con or _connect(None, None, None)
     out_dir.parent.mkdir(parents=True, exist_ok=True)
     tmp = Path(tempfile.mkdtemp(prefix=f".tmp-{out_dir.name}-", dir=out_dir.parent))
