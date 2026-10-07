@@ -89,6 +89,7 @@ class ObservationView:
     recording_method: str | None
     motion_context_raw: int | None
     identifiers: dict[str, tuple[str | None, str]] = field(default_factory=dict)
+    duplicate_roles: tuple[str, ...] = ()
     is_clinical_record: bool = False
 
 
@@ -157,9 +158,9 @@ def parse_observation(resource: dict) -> ObservationView:
     resource_type = resource.get("resourceType") or "<none>"
     if resource_type == "DocumentReference":
         return _empty(resource_type, clinical=True)
-    identifiers = _grove_identifiers(resource)
+    identifiers, duplicate_roles = _grove_identifiers(resource)
     if identifiers:
-        return _parse_grove(resource, resource_type, identifiers)
+        return _parse_grove(resource, resource_type, identifiers, duplicate_roles)
     return _parse_pre_grove(resource, resource_type)
 
 
@@ -192,15 +193,18 @@ def _empty(resource_type: str, *, clinical: bool) -> ObservationView:
     )
 
 
-def _grove_identifiers(resource: dict) -> dict[str, tuple[str | None, str]]:
+def _grove_identifiers(resource: dict) -> tuple[dict[str, tuple[str | None, str]], tuple[str, ...]]:
     out: dict[str, tuple[str | None, str]] = {}
+    duplicates: list[str] = []
     for ident in resource.get("identifier") or []:
         if not isinstance(ident, dict):
             continue
         role = _coding_code(ident.get("type"), system=GROVE_ROLE_SYSTEM)
         if role and ident.get("value"):
+            if role in out:
+                duplicates.append(role)
             out[role] = (ident.get("system"), ident["value"])
-    return out
+    return out, tuple(duplicates)
 
 
 def _parse_pre_grove(resource: dict, resource_type: str) -> ObservationView:
@@ -287,7 +291,12 @@ def _first_identifier_id(resource: dict) -> str | None:
     return None
 
 
-def _parse_grove(resource: dict, resource_type: str, identifiers: dict[str, tuple[str | None, str]]) -> ObservationView:
+def _parse_grove(
+    resource: dict,
+    resource_type: str,
+    identifiers: dict[str, tuple[str | None, str]],
+    duplicate_roles: tuple[str, ...] = (),
+) -> ObservationView:
     sample_type = recording_method = writer_version = None
     for ext in _ext_list(resource):
         url = ext.get("url")
@@ -340,6 +349,7 @@ def _parse_grove(resource: dict, resource_type: str, identifiers: dict[str, tupl
         recording_method=recording_method,
         motion_context_raw=motion,
         identifiers=identifiers,
+        duplicate_roles=duplicate_roles,
     )
 
 
@@ -359,10 +369,10 @@ def _decimal_text(value: Any) -> str | None:
     if value is None or isinstance(value, bool):
         return None
     if isinstance(value, int):
-        return str(value)
+        return str(value) if value >= 0 else None
     if isinstance(value, float) and value.is_integer():
-        return str(int(value))
-    if isinstance(value, str) and value.strip().lstrip("-").isdigit():
+        return str(int(value)) if value >= 0 else None
+    if isinstance(value, str) and value.strip().isdigit():
         return str(int(value))
     return None
 

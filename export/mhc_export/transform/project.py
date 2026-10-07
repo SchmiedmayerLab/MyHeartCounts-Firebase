@@ -8,9 +8,11 @@
 from __future__ import annotations
 
 import math
+import re
 from dataclasses import dataclass
 from typing import Any
 
+from mhc_export.config import IdentityConfig
 from mhc_export.grove.view import ObservationView
 from mhc_export.identity.grove_ids import HealthKitIdentity, IdentityError, opaque_identity
 from mhc_export.run.models import UploadKind
@@ -19,6 +21,8 @@ from mhc_export.transform.specs import TypeSpec
 from mhc_export.transform.timeparse import TimeParseError, parse_instant, zone_matches_offset
 from mhc_export.transform.units import UnitError, convert, ucum_code
 
+GROVE_ID_PATTERN = re.compile(r"v0:[^:]+:[1-9][0-9]*:[A-Za-z0-9_-]{43}")
+CANONICAL_DECIMAL = re.compile(r"0|[1-9][0-9]*")
 APPLE_BUNDLE_ID_SYSTEM = "https://grovealliance.org/fhir/healthkit/NamingSystem/apple-bundle-id"
 
 
@@ -35,6 +39,7 @@ class ProjectContext:
     run_id: str
     upload_kind: UploadKind
     from_archive: bool
+    config: IdentityConfig | None = None
 
 
 @dataclass(frozen=True)
@@ -61,7 +66,7 @@ def project(view: ObservationView, spec: TypeSpec, ctx: ProjectContext, seq: int
 
     value = unit = value_code = value_source_code = None
     if spec.value_kind == "quantity":
-        value, unit = _quantity(view, spec, warnings)
+        value, unit = _quantity(view, spec)
     else:
         value_code, value_source_code = _category(view, spec)
 
@@ -109,11 +114,15 @@ def project(view: ObservationView, spec: TypeSpec, ctx: ProjectContext, seq: int
 
 def _identities(view: ObservationView, spec: TypeSpec, ctx: ProjectContext) -> tuple[str, str]:
     if view.shape == "grove":
+        if view.duplicate_roles:
+            raise ProjectError("duplicate_grove_identity", ",".join(view.duplicate_roles))
         out = view.identifiers.get("source-output")
         rec = view.identifiers.get("source-record")
-        if out and rec:
-            return out[1], rec[1]
-        raise ProjectError("missing_grove_identity")
+        if not (out and rec):
+            raise ProjectError("missing_grove_identity")
+        for role, (system, value) in (("source-output", out), ("source-record", rec)):
+            _check_namespace(ctx, role, system, value)
+        return out[1], rec[1]
     if not view.native_uuid:
         raise ProjectError("missing_uuid")
     try:
@@ -123,6 +132,19 @@ def _identities(view: ObservationView, spec: TypeSpec, ctx: ProjectContext) -> t
         )
     except IdentityError as exc:
         raise ProjectError("bad_uuid", str(exc)) from exc
+
+
+def _check_namespace(ctx: ProjectContext, role: str, system: str | None, value: str) -> None:
+    """A Grove identity is accepted only under this deployment's identifier system and an accepted key epoch."""
+    config = ctx.config
+    if config is None:
+        return
+    if not GROVE_ID_PATTERN.fullmatch(value):
+        raise ProjectError("bad_grove_identity", f"{role} value is not a v0 Grove identity")
+    if not any(value.startswith(prefix) for prefix in config.accepted_prefixes()):
+        raise ProjectError("foreign_identity", f"{role} value under an unknown key or epoch")
+    if system not in config.accepted_systems(role):
+        raise ProjectError("foreign_identity", f"{role} system {system!r} is not this deployment's")
 
 
 def _times(
@@ -149,7 +171,7 @@ def _times(
     return start_ms, end_ms, offset_min, timezone
 
 
-def _quantity(view: ObservationView, spec: TypeSpec, warnings: list[str]) -> tuple[float | None, str]:
+def _quantity(view: ObservationView, spec: TypeSpec) -> tuple[float, str]:
     assert spec.unit is not None
     q = view.quantity
     if q is None:
@@ -167,15 +189,27 @@ def _quantity(view: ObservationView, spec: TypeSpec, warnings: list[str]) -> tup
     else:
         raise ProjectError("bad_value", type(raw).__name__)
     if math.isnan(value) or math.isinf(value):
-        warnings.append("non_finite_value")
-        return None, spec.unit
+        raise ProjectError("non_finite_value")
     try:
         source_unit = ucum_code(q.unit, q.code)
+        if view.shape == "pre-grove" and source_unit == "%":
+            # HealthKit's percent unit is a 0-1 fraction; Grove's '%' is percentage points
+            value *= 100.0
         value = convert(value, source_unit, spec.unit)
     except UnitError as exc:
         raise ProjectError("bad_unit", str(exc)) from exc
+    if not math.isfinite(value):
+        raise ProjectError("non_finite_value", "after unit conversion")
     if spec.integer_only and not value.is_integer():
-        warnings.append("non_integer_value")
+        raise ProjectError("out_of_domain", f"{value} is not integral")
+    if spec.minimum is not None:
+        low, inclusive = spec.minimum
+        if value < low or (value == low and not inclusive):
+            raise ProjectError("out_of_domain", f"{value} below {low}")
+    if spec.maximum is not None:
+        high, inclusive = spec.maximum
+        if value > high or (value == high and not inclusive):
+            raise ProjectError("out_of_domain", f"{value} above {high}")
     return value, spec.unit
 
 
@@ -197,7 +231,14 @@ def _category(view: ObservationView, spec: TypeSpec) -> tuple[str, str | None]:
 def _writer(view: ObservationView, ctx: ProjectContext, warnings: list[str]) -> tuple[str | None, str | None]:
     if view.shape == "grove":
         writer = view.identifiers.get("writer-record")
-        return (writer[1] if writer else None), view.sync_version
+        if writer:
+            _check_namespace(ctx, "writer-record", writer[0], writer[1])
+        version = view.sync_version
+        if version is not None and not CANONICAL_DECIMAL.fullmatch(version):
+            raise ProjectError("bad_writer_version", f"{version!r} is not a canonical unsigned decimal")
+        if (writer is None) != (version is None):
+            raise ProjectError("bad_writer_version", "writer identity and version must come as a pair")
+        return (writer[1] if writer else None), version
     has_id, has_version = bool(view.sync_identifier), view.sync_version is not None
     if has_id != has_version:
         warnings.append("writer_half_pair")

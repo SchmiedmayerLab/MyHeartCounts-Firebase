@@ -138,7 +138,7 @@ def test_project_writer_identity_and_manual_entry(ctx: ProjectContext) -> None:
     assert p2.row["writer_record_id"] is None and "writer_half_pair" in p2.warnings
 
 
-def test_project_warnings(ctx: ProjectContext) -> None:
+def test_project_warnings_and_domain(ctx: ProjectContext) -> None:
     res = pre_grove_heart_rate(
         code={
             "coding": [
@@ -148,10 +148,31 @@ def test_project_warnings(ctx: ProjectContext) -> None:
                 }
             ]
         },
-        valueQuantity={"value": 12.5, "unit": "steps"},
+        valueQuantity={"value": 12, "unit": "steps"},
     )
     p = project(parse_observation(res), STEPS, ctx, 1)
-    assert set(p.warnings) == {"period_expected", "non_integer_value"}
+    assert set(p.warnings) == {"period_expected"}
+    for bad in (12.5, -1, float("nan")):
+        res["valueQuantity"]["value"] = bad
+        with pytest.raises(ProjectError) as exc:
+            project(parse_observation(res), STEPS, ctx, 1)
+        assert exc.value.reason in {"out_of_domain", "non_finite_value"}
+    sat = REG.get("HKQuantityTypeIdentifierOxygenSaturation")
+    assert sat and sat.maximum == (100.0, True)
+    res_sat = pre_grove_heart_rate(
+        code={
+            "coding": [
+                {
+                    "system": "http://developer.apple.com/documentation/healthkit",
+                    "code": "HKQuantityTypeIdentifierOxygenSaturation",
+                }
+            ]
+        },
+        valueQuantity={"value": 101, "unit": "%", "code": "%"},
+    )
+    with pytest.raises(ProjectError) as exc2:
+        project(parse_observation(res_sat), sat, ctx, 1)
+    assert exc2.value.reason == "out_of_domain"
 
 
 @pytest.mark.parametrize(
