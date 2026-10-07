@@ -97,7 +97,7 @@ def _expected_rows_by_type(run_report: dict) -> dict[str, int]:
     for unit_id, result in (run_report.get("units") or {}).items():
         if "error" in result or result.get("skipped_reason"):
             continue
-        sample_type = unit_id.split(":", 1)[1]
+        sample_type = unit_id.split(":")[1]
         out[sample_type] = out.get(sample_type, 0) + int(result.get("rows_out", 0))
     return out
 
@@ -257,8 +257,9 @@ def run_complete_check(
         problems.append(f"{summary.get('units_done')} of {summary.get('units_total')} units done")
     totals = summary.get("totals") or {}
     rows_in, rows_out = int(totals.get("rows_in", 0) or 0), int(totals.get("rows_out", 0) or 0)
-    if rows_in > 0 and rows_out == 0:
-        problems.append(f"run read {rows_in} records and exported none")
+    if rows_out == 0 and (rows_in > 0 or fatal_total > 0):
+        # tolerated events that failed before projection never reach rows_in
+        problems.append(f"run read {rows_in} records, tolerated {fatal_total} fatal input errors and exported none")
     planned = summary.get("planned_units")
     if planned is not None and int(planned) != int(summary.get("units_total", -1)):
         problems.append(f"{summary.get('units_total')} units worked of {planned} planned")
