@@ -59,7 +59,6 @@ class Unit(BaseModel):
     uid: str
     sample_type: str
     objects: list[SourceObject] = Field(default_factory=list)
-    firestore_collection: str | None = None
     expected_bytes: int = 0
 
     @staticmethod
@@ -85,13 +84,17 @@ class UnitResult(BaseModel):
     rows_out: int = 0
     drops: dict[str, int] = Field(default_factory=dict)
     warnings: dict[str, int] = Field(default_factory=dict)
+    fatal: dict[str, int] = Field(default_factory=dict)
     dedup_removed: int = 0
+    dedup_conflicts: int = 0
     tombstones_seen: int = 0
     tombstoned: int = 0
     tuple_collisions: int = 0
     parts: list[str] = Field(default_factory=list)
     skipped_reason: str | None = None
     seconds: float = 0.0
+    peak_rss_mb: int = 0
+    arrow_mb: int = 0
 
     def merge(self, other: UnitResult) -> None:
         self.objects += other.objects
@@ -102,12 +105,17 @@ class UnitResult(BaseModel):
             self.drops[key] = self.drops.get(key, 0) + value
         for key, value in other.warnings.items():
             self.warnings[key] = self.warnings.get(key, 0) + value
+        for key, value in other.fatal.items():
+            self.fatal[key] = self.fatal.get(key, 0) + value
         self.dedup_removed += other.dedup_removed
+        self.dedup_conflicts += other.dedup_conflicts
         self.tombstones_seen += other.tombstones_seen
         self.tombstoned += other.tombstoned
         self.tuple_collisions += other.tuple_collisions
         self.parts += other.parts
         self.seconds += other.seconds
+        self.peak_rss_mb = max(self.peak_rss_mb, other.peak_rss_mb)
+        self.arrow_mb = max(self.arrow_mb, other.arrow_mb)
 
 
 class Lease(BaseModel):
@@ -125,6 +133,11 @@ class RunReport(BaseModel):
     units_total: int
     planned_units: int | None = None
     filtered: bool = False
+    tolerated_fatal: int = 0
+    max_unit_rows: int = 0
+    envelope_sha256: str = ""
+    identity: dict[str, object] = Field(default_factory=dict)
+    participants_source: str = ""
     units_done: int
     units_failed: int
     rows_out: int
