@@ -62,8 +62,8 @@ class Unit(BaseModel):
     expected_bytes: int = 0
 
     @staticmethod
-    def make_id(uid: str, sample_type: str) -> str:
-        return f"{uid}:{sample_type}"
+    def make_id(uid: str, sample_type: str, shard: int | None = None) -> str:
+        return f"{uid}:{sample_type}" if shard is None else f"{uid}:{sample_type}:{shard:03d}"
 
 
 class Run(BaseModel):
@@ -88,6 +88,7 @@ class UnitResult(BaseModel):
     dedup_removed: int = 0
     dedup_conflicts: int = 0
     tombstones_seen: int = 0
+    grove_retractions: int = 0
     tombstoned: int = 0
     tuple_collisions: int = 0
     parts: list[str] = Field(default_factory=list)
@@ -110,6 +111,7 @@ class UnitResult(BaseModel):
         self.dedup_removed += other.dedup_removed
         self.dedup_conflicts += other.dedup_conflicts
         self.tombstones_seen += other.tombstones_seen
+        self.grove_retractions += other.grove_retractions
         self.tombstoned += other.tombstoned
         self.tuple_collisions += other.tuple_collisions
         self.parts += other.parts
@@ -137,6 +139,7 @@ class RunReport(BaseModel):
     max_unit_rows: int = 0
     envelope_sha256: str = ""
     identity: dict[str, object] = Field(default_factory=dict)
+    grove: dict[str, object] = Field(default_factory=dict)
     participants_source: str = ""
     units_done: int
     units_failed: int

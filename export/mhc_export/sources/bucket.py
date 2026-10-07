@@ -37,8 +37,8 @@ def classify(info: ObjectInfo) -> tuple[str, str, SourceObject] | None:
     m = LEGACY_RE.search(info.uri)
     if m:
         kind = LEGACY_KINDS[m.group("kind")]
-        if (kind == UploadKind.DELETIONS) != (m.group("ext") == "csv"):
-            return None
+        if kind != UploadKind.DELETIONS and m.group("ext") == "csv":
+            return None  # deletions arrive as CSV (legacy) or as JSON retraction events; samples only as JSON
         obj = SourceObject(
             uri=info.uri,
             generation=info.generation,
@@ -78,7 +78,10 @@ def plan_units(
     sample_types: set[str] | None = None,
     batch_start: datetime | None = None,
     batch_end: datetime | None = None,
+    max_unit_bytes: int | None = None,
 ) -> list[Unit]:
+    """Units of one user and type; a unit above max_unit_bytes of input is split into shards of whole objects.
+    Shards are safe because compaction deduplicates and applies the run's whole retraction ledger across them."""
     grouped: dict[tuple[str, str], list[SourceObject]] = defaultdict(list)
     for info in objects:
         hit = classify(info)
@@ -98,16 +101,32 @@ def plan_units(
     units: list[Unit] = []
     for (uid, sample_type), objs in sorted(grouped.items()):
         objs.sort(key=lambda o: (o.upload_kind != UploadKind.HISTORICAL, o.upload_kind == UploadKind.DELETIONS, o.uri))
-        units.append(
-            Unit(
-                unit_id=Unit.make_id(uid, sample_type),
-                uid=uid,
-                sample_type=sample_type,
-                objects=objs,
-                expected_bytes=sum(o.size for o in objs),
+        shards = _shards(objs, max_unit_bytes)
+        for n, shard in enumerate(shards):
+            units.append(
+                Unit(
+                    unit_id=Unit.make_id(uid, sample_type, n if len(shards) > 1 else None),
+                    uid=uid,
+                    sample_type=sample_type,
+                    objects=shard,
+                    expected_bytes=sum(o.size for o in shard),
+                )
             )
-        )
     return units
+
+
+def _shards(objs: list[SourceObject], max_bytes: int | None) -> list[list[SourceObject]]:
+    if not max_bytes or sum(o.size for o in objs) <= max_bytes:
+        return [objs]
+    shards: list[list[SourceObject]] = [[]]
+    size = 0
+    for obj in objs:
+        if shards[-1] and size + obj.size > max_bytes:
+            shards.append([])
+            size = 0
+        shards[-1].append(obj)
+        size += obj.size
+    return shards
 
 
 def apply_eligibility(units: list[Unit], flags: dict[str, UserFlags]) -> tuple[list[Unit], dict[str, int], int]:
