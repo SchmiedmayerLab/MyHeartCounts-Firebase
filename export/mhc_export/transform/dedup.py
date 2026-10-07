@@ -14,24 +14,29 @@ import pyarrow.compute as pc
 TUPLE_KEYS = ["effective_start", "effective_end", "value", "value_code", "source_bundle_hash"]
 
 
-def _writer_version_rank(table: pa.Table) -> pa.Array:
-    col = table["writer_version"]
-    numeric = pc.cast(col, pa.int64(), safe=False) if col.null_count < len(col) else pa.nulls(len(col), pa.int64())
-    return pc.fill_null(numeric, -1)
+def _writer_version_keys(table: pa.Table) -> tuple[pa.Array, pa.Array]:
+    """Canonical unsigned decimals compare by length then text; NULL ranks below every version."""
+    col = pc.fill_null(table["writer_version"], "")
+    return pc.utf8_length(col), col
+
+
+CONFLICT_KEYS = ["effective_start", "effective_end", "value", "unit", "value_code"]
 
 
 def dedup(table: pa.Table) -> tuple[pa.Table, int]:
     """Returns (deduplicated table sorted by effective_start, number of rows removed)."""
     if table.num_rows == 0:
         return table, 0
-    ranked = table.append_column("_wv", _writer_version_rank(table))
+    wv_len, wv_text = _writer_version_keys(table)
+    ranked = table.append_column("_wvl", wv_len).append_column("_wvt", wv_text)
     ranked = ranked.append_column("_ca", pc.fill_null(pc.cast(table["converted_at"], pa.int64()), -1))
     ranked = ranked.append_column("_fa", pc.cast(table["from_archive"], pa.int8()))
     order = pc.sort_indices(
         ranked,
         sort_keys=[
             ("sample_id", "ascending"),
-            ("_wv", "descending"),
+            ("_wvl", "descending"),
+            ("_wvt", "descending"),
             ("_ca", "descending"),
             ("_fa", "ascending"),
             ("export_seq", "ascending"),
@@ -41,10 +46,19 @@ def dedup(table: pa.Table) -> tuple[pa.Table, int]:
     ids = ranked["sample_id"].to_numpy(zero_copy_only=False)
     keep = np.ones(len(ids), dtype=bool)
     keep[1:] = ids[1:] != ids[:-1]
-    kept = ranked.filter(pa.array(keep)).drop_columns(["_wv", "_ca", "_fa"])
+    kept = ranked.filter(pa.array(keep)).drop_columns(["_wvl", "_wvt", "_ca", "_fa"])
     removed = table.num_rows - kept.num_rows
     kept = kept.take(pc.sort_indices(kept, sort_keys=[("effective_start", "ascending"), ("sample_id", "ascending")]))
     return kept, removed
+
+
+def dedup_conflicts(table: pa.Table) -> int:
+    """Sample ids whose copies disagree in content; the copies are never merged, only counted."""
+    if table.num_rows == 0:
+        return 0
+    distinct = table.select(["sample_id", *CONFLICT_KEYS]).group_by(["sample_id", *CONFLICT_KEYS]).aggregate([])
+    per_id = distinct.group_by("sample_id").aggregate([([], "count_all")])
+    return int(pc.sum(pc.greater(per_id["count_all"], 1).cast(pa.int64())).as_py() or 0)
 
 
 def tuple_collisions(table: pa.Table) -> int:
