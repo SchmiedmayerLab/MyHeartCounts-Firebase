@@ -14,7 +14,7 @@ from datetime import datetime
 
 from mhc_export.io.blobstore import ObjectInfo
 from mhc_export.run.models import DataVersion, Layout, SourceObject, Unit, UploadKind
-from mhc_export.sources.firestore import collection_path
+from mhc_export.sources.users import UserFlags
 
 LEGACY_RE = re.compile(
     r"(?:^|/)users/(?P<uid>[^/]+)/(?P<kind>liveHealthSamples|historicalHealthSamples|healthDeletions)/"
@@ -78,7 +78,6 @@ def plan_units(
     sample_types: set[str] | None = None,
     batch_start: datetime | None = None,
     batch_end: datetime | None = None,
-    with_firestore: bool = False,
 ) -> list[Unit]:
     grouped: dict[tuple[str, str], list[SourceObject]] = defaultdict(list)
     for info in objects:
@@ -105,8 +104,22 @@ def plan_units(
                 uid=uid,
                 sample_type=sample_type,
                 objects=objs,
-                firestore_collection=collection_path(uid, sample_type) if with_firestore else None,
                 expected_bytes=sum(o.size for o in objs),
             )
         )
     return units
+
+
+def apply_eligibility(units: list[Unit], flags: dict[str, UserFlags]) -> tuple[list[Unit], dict[str, int], int]:
+    """Drops every unit of an ineligible user. Returns (kept units, excluded users per reason, excluded units)."""
+    kept: list[Unit] = []
+    excluded_users: dict[str, set[str]] = defaultdict(set)
+    excluded_units = 0
+    for unit in units:
+        reason = flags[unit.uid].exclusion_reason if unit.uid in flags else "no_account"
+        if reason is None:
+            kept.append(unit)
+        else:
+            excluded_users[reason].add(unit.uid)
+            excluded_units += 1
+    return kept, {reason: len(uids) for reason, uids in sorted(excluded_users.items())}, excluded_units
