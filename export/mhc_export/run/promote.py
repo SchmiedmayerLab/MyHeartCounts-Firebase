@@ -18,6 +18,7 @@ import contextlib
 import hashlib
 import json
 import logging
+import re
 import time
 from datetime import UTC, datetime
 from pathlib import Path
@@ -52,6 +53,7 @@ SUMMARY_FIELDS = (
     "seconds",
     "tolerated_fatal",
     "identity",
+    "grove",
     "participants_source",
 )
 COUNTER_FIELDS = (
@@ -65,6 +67,7 @@ COUNTER_FIELDS = (
     "dedup_removed",
     "dedup_conflicts",
     "tombstones_seen",
+    "grove_retractions",
     "tombstoned",
     "tuple_collisions",
     "seconds",
@@ -99,7 +102,7 @@ def sanitize_report(run_report: dict) -> dict[str, Any]:
         "totals": counters(summary.get("totals") or {}),
         "per_sample_type": {t: counters(r) for t, r in (summary.get("per_sample_type") or {}).items()},
         "skipped_types": sorted(
-            {u.split(":", 1)[1] for u, r in (run_report.get("units") or {}).items() if r.get("skipped_reason")}
+            {u.split(":")[1] for u, r in (run_report.get("units") or {}).items() if r.get("skipped_reason")}
         ),
     }
 
@@ -118,8 +121,40 @@ def _local_md5(path: Path) -> str:
     return file_md5(path)
 
 
+BUCKET_ROOT = re.compile(r"gs://[a-z0-9][a-z0-9._-]*/?")
+
+
+def production_run_problems(envelope: RunEnvelope, run_report: dict) -> list[str]:
+    """What the workers and the plan recorded must match a production run; flags on one command are not enough."""
+    summary = run_report.get("report") or {}
+    identity = summary.get("identity") or {}
+    grove = summary.get("grove") or {}
+    problems: list[str] = []
+    if identity.get("key_source") != "secret-manager":
+        problems.append("the key did not come from Secret Manager")
+    if identity.get("key_id") in (None, "", "local"):
+        problems.append("the key id is missing or 'local'")
+    if summary.get("participants_source") != "firestore":
+        problems.append("participant ids did not come from the Firestore lookup")
+    if grove.get("accept_legacy") is not False:
+        problems.append("the workers read legacy resources or recorded no Grove settings")
+    if envelope.eligibility.source != "firestore":
+        problems.append("eligibility was not read from Firestore at plan time")
+    if not BUCKET_ROOT.fullmatch(envelope.source):
+        problems.append(f"the plan listed {envelope.source}, not a whole source bucket")
+    if envelope.unit_count == 0:
+        problems.append("an empty run never moves a production watermark")
+    return problems
+
+
 def _check_guards(
-    compacted_root: Path, run_id: str, envelope: RunEnvelope, validation: dict, run_report: dict, production_lake: bool
+    compacted_root: Path,
+    run_id: str,
+    envelope: RunEnvelope,
+    validation: dict,
+    run_report: dict,
+    production_lake: bool,
+    production: bool = False,
 ) -> str:
     if not validation.get("ok"):
         raise PromoteConflict("validation did not pass; refusing to promote")
@@ -138,6 +173,8 @@ def _check_guards(
     if not completeness.ok:
         raise PromoteConflict(f"run is not complete: {completeness.detail}")
     problems = promotion_problems(envelope, production_lake=production_lake)
+    if production:
+        problems += production_run_problems(envelope, run_report)
     if problems:
         raise PromoteConflict("run may not be promoted: " + "; ".join(problems))
     return digest
@@ -152,10 +189,14 @@ def promote_run(
     envelope: RunEnvelope,
     validation: dict,
     run_report: dict,
+    production: bool = False,
 ) -> PromoteResult:
     """lake_prefix is 'gs://bucket/path' or '' for a local store rooted at the lake directory."""
     started = time.monotonic()
-    _check_guards(compacted_root, run_id, envelope, validation, run_report, lake_prefix.startswith("gs://"))
+    production_lake = lake_prefix.startswith("gs://")
+    if production and not production_lake:
+        raise PromoteConflict("a production promotion needs a gs:// lake")
+    _check_guards(compacted_root, run_id, envelope, validation, run_report, production_lake, production)
     result = PromoteResult(run_id=run_id, dataset_uri=join(lake_prefix, dataset_path(run_id)))
     pointer, token, committed = read_committed(lake, lake_prefix)
     if pointer is not None and pointer.run_id == run_id:
@@ -166,6 +207,8 @@ def promote_run(
     gap = contiguity_problem(envelope, pointer.model_dump(mode="json") if pointer else None)
     if gap:
         raise PromoteConflict(f"runs must be contiguous: {gap}")
+    if production_lake and pointer is not None and pointer.source and pointer.source != envelope.source:
+        raise PromoteConflict(f"the run listed {envelope.source}, but the lake was built from {pointer.source}")
     base = pointer.dataset_sha256 if pointer else None
     if validation.get("base_dataset_sha256") != base:
         raise PromoteConflict("the lake changed since this run was compacted and validated; compact and validate again")
@@ -244,6 +287,7 @@ def promote_run(
         rows=sum(e.rows for e in dataset),
         committed_at=datetime.now(tz=UTC),
         previous_dataset=pointer.dataset if pointer else None,
+        source=envelope.source,
     )
     try:
         commit(lake, lake_prefix, new_pointer, token)
