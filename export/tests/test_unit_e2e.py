@@ -24,10 +24,10 @@ def _zstd(data: bytes) -> bytes:
     return zstandard.ZstdCompressor(write_content_size=False).compress(data)
 
 
-def build_source(root: Path) -> None:
-    hist = root / "users" / UID / "historicalHealthSamples"
-    live = root / "users" / UID / "liveHealthSamples"
-    dels = root / "users" / UID / "healthDeletions"
+def build_source(root: Path, uid: str = UID) -> None:
+    hist = root / "users" / uid / "historicalHealthSamples"
+    live = root / "users" / uid / "liveHealthSamples"
+    dels = root / "users" / uid / "healthDeletions"
     for d in (hist, live, dels):
         d.mkdir(parents=True)
     samples = [
@@ -75,8 +75,8 @@ def build_source(root: Path) -> None:
     )
     (dels / "HKQuantityTypeIdentifierHeartRate_F.csv.zstd").write_bytes(_zstd(csv.encode()))
     # noise that must be ignored
-    (root / "users" / UID / "consent").mkdir()
-    (root / "users" / UID / "consent" / "consent.pdf").write_bytes(b"%PDF")
+    (root / "users" / uid / "consent").mkdir()
+    (root / "users" / uid / "consent" / "consent.pdf").write_bytes(b"%PDF")
 
 
 def test_classify_and_plan(tmp_path: Path) -> None:
