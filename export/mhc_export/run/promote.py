@@ -3,14 +3,19 @@
 # SPDX-FileCopyrightText: 2026 Stanford University and the project authors (see CONTRIBUTORS.md)
 # SPDX-License-Identifier: MIT
 
-"""Promote: compacted files -> v1/ in the datalake, snapshot listing, watermark. Idempotent on redo.
+"""Promote: publish a validated run as the lake's next dataset version, atomically.
 
-Only anonymized artifacts cross into the lake: Parquet files, the validation report, a sanitized run summary.
+The run's rebuilt partition files are uploaded under run-specific immutable names, a dataset manifest is written
+that lists the committed files of untouched partitions plus the new files of rebuilt ones, and only then the lake
+pointer is swapped to that manifest with a compare-and-swap. Readers see either the previous or the new dataset,
+never a mix. Only anonymized artifacts cross into the lake: Parquet files, the validation report, a sanitized
+summary and the dataset manifest.
 """
 
 from __future__ import annotations
 
 import contextlib
+import hashlib
 import json
 import logging
 import time
@@ -21,13 +26,34 @@ from typing import Any
 from pydantic import BaseModel, Field
 
 from mhc_export.io.blobstore import BlobExistsError, BlobStore
-from mhc_export.run.compact import list_compacted
-from mhc_export.run.validate import compacted_fingerprint, report_digest, run_complete_check
+from mhc_export.run.compact import MANIFEST_NAME, list_compacted, partition_key, read_touched
+from mhc_export.run.envelope import RunEnvelope, contiguity_problem, envelope_digest, promotion_problems
+from mhc_export.run.lake import (
+    LAYOUT_VERSION,
+    CurrentPointer,
+    DatasetEntry,
+    LakeConflict,
+    commit,
+    dataset_path,
+    dump_dataset,
+    join,
+    read_committed,
+)
+from mhc_export.run.validate import compacted_fingerprint, file_md5, report_digest, run_complete_check
 
 log = logging.getLogger(__name__)
 
-LAYOUT_VERSION = "v1"
-SUMMARY_FIELDS = ("run_id", "units_total", "units_done", "units_failed", "rows_out", "seconds")
+SUMMARY_FIELDS = (
+    "run_id",
+    "units_total",
+    "units_done",
+    "units_failed",
+    "rows_out",
+    "seconds",
+    "tolerated_fatal",
+    "identity",
+    "participants_source",
+)
 COUNTER_FIELDS = (
     "objects",
     "bytes_in",
@@ -35,7 +61,9 @@ COUNTER_FIELDS = (
     "rows_out",
     "drops",
     "warnings",
+    "fatal",
     "dedup_removed",
+    "dedup_conflicts",
     "tombstones_seen",
     "tombstoned",
     "tuple_collisions",
@@ -53,17 +81,13 @@ class PromoteResult(BaseModel):
     skipped: int = 0
     bytes: int = 0
     files: list[str] = Field(default_factory=list)
-    snapshot_uri: str = ""
-    snapshot_written: bool = False
-    watermark_uri: str = ""
-    watermark_updated: bool = False
+    replaced_partitions: int = 0
+    dataset_uri: str = ""
+    dataset_files: int = 0
+    dataset_rows: int = 0
+    committed: bool = False
+    already_committed: bool = False
     seconds: float = 0.0
-
-
-def _join(prefix: str, *parts: str) -> str:
-    base = prefix.rstrip("/")
-    tail = "/".join(parts)
-    return f"{base}/{tail}" if base else tail
 
 
 def sanitize_report(run_report: dict) -> dict[str, Any]:
@@ -86,32 +110,17 @@ def _same_object(lake: BlobStore, dst: str, path: Path, size: int) -> bool:
         return False
     remote_md5 = lake.md5(dst)
     if remote_md5 is None:
-        return True
+        return False
     return remote_md5 == _local_md5(path)
 
 
 def _local_md5(path: Path) -> str:
-    import hashlib
-
-    digest = hashlib.md5()  # noqa: S324 - integrity only, mirrors the GCS object checksum
-    with path.open("rb") as fh:
-        for chunk in iter(lambda: fh.read(1 << 20), b""):
-            digest.update(chunk)
-    return digest.hexdigest()
+    return file_md5(path)
 
 
-def promote_run(
-    compacted_root: Path,
-    lake: BlobStore,
-    lake_prefix: str,
-    *,
-    run_id: str,
-    batch_end: datetime | None,
-    validation: dict,
-    run_report: dict,
-) -> PromoteResult:
-    """lake_prefix is 'gs://bucket/path' or '' for a local store rooted at the lake directory."""
-    started = time.monotonic()
+def _check_guards(
+    compacted_root: Path, run_id: str, envelope: RunEnvelope, validation: dict, run_report: dict, production_lake: bool
+) -> str:
     if not validation.get("ok"):
         raise PromoteConflict("validation did not pass; refusing to promote")
     if validation.get("run_id") != run_id:
@@ -123,26 +132,63 @@ def promote_run(
         raise PromoteConflict("compacted files changed since validation; validate again")
     if validation.get("report_digest") != report_digest(run_report):
         raise PromoteConflict("run report changed since validation; validate again")
-    completeness = run_complete_check(run_report, run_id)
+    if validation.get("envelope_sha256") != envelope_digest(envelope):
+        raise PromoteConflict("validation was not run against this run envelope; validate again with --envelope")
+    completeness = run_complete_check(run_report, run_id, envelope=envelope)
     if not completeness.ok:
         raise PromoteConflict(f"run is not complete: {completeness.detail}")
-    lake_validation_uri = _join(lake_prefix, "runs", run_id, "validation.json")
-    if lake.exists(lake_validation_uri):
-        recorded = json.loads(lake.read(lake_validation_uri).decode())
-        if recorded.get("compacted_digest") != digest:
-            raise PromoteConflict("this run id was already promoted with a different file set; use a new run id")
+    problems = promotion_problems(envelope, production_lake=production_lake)
+    if problems:
+        raise PromoteConflict("run may not be promoted: " + "; ".join(problems))
+    return digest
 
-    result = PromoteResult(run_id=run_id)
+
+def promote_run(
+    compacted_root: Path,
+    lake: BlobStore,
+    lake_prefix: str,
+    *,
+    run_id: str,
+    envelope: RunEnvelope,
+    validation: dict,
+    run_report: dict,
+) -> PromoteResult:
+    """lake_prefix is 'gs://bucket/path' or '' for a local store rooted at the lake directory."""
+    started = time.monotonic()
+    _check_guards(compacted_root, run_id, envelope, validation, run_report, lake_prefix.startswith("gs://"))
+    result = PromoteResult(run_id=run_id, dataset_uri=join(lake_prefix, dataset_path(run_id)))
+    pointer, token, committed = read_committed(lake, lake_prefix)
+    if pointer is not None and pointer.run_id == run_id:
+        result.already_committed = True
+        result.dataset_files, result.dataset_rows = pointer.files, pointer.rows
+        log.info("run %s is already the committed dataset; nothing to do", run_id)
+        return result
+    gap = contiguity_problem(envelope, pointer.model_dump(mode="json") if pointer else None)
+    if gap:
+        raise PromoteConflict(f"runs must be contiguous: {gap}")
+    base = pointer.dataset_sha256 if pointer else None
+    if validation.get("base_dataset_sha256") != base:
+        raise PromoteConflict("the lake changed since this run was compacted and validated; compact and validate again")
+
+    touched = read_touched(compacted_root)
+    touched_keys = set(touched.get("partitions") or [])
+    validated_md5 = {e["path"]: e.get("md5") for e in validation.get("entries") or []}
+    ranges: dict[str, tuple[str | None, str | None]] = {}
+    for manifest_path in compacted_root.glob(f"*/year=*/month=*/{MANIFEST_NAME}"):
+        info = json.loads(manifest_path.read_text())
+        prefix = info["key"]
+        for f in info.get("files") or []:
+            ranges[f"{prefix}/{f['name']}"] = (f.get("participant_min"), f.get("participant_max"))
+
+    new_entries: list[DatasetEntry] = []
     for sample_type, year, month, files in list_compacted(compacted_root):
         for n, path in enumerate(sorted(files)):
-            dst = _join(
-                lake_prefix,
-                LAYOUT_VERSION,
-                sample_type,
-                f"year={year:04d}",
-                f"month={month:02d}",
-                f"part-{run_id}-{n:05d}.parquet",
-            )
+            rel = f"{partition_key(sample_type, year, month)}/{path.name}"
+            expected_md5 = validated_md5.get(rel)
+            if not expected_md5:
+                raise PromoteConflict(f"{rel} has no validated checksum; validate again")
+            lake_rel = f"{LAYOUT_VERSION}/{sample_type}/year={year:04d}/month={month:02d}/part-{run_id}-{n:05d}.parquet"
+            dst = join(lake_prefix, lake_rel)
             size = path.stat().st_size
             if lake.exists(dst):
                 if not _same_object(lake, dst, path, size):
@@ -156,38 +202,81 @@ def promote_run(
                     if not _same_object(lake, dst, path, size):
                         raise PromoteConflict(f"{dst} appeared concurrently with different content") from None
                     result.skipped += 1
+            uploaded_md5 = lake.md5(dst)
+            if uploaded_md5 != expected_md5:
+                raise PromoteConflict(f"{dst} content differs from the validated file (uploaded {uploaded_md5})")
+            lo, hi = ranges.get(rel, (None, None))
+            new_entries.append(
+                DatasetEntry(
+                    path=lake_rel,
+                    sample_type=sample_type,
+                    year=year,
+                    month=month,
+                    bytes=size,
+                    rows=_rows(path),
+                    md5=expected_md5,
+                    participant_min=lo,
+                    participant_max=hi,
+                    run_id=run_id,
+                )
+            )
             result.bytes += size
             result.files.append(dst)
 
-    result.snapshot_uri = _join(lake_prefix, "runs", run_id, "snapshot.jsonl")
-    if lake.exists(result.snapshot_uri):
-        log.info("snapshot %s already exists; keeping the original citation", result.snapshot_uri)
-    else:
-        listing = sorted(lake.list(_join(lake_prefix, LAYOUT_VERSION) + "/"), key=lambda i: i.uri)
-        lines = [json.dumps({"uri": i.uri, "size": i.size, "generation": i.generation}) for i in listing]
-        try:
-            lake.write(result.snapshot_uri, ("\n".join(lines) + "\n").encode(), overwrite=False)
-            result.snapshot_written = True
-        except BlobExistsError:
-            log.info("snapshot %s written concurrently; keeping it", result.snapshot_uri)
-    _write_if_absent(lake, lake_validation_uri, json.dumps(validation, indent=1, default=str))
-    summary_uri = _join(lake_prefix, "runs", run_id, "summary.json")
-    _write_if_absent(lake, summary_uri, json.dumps(sanitize_report(run_report), indent=1))
-
-    result.watermark_uri = _join(lake_prefix, "runs", "_watermark.json")
-    result.watermark_updated = _advance_watermark(
-        lake, result.watermark_uri, run_id, batch_end, len(result.files), result.snapshot_uri
+    kept = [e for e in committed if partition_key(*e.partition) not in touched_keys]
+    result.replaced_partitions = len({partition_key(*e.partition) for e in committed} & touched_keys)
+    dataset = kept + new_entries
+    data = dump_dataset(dataset)
+    _write_exact(lake, result.dataset_uri, data)
+    _write_if_absent(
+        lake, join(lake_prefix, "runs", run_id, "validation.json"), json.dumps(validation, indent=1, default=str)
     )
+    _write_if_absent(
+        lake, join(lake_prefix, "runs", run_id, "summary.json"), json.dumps(sanitize_report(run_report), indent=1)
+    )
+
+    new_pointer = CurrentPointer(
+        run_id=run_id,
+        batch_end=envelope.batch_end if envelope.batch_end is not None else (pointer.batch_end if pointer else None),
+        dataset=dataset_path(run_id),
+        dataset_sha256=hashlib.sha256(data).hexdigest(),
+        files=len(dataset),
+        rows=sum(e.rows for e in dataset),
+        committed_at=datetime.now(tz=UTC),
+        previous_dataset=pointer.dataset if pointer else None,
+    )
+    try:
+        commit(lake, lake_prefix, new_pointer, token)
+    except LakeConflict as exc:
+        raise PromoteConflict(str(exc)) from exc
+    result.committed = True
+    result.dataset_files, result.dataset_rows = new_pointer.files, new_pointer.rows
     result.seconds = time.monotonic() - started
     log.info(
-        "promoted %s: %d copied, %d already present, %.1f MB, watermark %s",
+        "committed %s: %d files uploaded (%d already present), %d partitions replaced, dataset %d files %d rows",
         run_id,
         result.copied,
         result.skipped,
-        result.bytes / 1e6,
-        "advanced" if result.watermark_updated else "unchanged",
+        result.replaced_partitions,
+        result.dataset_files,
+        result.dataset_rows,
     )
     return result
+
+
+def _rows(path: Path) -> int:
+    import pyarrow.parquet as pq
+
+    return pq.read_metadata(path).num_rows
+
+
+def _write_exact(lake: BlobStore, uri: str, data: bytes) -> None:
+    """Write-once: an existing object must already hold exactly these bytes."""
+    try:
+        lake.write(uri, data, overwrite=False)
+    except BlobExistsError:
+        if lake.read(uri) != data:
+            raise PromoteConflict(f"{uri} exists with different content; use a new run id") from None
 
 
 def _write_if_absent(lake: BlobStore, uri: str, text: str) -> None:
@@ -195,30 +284,3 @@ def _write_if_absent(lake: BlobStore, uri: str, text: str) -> None:
         return
     with contextlib.suppress(BlobExistsError):
         lake.write(uri, text.encode(), overwrite=False)
-
-
-def _advance_watermark(
-    lake: BlobStore, uri: str, run_id: str, batch_end: datetime | None, files: int, snapshot_uri: str
-) -> bool:
-    """Monotonic: never moves backwards, never replaced by a run without a batch end."""
-    if batch_end is None:
-        log.info("no batch end given; watermark left unchanged")
-        return False
-    existing: dict[str, Any] = {}
-    if lake.exists(uri):
-        existing = json.loads(lake.read(uri).decode())
-    current = existing.get("batch_end")
-    if current and datetime.fromisoformat(current) > batch_end:
-        log.warning("watermark %s is ahead of %s; not regressing it", current, batch_end.isoformat())
-        return False
-    if current and datetime.fromisoformat(current) == batch_end and existing.get("run_id") == run_id:
-        return False
-    watermark = {
-        "run_id": run_id,
-        "batch_end": batch_end.isoformat(),
-        "promoted_at": datetime.now(tz=UTC).isoformat(timespec="seconds"),
-        "files": files,
-        "snapshot": snapshot_uri,
-    }
-    lake.write(uri, json.dumps(watermark, indent=1).encode(), overwrite=True)
-    return True
