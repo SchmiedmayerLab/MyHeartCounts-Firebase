@@ -14,6 +14,7 @@ from collections.abc import Callable
 from datetime import timedelta
 from typing import Any
 
+from mhc_export import __version__
 from mhc_export.run.leases import DONE, FAILED, LeaseLost, LeaseStore
 from mhc_export.run.models import RunReport, Unit, UnitResult
 from mhc_export.run.unit import Deps, process_unit
@@ -24,7 +25,11 @@ log = logging.getLogger(__name__)
 def worker_context(deps: Deps, *, envelope_sha: str, tolerated_fatal: int, participants_source: str) -> dict[str, Any]:
     """Configuration every worker of a run must share; recorded with each unit result and compared at report time."""
     return {
+        "package_version": __version__,
+        "registry_sha256": deps.registry.digest,
+        "coverage_sha256": deps.coverage.digest,
         "identity": deps.identity.describe(),
+        "grove": deps.grove.describe(),
         "envelope_sha256": envelope_sha,
         "max_unit_rows": deps.max_unit_rows,
         "tolerated_fatal": tolerated_fatal,
@@ -132,6 +137,7 @@ def assemble_report(
         max_unit_rows=int(context.get("max_unit_rows", 0)),
         envelope_sha256=str(context.get("envelope_sha256", "")),
         identity=dict(context.get("identity") or {}),
+        grove=dict(context.get("grove") or {}),
         participants_source=str(context.get("participants_source", "")),
         units_done=done,
         units_failed=failed,
@@ -166,7 +172,10 @@ def report_from_leases(
             outcomes[unit.unit_id] = "; ".join(lease.errors) or "failed"
     distinct = {repr(sorted(c.items())) for c in contexts}
     if len(distinct) > 1:
-        raise ValueError("workers of this run used different configurations (identity, envelope, caps or tolerance)")
+        raise ValueError(
+            "workers of this run used different configurations (code, registry, coverage, identity, Grove settings, "
+            "envelope, caps or tolerance)"
+        )
     context = contexts[0] if contexts else {}
     return assemble_report(
         run_id, units, outcomes, context, planned_units=planned_units, filtered=False, seconds=seconds

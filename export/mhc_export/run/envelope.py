@@ -42,6 +42,8 @@ class RunEnvelope(BaseModel):
     registry_commit: str
     package_version: str
     created_at: datetime
+    registry_sha256: str = ""
+    coverage_sha256: str = ""
 
 
 def manifest_sha256(manifest_bytes: bytes) -> str:
