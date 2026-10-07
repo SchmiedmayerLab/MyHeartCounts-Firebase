@@ -22,12 +22,15 @@ class Tombstone:
     timestamp: float | None
 
 
-def tombstones_from_csv(rows: list[dict[str, str]]) -> list[Tombstone]:
+def tombstones_from_csv(rows: list[dict[str, str]]) -> tuple[list[Tombstone], int]:
+    """Returns (tombstones, malformed rows). A row without sample type or id is unusable, not ignorable."""
     out: list[Tombstone] = []
+    malformed = 0
     for row in rows:
         sample_type = (row.get("sampleType") or "").strip()
         uuid = (row.get("sampleId") or "").strip()
         if not sample_type or not uuid:
+            malformed += 1
             continue
         ts_text = (row.get("timestamp") or "").strip()
         try:
@@ -35,7 +38,7 @@ def tombstones_from_csv(rows: list[dict[str, str]]) -> list[Tombstone]:
         except ValueError:
             ts = None
         out.append(Tombstone(sample_type, uuid, ts))
-    return out
+    return out, malformed
 
 
 def tombstone_ids(tombstones: list[Tombstone], spec: TypeSpec, identity: HealthKitIdentity) -> tuple[set[str], int]:

@@ -79,7 +79,7 @@ def test_tuple_collisions(ctx: ProjectContext) -> None:
 
 
 def test_tombstones(identity: HealthKitIdentity) -> None:
-    stones = tombstones_from_csv(
+    stones, malformed = tombstones_from_csv(
         [
             {
                 "sampleType": "HKQuantityTypeIdentifierHeartRate",
@@ -95,7 +95,7 @@ def test_tombstones(identity: HealthKitIdentity) -> None:
             {"sampleType": "", "sampleId": "", "timestamp": ""},
         ]
     )
-    assert len(stones) == 3 and stones[0].timestamp == 1787567716.438 and stones[1].timestamp is None
+    assert len(stones) == 3 and malformed == 1 and stones[0].timestamp == 1787567716.438 and stones[1].timestamp is None
     ids, bad = tombstone_ids(stones, HR, identity)
     assert bad == 1
     assert ids == {
