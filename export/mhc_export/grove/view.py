@@ -26,7 +26,6 @@ FHIR_TIMEZONE_URLS = (
     "http://hl7.org/fhir/StructureDefinition/timezone",
     "http://hl7.org/fhir/StructureDefinition/tz-code",
 )
-GROVE_MOBILE_PREFIX = "https://grovealliance.org/fhir/mobile/"
 GROVE_HK_PREFIX = "https://grovealliance.org/fhir/healthkit/"
 MDC_HARDWARE, MDC_SOFTWARE, MDC_FIRMWARE = "531974", "531975", "531976"
 
@@ -53,6 +52,7 @@ class Device:
     model: str | None = None
     hardware: str | None = None
     software: str | None = None
+    firmware: str | None = None
 
 
 @dataclass(frozen=True)
@@ -74,8 +74,7 @@ class ObservationView:
     issued: str | None
     quantity: Quantity | None
     category_raw: str | None
-    value_code: str | None
-    value_source_code: str | None
+    value_codings: tuple[tuple[str, str], ...]  # Grove: (system, code) of every valueCodeableConcept coding
     device: Device | None
     source: SourceRevision | None
     upload_timezone: str | None
@@ -91,6 +90,7 @@ class ObservationView:
     identifiers: dict[str, tuple[str | None, str]] = field(default_factory=dict)
     duplicate_roles: tuple[str, ...] = ()
     is_clinical_record: bool = False
+    recorded: str | None = None  # Grove: the conversion Provenance's recorded instant
 
 
 def _ext_list(obj: dict | None) -> list[dict]:
@@ -136,7 +136,7 @@ def _effective(resource: dict) -> Effective | None:
 
 def _timezone_ext(primitive: dict | None) -> str | None:
     for ext in _ext_list(primitive):
-        if ext.get("url") in FHIR_TIMEZONE_URLS:
+        if str(ext.get("url") or "").split("|", 1)[0] in FHIR_TIMEZONE_URLS:
             return ext.get("valueCode") or ext.get("valueString")
     return None
 
@@ -175,8 +175,7 @@ def _empty(resource_type: str, *, clinical: bool) -> ObservationView:
         issued=None,
         quantity=None,
         category_raw=None,
-        value_code=None,
-        value_source_code=None,
+        value_codings=(),
         device=None,
         source=None,
         upload_timezone=None,
@@ -264,8 +263,7 @@ def _parse_pre_grove(resource: dict, resource_type: str) -> ObservationView:
         issued=resource.get("issued"),
         quantity=_quantity(resource),
         category_raw=str(category_raw) if category_raw is not None else None,
-        value_code=None,
-        value_source_code=None,
+        value_codings=(),
         device=device,
         source=source,
         upload_timezone=upload_tz,
@@ -308,8 +306,11 @@ def _parse_grove(
         elif url == GROVE_WRITER_VERSION:
             writer_version = ext.get("valueString")
     concept = resource.get("valueCodeableConcept")
-    value_code = _coding_code(concept, prefix=GROVE_MOBILE_PREFIX)
-    value_source_code = _coding_code(concept, prefix=GROVE_HK_PREFIX)
+    value_codings = tuple(
+        (c["system"], c["code"])
+        for c in ((concept or {}).get("coding") or [])
+        if isinstance(c, dict) and isinstance(c.get("system"), str) and isinstance(c.get("code"), str)
+    )
     motion = None
     for comp in resource.get("component") or []:
         code = _coding_code(comp.get("code"), prefix=GROVE_HK_PREFIX) or _coding_code(comp.get("code"))
@@ -334,8 +335,7 @@ def _parse_grove(
         issued=resource.get("issued"),
         quantity=_quantity(resource),
         category_raw=None,
-        value_code=value_code,
-        value_source_code=value_source_code,
+        value_codings=value_codings,
         device=None,
         source=None,
         upload_timezone=None,
