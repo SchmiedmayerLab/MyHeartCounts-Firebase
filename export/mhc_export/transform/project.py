@@ -10,10 +10,10 @@ from __future__ import annotations
 import math
 import re
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from typing import Any
 
-from mhc_export.config import IdentityConfig
-from mhc_export.grove.view import ObservationView
+from mhc_export.grove.view import GROVE_HK_PREFIX, ObservationView
 from mhc_export.identity.grove_ids import HealthKitIdentity, IdentityError, opaque_identity
 from mhc_export.run.models import UploadKind
 from mhc_export.transform.category_values import HEART_RATE_MOTION_CONTEXT, CategoryValueError, category_value
@@ -21,7 +21,11 @@ from mhc_export.transform.specs import TypeSpec
 from mhc_export.transform.timeparse import TimeParseError, parse_instant, zone_matches_offset
 from mhc_export.transform.units import UnitError, convert, ucum_code
 
-GROVE_ID_PATTERN = re.compile(r"v0:[^:]+:[1-9][0-9]*:[A-Za-z0-9_-]{43}")
+EXPORTED_STATUSES = frozenset({"final", "amended", "corrected"})
+PARTITION_RANGE_MS = (
+    int(datetime(1960, 1, 1, tzinfo=UTC).timestamp() * 1000),
+    int(datetime(2160, 1, 1, tzinfo=UTC).timestamp() * 1000),
+)
 CANONICAL_DECIMAL = re.compile(r"0|[1-9][0-9]*")
 APPLE_BUNDLE_ID_SYSTEM = "https://grovealliance.org/fhir/healthkit/NamingSystem/apple-bundle-id"
 
@@ -39,7 +43,6 @@ class ProjectContext:
     run_id: str
     upload_kind: UploadKind
     from_archive: bool
-    config: IdentityConfig | None = None
 
 
 @dataclass(frozen=True)
@@ -54,7 +57,7 @@ def project(view: ObservationView, spec: TypeSpec, ctx: ProjectContext, seq: int
         raise ProjectError("clinical_record")
     if view.resource_type != "Observation":
         raise ProjectError("not_observation", view.resource_type)
-    if view.status != "final":
+    if view.status not in EXPORTED_STATUSES:
         raise ProjectError("non_final", str(view.status))
     if view.sample_type and view.sample_type != spec.sample_type:
         raise ProjectError("sample_type_mismatch", f"{view.sample_type} in {spec.sample_type} unit")
@@ -92,10 +95,9 @@ def project(view: ObservationView, spec: TypeSpec, ctx: ProjectContext, seq: int
         "device_model": device.model if device else None,
         "device_hardware": device.hardware if device else None,
         "device_software": device.software if device else None,
+        "device_firmware": device.firmware if device else None,
         "source_bundle_hash": _source_bundle_hash(view, ctx),
         "source_version": source.version if source else None,
-        "source_product_type": source.product_type if source else None,
-        "source_os_version": source.os_version if source else None,
         "app_version": view.app_version,
         "app_build": view.app_build,
         "study_revision": view.study_revision,
@@ -113,16 +115,8 @@ def project(view: ObservationView, spec: TypeSpec, ctx: ProjectContext, seq: int
 
 
 def _identities(view: ObservationView, spec: TypeSpec, ctx: ProjectContext) -> tuple[str, str]:
-    if view.shape == "grove":
-        if view.duplicate_roles:
-            raise ProjectError("duplicate_grove_identity", ",".join(view.duplicate_roles))
-        out = view.identifiers.get("source-output")
-        rec = view.identifiers.get("source-record")
-        if not (out and rec):
-            raise ProjectError("missing_grove_identity")
-        for role, (system, value) in (("source-output", out), ("source-record", rec)):
-            _check_namespace(ctx, role, system, value)
-        return out[1], rec[1]
+    """Minted with the export key from the HealthKit record id for both shapes, so a sample keeps one id across
+    devices, reinstalls and the legacy-to-Grove migration; the producer's own opaque identities are only validated."""
     if not view.native_uuid:
         raise ProjectError("missing_uuid")
     try:
@@ -132,19 +126,6 @@ def _identities(view: ObservationView, spec: TypeSpec, ctx: ProjectContext) -> t
         )
     except IdentityError as exc:
         raise ProjectError("bad_uuid", str(exc)) from exc
-
-
-def _check_namespace(ctx: ProjectContext, role: str, system: str | None, value: str) -> None:
-    """A Grove identity is accepted only under this deployment's identifier system and an accepted key epoch."""
-    config = ctx.config
-    if config is None:
-        return
-    if not GROVE_ID_PATTERN.fullmatch(value):
-        raise ProjectError("bad_grove_identity", f"{role} value is not a v0 Grove identity")
-    if not any(value.startswith(prefix) for prefix in config.accepted_prefixes()):
-        raise ProjectError("foreign_identity", f"{role} value under an unknown key or epoch")
-    if system not in config.accepted_systems(role):
-        raise ProjectError("foreign_identity", f"{role} system {system!r} is not this deployment's")
 
 
 def _times(
@@ -159,6 +140,8 @@ def _times(
         raise ProjectError("bad_time", str(exc)) from exc
     if end_ms is not None and end_ms < start_ms:
         raise ProjectError("bad_time", "end before start")
+    if not PARTITION_RANGE_MS[0] <= start_ms < PARTITION_RANGE_MS[1]:
+        raise ProjectError("bad_time", "start outside the months BigQuery can partition (1960 to 2159)")
     if spec.effective == "Period" and end_ms is None:
         warnings.append("period_expected")
     elif spec.effective == "dateTime" and end_ms is not None and end_ms != start_ms:
@@ -215,9 +198,7 @@ def _quantity(view: ObservationView, spec: TypeSpec) -> tuple[float, str]:
 
 def _category(view: ObservationView, spec: TypeSpec) -> tuple[str, str | None]:
     if view.shape == "grove":
-        if view.value_code is None:
-            raise ProjectError("missing_value")
-        code, source_code = view.value_code, view.value_source_code
+        code, source_code = _grove_category(view, spec)
     else:
         try:
             source_code, code = category_value(spec.sample_type, view.category_raw)
@@ -228,11 +209,27 @@ def _category(view: ObservationView, spec: TypeSpec) -> tuple[str, str | None]:
     return code, source_code
 
 
+def _grove_category(view: ObservationView, spec: TypeSpec) -> tuple[str, str | None]:
+    """The Grove code is the coding in the measurement's result code system; the HealthKit case is a separate
+    healthkit coding when the result system is source-neutral, else the result code itself."""
+    codes = {code for system, code in view.value_codings if system == spec.value_system}
+    if len(codes) != 1:
+        raise ProjectError("grove_value_system", f"needs exactly one coding in {spec.value_system}")
+    code = codes.pop()
+    others = [
+        c for system, c in view.value_codings if system.startswith(GROVE_HK_PREFIX) and system != spec.value_system
+    ]
+    if len(others) > 1:
+        raise ProjectError("grove_value_system", "several HealthKit case codings")
+    if others:
+        return code, others[0]
+    return code, code if (spec.value_system or "").startswith(GROVE_HK_PREFIX) else None
+
+
 def _writer(view: ObservationView, ctx: ProjectContext, warnings: list[str]) -> tuple[str | None, str | None]:
     if view.shape == "grove":
+        # the producer's writer identity, already checked against the accepted producer namespaces
         writer = view.identifiers.get("writer-record")
-        if writer:
-            _check_namespace(ctx, "writer-record", writer[0], writer[1])
         version = view.sync_version
         if version is not None and not CANONICAL_DECIMAL.fullmatch(version):
             raise ProjectError("bad_writer_version", f"{version!r} is not a canonical unsigned decimal")
@@ -264,10 +261,17 @@ def _source_bundle_hash(view: ObservationView, ctx: ProjectContext) -> str | Non
     if not bundle:
         return None
     try:
+        # a source-context identity, so it cannot be mistaken for a Grove recording-device identity
         return opaque_identity(
             ctx.identity.key,
-            "recording-device",
-            [HealthKitIdentity.ADAPTER_ID, ctx.identity.scope.system, ctx.identity.scope.value, bundle],
+            "source-context",
+            [
+                HealthKitIdentity.ADAPTER_ID,
+                "apple-bundle-id",
+                ctx.identity.scope.system,
+                ctx.identity.scope.value,
+                bundle,
+            ],
         )
     except IdentityError:
         return None
@@ -282,10 +286,11 @@ def _recording_method(view: ObservationView) -> str | None:
 
 
 def _converted_at(view: ObservationView) -> int | None:
-    if not view.issued:
+    instant = view.recorded if view.shape == "grove" else view.issued
+    if not instant:
         return None
     try:
-        return parse_instant(view.issued)[0]
+        return parse_instant(instant)[0]
     except TimeParseError:
         return None
 

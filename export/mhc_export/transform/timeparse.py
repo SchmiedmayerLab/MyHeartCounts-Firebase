@@ -76,5 +76,8 @@ def zone_matches_offset(name: str | None, epoch_ms: int, offset_min: int | None)
     zone = _zone(name)
     if zone is None:
         return False
-    at = datetime.fromtimestamp(epoch_ms / 1000, tz=zone).utcoffset()
+    try:
+        at = datetime.fromtimestamp(epoch_ms / 1000, tz=zone).utcoffset()
+    except (OverflowError, OSError, ValueError):
+        return False
     return at is not None and int(at.total_seconds()) // 60 == offset_min

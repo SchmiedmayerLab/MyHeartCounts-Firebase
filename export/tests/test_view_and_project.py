@@ -222,6 +222,9 @@ def test_clinical_record_envelope_and_unsupported_type(ctx: ProjectContext) -> N
     assert exc2.value.reason == "unsupported_type"
 
 
+NATIVE = "6F1A9D2C-4B7E-4C1A-9E0B-2D3C4B5A6978"
+
+
 def test_view_grove_shape(ctx: ProjectContext) -> None:
     role = "https://grovealliance.org/fhir/mobile/CodeSystem/grove-identifier-role"
     res = {
@@ -238,6 +241,7 @@ def test_view_grove_shape(ctx: ProjectContext) -> None:
                 "system": "https://x/so",
                 "value": "v0:k:1:BBB",
             },
+            {"system": "https://myheartcounts.stanford.edu/fhir/identifiers/healthkit-record", "value": NATIVE},
         ],
         "extension": [
             {
@@ -269,6 +273,8 @@ def test_view_grove_shape(ctx: ProjectContext) -> None:
     v = parse_observation(res)
     assert v.shape == "grove" and v.sample_type == "HKCategoryTypeIdentifierSleepAnalysis"
     row = project(v, SLEEP, ctx, 1).row
-    assert row["sample_id"] == "v0:k:1:BBB" and row["source_record_id"] == "v0:k:1:AAA"
+    # the export mints its own identities from the disclosed record id, never adopting the producer's
+    assert row["sample_id"] == ctx.identity.source_output(SLEEP.sample_type, NATIVE, "sleep-stage")
+    assert row["source_record_id"] == ctx.identity.source_record(SLEEP.sample_type, NATIVE)
     assert row["value_code"] == "deep" and row["value_source_code"] == "asleepDeep"
     assert row["timezone"] == "Europe/Berlin" and row["recording_method"] == "manual-entry"
