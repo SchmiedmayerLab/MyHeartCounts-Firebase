@@ -6,6 +6,8 @@
 from __future__ import annotations
 
 import base64
+import contextlib
+import fcntl
 import hashlib
 import json
 import os
@@ -31,6 +33,10 @@ class BlobExistsError(FileExistsError):
     pass
 
 
+class BlobConflict(RuntimeError):
+    """A versioned write lost a race: the object changed since it was read."""
+
+
 class BlobStore(Protocol):
     def list(self, prefix: str) -> Iterator[ObjectInfo]: ...
     def read(self, uri: str, generation: int | None = None) -> bytes: ...
@@ -40,6 +46,9 @@ class BlobStore(Protocol):
     def info(self, uri: str) -> ObjectInfo | None: ...
     def upload(self, path: Path, uri: str, *, overwrite: bool) -> None: ...
     def md5(self, uri: str) -> str | None: ...
+    def delete(self, uri: str) -> None: ...
+    def read_versioned(self, uri: str) -> tuple[bytes, str] | None: ...
+    def write_versioned(self, uri: str, data: bytes, token: str | None) -> None: ...
 
 
 class LocalBlobStore:
@@ -89,12 +98,19 @@ class LocalBlobStore:
     def copy(self, src: str, dst: str, *, overwrite: bool) -> None:
         self.upload(self._path(src), dst, overwrite=overwrite)
 
+    def _inside(self, uri: str) -> Path | None:
+        try:
+            return self._path(uri)
+        except ValueError:
+            return None
+
     def exists(self, uri: str) -> bool:
-        return self._path(uri).is_file()
+        path = self._inside(uri)
+        return path is not None and path.is_file()
 
     def info(self, uri: str) -> ObjectInfo | None:
-        path = self._path(uri)
-        if not path.is_file():
+        path = self._inside(uri)
+        if path is None or not path.is_file():
             return None
         stat = path.stat()
         return ObjectInfo(str(path), stat.st_size, None, datetime.fromtimestamp(stat.st_mtime, tz=UTC), {})
@@ -106,6 +122,31 @@ class LocalBlobStore:
         os.close(fd)
         shutil.copyfile(path, tmp_name)
         _place(Path(tmp_name), dst, overwrite, uri)
+
+    def delete(self, uri: str) -> None:
+        self._path(uri).unlink(missing_ok=True)
+
+    def read_versioned(self, uri: str) -> tuple[bytes, str] | None:
+        path = self._path(uri)
+        if not path.is_file():
+            return None
+        data = path.read_bytes()
+        return data, hashlib.sha256(data).hexdigest()
+
+    def write_versioned(self, uri: str, data: bytes, token: str | None) -> None:
+        """Replace the object only if it still has the content the caller read (token None: must not exist)."""
+        path = self._path(uri)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        lock_path = path.with_name(f".{path.name}.lock")
+        with lock_path.open("a") as lock:
+            fcntl.flock(lock, fcntl.LOCK_EX)
+            current = hashlib.sha256(path.read_bytes()).hexdigest() if path.is_file() else None
+            if current != token:
+                raise BlobConflict(f"{uri} changed since it was read")
+            fd, tmp_name = tempfile.mkstemp(prefix=f".{path.name}.", dir=path.parent)
+            with os.fdopen(fd, "wb") as fh:
+                fh.write(data)
+            Path(tmp_name).replace(path)
 
     def md5(self, uri: str) -> str | None:
         path = self._path(uri)
@@ -209,6 +250,31 @@ class GcsBlobStore:
             return None
         return base64.b64decode(blob.md5_hash).hex()
 
+    def read_versioned(self, uri: str) -> tuple[bytes, str] | None:
+        bucket, name = self.split(uri)
+        blob = self._client.bucket(bucket).get_blob(name)
+        if blob is None:
+            return None
+        return blob.download_as_bytes(if_generation_match=blob.generation), str(blob.generation)
+
+    def write_versioned(self, uri: str, data: bytes, token: str | None) -> None:
+        from google.api_core.exceptions import PreconditionFailed
+
+        bucket, name = self.split(uri)
+        try:
+            self._client.bucket(bucket).blob(name).upload_from_string(
+                data, if_generation_match=int(token) if token is not None else 0
+            )
+        except PreconditionFailed as exc:
+            raise BlobConflict(f"{uri} changed since it was read") from exc
+
+    def delete(self, uri: str) -> None:
+        from google.api_core.exceptions import NotFound
+
+        bucket, name = self.split(uri)
+        with contextlib.suppress(NotFound):
+            self._client.bucket(bucket).blob(name).delete()
+
     def upload(self, path: Path, uri: str, *, overwrite: bool) -> None:
         from google.api_core.exceptions import PreconditionFailed
 
@@ -231,6 +297,8 @@ class RoutedStore:
         return self._read.list(prefix)
 
     def read(self, uri: str, generation: int | None = None) -> bytes:
+        if generation is None and self._write.exists(uri):
+            return self._write.read(uri)
         return self._read.read(uri, generation)
 
     def write(self, uri: str, data: bytes, *, overwrite: bool, metadata: dict[str, str] | None = None) -> None:
@@ -250,6 +318,15 @@ class RoutedStore:
 
     def md5(self, uri: str) -> str | None:
         return self._write.md5(uri)
+
+    def delete(self, uri: str) -> None:
+        self._write.delete(uri)
+
+    def read_versioned(self, uri: str) -> tuple[bytes, str] | None:
+        return self._write.read_versioned(uri)
+
+    def write_versioned(self, uri: str, data: bytes, token: str | None) -> None:
+        self._write.write_versioned(uri, data, token)
 
 
 def store_for(uri: str, *, project: str | None = None) -> BlobStore:
@@ -311,6 +388,12 @@ def sync_prefix(store: BlobStore, prefix: str, local_root: Path) -> list[Path]:
         Path(tmp_name).replace(target)
         recorded[rel] = {"size": info.size, "generation": info.generation}
         out.append(target)
+    present = {str(p.relative_to(local_root)) for p in out}
+    recorded = {rel: v for rel, v in recorded.items() if rel in present}
+    if local_root.exists():
+        for path in local_root.rglob("*"):
+            if path.is_file() and path.name != SYNC_MANIFEST and str(path.relative_to(local_root)) not in present:
+                path.unlink()
     local_root.mkdir(parents=True, exist_ok=True)
     manifest_path.write_text(json.dumps(recorded, indent=1, sort_keys=True))
     return out
