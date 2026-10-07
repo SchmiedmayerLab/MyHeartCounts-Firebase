@@ -1,7 +1,7 @@
 {
  "generated_from": {
   "repo": "SchmiedmayerLab/grove-fhir",
-  "ref": "origin/main",
+  "ref": "e04ab868401faa8984105e09b3077336519a0ef9",
   "commit": "e04ab86"
  },
  "grove_version": "0.6.0",
@@ -28,7 +28,8 @@
    "code": {
     "system": "https://grovealliance.org/fhir/healthkit/CodeSystem/healthkit-measurement",
     "code": "symptom-abdominal-cramps"
-   }
+   },
+   "value_system": "https://grovealliance.org/fhir/healthkit/CodeSystem/grove-symptom-severity"
   },
   "HKCategoryTypeIdentifierAcne": {
    "status": "supported",
@@ -51,7 +52,8 @@
    "code": {
     "system": "https://grovealliance.org/fhir/healthkit/CodeSystem/healthkit-measurement",
     "code": "symptom-acne"
-   }
+   },
+   "value_system": "https://grovealliance.org/fhir/healthkit/CodeSystem/grove-symptom-severity"
   },
   "HKCategoryTypeIdentifierAppetiteChanges": {
    "status": "supported",
@@ -73,7 +75,8 @@
    "code": {
     "system": "https://grovealliance.org/fhir/healthkit/CodeSystem/healthkit-measurement",
     "code": "symptom-appetite-changes"
-   }
+   },
+   "value_system": "https://grovealliance.org/fhir/healthkit/CodeSystem/healthkit-symptom-appetite-changes"
   },
   "HKCategoryTypeIdentifierAppleStandHour": {
    "status": "supported",
@@ -93,7 +96,8 @@
    "code": {
     "system": "https://grovealliance.org/fhir/healthkit/CodeSystem/healthkit-measurement",
     "code": "apple-stand-hour"
-   }
+   },
+   "value_system": "https://grovealliance.org/fhir/healthkit/CodeSystem/healthkit-apple-stand-hour"
   },
   "HKCategoryTypeIdentifierAppleWalkingSteadinessEvent": {
    "status": "supported",
@@ -113,7 +117,8 @@
    "code": {
     "system": "https://grovealliance.org/fhir/healthkit/CodeSystem/healthkit-measurement",
     "code": "walking-steadiness-notification"
-   }
+   },
+   "value_system": "https://grovealliance.org/fhir/healthkit/CodeSystem/healthkit-walking-steadiness-notification"
   },
   "HKCategoryTypeIdentifierAudioExposureEvent": {
    "status": "supported",
@@ -132,7 +137,8 @@
    "code": {
     "system": "https://grovealliance.org/fhir/healthkit/CodeSystem/healthkit-measurement",
     "code": "environmental-audio-exposure-notification"
-   }
+   },
+   "value_system": "https://grovealliance.org/fhir/healthkit/CodeSystem/healthkit-environmental-audio-exposure-notification"
   },
   "HKCategoryTypeIdentifierBladderIncontinence": {
    "status": "supported",
@@ -155,7 +161,8 @@
    "code": {
     "system": "https://grovealliance.org/fhir/healthkit/CodeSystem/healthkit-measurement",
     "code": "bladder-incontinence"
-   }
+   },
+   "value_system": "https://grovealliance.org/fhir/healthkit/CodeSystem/grove-symptom-severity"
   },
   "HKCategoryTypeIdentifierBleedingAfterPregnancy": {
    "status": "supported",
@@ -178,7 +185,8 @@
    "code": {
     "system": "https://grovealliance.org/fhir/healthkit/CodeSystem/healthkit-measurement",
     "code": "bleeding-after-pregnancy"
-   }
+   },
+   "value_system": "https://grovealliance.org/fhir/healthkit/CodeSystem/healthkit-bleeding-after-pregnancy"
   },
   "HKCategoryTypeIdentifierBleedingDuringPregnancy": {
    "status": "supported",
@@ -201,7 +209,8 @@
    "code": {
     "system": "https://grovealliance.org/fhir/healthkit/CodeSystem/healthkit-measurement",
     "code": "bleeding-during-pregnancy"
-   }
+   },
+   "value_system": "https://grovealliance.org/fhir/healthkit/CodeSystem/healthkit-bleeding-during-pregnancy"
   },
   "HKCategoryTypeIdentifierBloating": {
    "status": "supported",
@@ -224,7 +233,8 @@
    "code": {
     "system": "https://grovealliance.org/fhir/healthkit/CodeSystem/healthkit-measurement",
     "code": "symptom-bloating"
-   }
+   },
+   "value_system": "https://grovealliance.org/fhir/healthkit/CodeSystem/grove-symptom-severity"
   },
   "HKCategoryTypeIdentifierBreastPain": {
    "status": "supported",
@@ -247,7 +257,8 @@
    "code": {
     "system": "https://grovealliance.org/fhir/healthkit/CodeSystem/healthkit-measurement",
     "code": "symptom-breast-pain"
-   }
+   },
+   "value_system": "https://grovealliance.org/fhir/healthkit/CodeSystem/grove-symptom-severity"
   },
   "HKCategoryTypeIdentifierCervicalMucusQuality": {
    "status": "supported",
@@ -272,7 +283,8 @@
    "code": {
     "system": "https://grovealliance.org/fhir/mobile/CodeSystem/grove-mobile-measurement",
     "code": "cervical-mucus-quality"
-   }
+   },
+   "value_system": "https://grovealliance.org/fhir/mobile/CodeSystem/grove-cervical-mucus-quality"
   },
   "HKCategoryTypeIdentifierChestTightnessOrPain": {
    "status": "supported",
@@ -295,7 +307,8 @@
    "code": {
     "system": "https://grovealliance.org/fhir/healthkit/CodeSystem/healthkit-measurement",
     "code": "symptom-chest-tightness-or-pain"
-   }
+   },
+   "value_system": "https://grovealliance.org/fhir/healthkit/CodeSystem/grove-symptom-severity"
   },
   "HKCategoryTypeIdentifierChills": {
    "status": "supported",
@@ -318,7 +331,8 @@
    "code": {
     "system": "https://grovealliance.org/fhir/healthkit/CodeSystem/healthkit-measurement",
     "code": "symptom-chills"
-   }
+   },
+   "value_system": "https://grovealliance.org/fhir/healthkit/CodeSystem/grove-symptom-severity"
   },
   "HKCategoryTypeIdentifierConstipation": {
    "status": "supported",
@@ -341,7 +355,8 @@
    "code": {
     "system": "https://grovealliance.org/fhir/healthkit/CodeSystem/healthkit-measurement",
     "code": "symptom-constipation"
-   }
+   },
+   "value_system": "https://grovealliance.org/fhir/healthkit/CodeSystem/grove-symptom-severity"
   },
   "HKCategoryTypeIdentifierContraceptive": {
    "status": "supported",
@@ -366,7 +381,8 @@
    "code": {
     "system": "http://loinc.org",
     "code": "8659-5"
-   }
+   },
+   "value_system": "https://grovealliance.org/fhir/healthkit/CodeSystem/healthkit-contraceptive-use"
   },
   "HKCategoryTypeIdentifierCoughing": {
    "status": "supported",
@@ -389,7 +405,8 @@
    "code": {
     "system": "https://grovealliance.org/fhir/healthkit/CodeSystem/healthkit-measurement",
     "code": "symptom-coughing"
-   }
+   },
+   "value_system": "https://grovealliance.org/fhir/healthkit/CodeSystem/grove-symptom-severity"
   },
   "HKCategoryTypeIdentifierDiarrhea": {
    "status": "supported",
@@ -412,7 +429,8 @@
    "code": {
     "system": "https://grovealliance.org/fhir/healthkit/CodeSystem/healthkit-measurement",
     "code": "symptom-diarrhea"
-   }
+   },
+   "value_system": "https://grovealliance.org/fhir/healthkit/CodeSystem/grove-symptom-severity"
   },
   "HKCategoryTypeIdentifierDizziness": {
    "status": "supported",
@@ -435,7 +453,8 @@
    "code": {
     "system": "https://grovealliance.org/fhir/healthkit/CodeSystem/healthkit-measurement",
     "code": "symptom-dizziness"
-   }
+   },
+   "value_system": "https://grovealliance.org/fhir/healthkit/CodeSystem/grove-symptom-severity"
   },
   "HKCategoryTypeIdentifierDrySkin": {
    "status": "supported",
@@ -458,7 +477,8 @@
    "code": {
     "system": "https://grovealliance.org/fhir/healthkit/CodeSystem/healthkit-measurement",
     "code": "symptom-dry-skin"
-   }
+   },
+   "value_system": "https://grovealliance.org/fhir/healthkit/CodeSystem/grove-symptom-severity"
   },
   "HKCategoryTypeIdentifierFainting": {
    "status": "supported",
@@ -481,7 +501,8 @@
    "code": {
     "system": "https://grovealliance.org/fhir/healthkit/CodeSystem/healthkit-measurement",
     "code": "symptom-fainting"
-   }
+   },
+   "value_system": "https://grovealliance.org/fhir/healthkit/CodeSystem/grove-symptom-severity"
   },
   "HKCategoryTypeIdentifierFatigue": {
    "status": "supported",
@@ -504,7 +525,8 @@
    "code": {
     "system": "https://grovealliance.org/fhir/healthkit/CodeSystem/healthkit-measurement",
     "code": "symptom-fatigue"
-   }
+   },
+   "value_system": "https://grovealliance.org/fhir/healthkit/CodeSystem/grove-symptom-severity"
   },
   "HKCategoryTypeIdentifierFever": {
    "status": "supported",
@@ -527,7 +549,8 @@
    "code": {
     "system": "https://grovealliance.org/fhir/healthkit/CodeSystem/healthkit-measurement",
     "code": "symptom-fever"
-   }
+   },
+   "value_system": "https://grovealliance.org/fhir/healthkit/CodeSystem/grove-symptom-severity"
   },
   "HKCategoryTypeIdentifierGeneralizedBodyAche": {
    "status": "supported",
@@ -550,7 +573,8 @@
    "code": {
     "system": "https://grovealliance.org/fhir/healthkit/CodeSystem/healthkit-measurement",
     "code": "symptom-generalized-body-ache"
-   }
+   },
+   "value_system": "https://grovealliance.org/fhir/healthkit/CodeSystem/grove-symptom-severity"
   },
   "HKCategoryTypeIdentifierHairLoss": {
    "status": "supported",
@@ -573,7 +597,8 @@
    "code": {
     "system": "https://grovealliance.org/fhir/healthkit/CodeSystem/healthkit-measurement",
     "code": "symptom-hair-loss"
-   }
+   },
+   "value_system": "https://grovealliance.org/fhir/healthkit/CodeSystem/grove-symptom-severity"
   },
   "HKCategoryTypeIdentifierHandwashingEvent": {
    "status": "supported",
@@ -613,7 +638,8 @@
    "code": {
     "system": "https://grovealliance.org/fhir/healthkit/CodeSystem/healthkit-measurement",
     "code": "symptom-headache"
-   }
+   },
+   "value_system": "https://grovealliance.org/fhir/healthkit/CodeSystem/grove-symptom-severity"
   },
   "HKCategoryTypeIdentifierHeadphoneAudioExposureEvent": {
    "status": "supported",
@@ -632,7 +658,8 @@
    "code": {
     "system": "https://grovealliance.org/fhir/healthkit/CodeSystem/healthkit-measurement",
     "code": "headphone-audio-exposure-notification"
-   }
+   },
+   "value_system": "https://grovealliance.org/fhir/healthkit/CodeSystem/healthkit-headphone-audio-exposure-notification"
   },
   "HKCategoryTypeIdentifierHeartburn": {
    "status": "supported",
@@ -655,7 +682,8 @@
    "code": {
     "system": "https://grovealliance.org/fhir/healthkit/CodeSystem/healthkit-measurement",
     "code": "symptom-heartburn"
-   }
+   },
+   "value_system": "https://grovealliance.org/fhir/healthkit/CodeSystem/grove-symptom-severity"
   },
   "HKCategoryTypeIdentifierHighHeartRateEvent": {
    "status": "supported",
@@ -674,7 +702,8 @@
    "code": {
     "system": "https://grovealliance.org/fhir/healthkit/CodeSystem/healthkit-measurement",
     "code": "high-heart-rate-notification"
-   }
+   },
+   "value_system": "https://grovealliance.org/fhir/healthkit/CodeSystem/healthkit-high-heart-rate-notification"
   },
   "HKCategoryTypeIdentifierHotFlashes": {
    "status": "supported",
@@ -697,7 +726,8 @@
    "code": {
     "system": "https://grovealliance.org/fhir/healthkit/CodeSystem/healthkit-measurement",
     "code": "symptom-hot-flashes"
-   }
+   },
+   "value_system": "https://grovealliance.org/fhir/healthkit/CodeSystem/grove-symptom-severity"
   },
   "HKCategoryTypeIdentifierHypertensionEvent": {
    "status": "supported",
@@ -716,7 +746,8 @@
    "code": {
     "system": "https://grovealliance.org/fhir/healthkit/CodeSystem/healthkit-measurement",
     "code": "hypertension-notification"
-   }
+   },
+   "value_system": "https://grovealliance.org/fhir/healthkit/CodeSystem/healthkit-hypertension-notification"
   },
   "HKCategoryTypeIdentifierInfrequentMenstrualCycles": {
    "status": "supported",
@@ -736,7 +767,8 @@
    "code": {
     "system": "https://grovealliance.org/fhir/healthkit/CodeSystem/healthkit-measurement",
     "code": "infrequent-menstrual-cycles"
-   }
+   },
+   "value_system": "https://grovealliance.org/fhir/healthkit/CodeSystem/healthkit-infrequent-menstrual-cycles"
   },
   "HKCategoryTypeIdentifierIntermenstrualBleeding": {
    "status": "supported",
@@ -755,7 +787,8 @@
    "code": {
     "system": "https://grovealliance.org/fhir/mobile/CodeSystem/grove-mobile-measurement",
     "code": "intermenstrual-bleeding"
-   }
+   },
+   "value_system": "https://grovealliance.org/fhir/mobile/CodeSystem/grove-intermenstrual-bleeding"
   },
   "HKCategoryTypeIdentifierIrregularHeartRhythmEvent": {
    "status": "supported",
@@ -774,7 +807,8 @@
    "code": {
     "system": "https://grovealliance.org/fhir/healthkit/CodeSystem/healthkit-measurement",
     "code": "irregular-heart-rhythm-notification"
-   }
+   },
+   "value_system": "https://grovealliance.org/fhir/healthkit/CodeSystem/healthkit-irregular-heart-rhythm-notification"
   },
   "HKCategoryTypeIdentifierIrregularMenstrualCycles": {
    "status": "supported",
@@ -794,7 +828,8 @@
    "code": {
     "system": "https://grovealliance.org/fhir/healthkit/CodeSystem/healthkit-measurement",
     "code": "irregular-menstrual-cycles"
-   }
+   },
+   "value_system": "https://grovealliance.org/fhir/healthkit/CodeSystem/healthkit-irregular-menstrual-cycles"
   },
   "HKCategoryTypeIdentifierLactation": {
    "status": "supported",
@@ -813,7 +848,8 @@
    "code": {
     "system": "http://loinc.org",
     "code": "63895-7"
-   }
+   },
+   "value_system": "https://grovealliance.org/fhir/healthkit/CodeSystem/healthkit-lactation-status"
   },
   "HKCategoryTypeIdentifierLossOfSmell": {
    "status": "supported",
@@ -836,7 +872,8 @@
    "code": {
     "system": "https://grovealliance.org/fhir/healthkit/CodeSystem/healthkit-measurement",
     "code": "symptom-loss-of-smell"
-   }
+   },
+   "value_system": "https://grovealliance.org/fhir/healthkit/CodeSystem/grove-symptom-severity"
   },
   "HKCategoryTypeIdentifierLossOfTaste": {
    "status": "supported",
@@ -859,7 +896,8 @@
    "code": {
     "system": "https://grovealliance.org/fhir/healthkit/CodeSystem/healthkit-measurement",
     "code": "symptom-loss-of-taste"
-   }
+   },
+   "value_system": "https://grovealliance.org/fhir/healthkit/CodeSystem/grove-symptom-severity"
   },
   "HKCategoryTypeIdentifierLowCardioFitnessEvent": {
    "status": "supported",
@@ -878,7 +916,8 @@
    "code": {
     "system": "https://grovealliance.org/fhir/healthkit/CodeSystem/healthkit-measurement",
     "code": "low-cardio-fitness-notification"
-   }
+   },
+   "value_system": "https://grovealliance.org/fhir/healthkit/CodeSystem/healthkit-low-cardio-fitness-notification"
   },
   "HKCategoryTypeIdentifierLowHeartRateEvent": {
    "status": "supported",
@@ -897,7 +936,8 @@
    "code": {
     "system": "https://grovealliance.org/fhir/healthkit/CodeSystem/healthkit-measurement",
     "code": "low-heart-rate-notification"
-   }
+   },
+   "value_system": "https://grovealliance.org/fhir/healthkit/CodeSystem/healthkit-low-heart-rate-notification"
   },
   "HKCategoryTypeIdentifierLowerBackPain": {
    "status": "supported",
@@ -920,7 +960,8 @@
    "code": {
     "system": "https://grovealliance.org/fhir/healthkit/CodeSystem/healthkit-measurement",
     "code": "symptom-lower-back-pain"
-   }
+   },
+   "value_system": "https://grovealliance.org/fhir/healthkit/CodeSystem/grove-symptom-severity"
   },
   "HKCategoryTypeIdentifierMemoryLapse": {
    "status": "supported",
@@ -943,7 +984,8 @@
    "code": {
     "system": "https://grovealliance.org/fhir/healthkit/CodeSystem/healthkit-measurement",
     "code": "symptom-memory-lapse"
-   }
+   },
+   "value_system": "https://grovealliance.org/fhir/healthkit/CodeSystem/grove-symptom-severity"
   },
   "HKCategoryTypeIdentifierMenstrualFlow": {
    "status": "supported",
@@ -966,7 +1008,8 @@
    "code": {
     "system": "https://grovealliance.org/fhir/mobile/CodeSystem/grove-mobile-measurement",
     "code": "menstruation-flow"
-   }
+   },
+   "value_system": "https://grovealliance.org/fhir/mobile/CodeSystem/grove-menstruation-flow"
   },
   "HKCategoryTypeIdentifierMindfulSession": {
    "status": "supported",
@@ -1003,7 +1046,8 @@
    "code": {
     "system": "https://grovealliance.org/fhir/healthkit/CodeSystem/healthkit-measurement",
     "code": "symptom-mood-changes"
-   }
+   },
+   "value_system": "https://grovealliance.org/fhir/healthkit/CodeSystem/grove-symptom-severity"
   },
   "HKCategoryTypeIdentifierNausea": {
    "status": "supported",
@@ -1026,7 +1070,8 @@
    "code": {
     "system": "http://loinc.org",
     "code": "81660-3"
-   }
+   },
+   "value_system": "https://grovealliance.org/fhir/healthkit/CodeSystem/grove-symptom-severity"
   },
   "HKCategoryTypeIdentifierNightSweats": {
    "status": "supported",
@@ -1049,7 +1094,8 @@
    "code": {
     "system": "https://grovealliance.org/fhir/healthkit/CodeSystem/healthkit-measurement",
     "code": "symptom-night-sweats"
-   }
+   },
+   "value_system": "https://grovealliance.org/fhir/healthkit/CodeSystem/grove-symptom-severity"
   },
   "HKCategoryTypeIdentifierOvulationTestResult": {
    "status": "supported",
@@ -1071,7 +1117,8 @@
    "code": {
     "system": "https://grovealliance.org/fhir/mobile/CodeSystem/grove-mobile-measurement",
     "code": "ovulation-test-result"
-   }
+   },
+   "value_system": "https://grovealliance.org/fhir/mobile/CodeSystem/grove-ovulation-test-result"
   },
   "HKCategoryTypeIdentifierPelvicPain": {
    "status": "supported",
@@ -1094,7 +1141,8 @@
    "code": {
     "system": "https://grovealliance.org/fhir/healthkit/CodeSystem/healthkit-measurement",
     "code": "symptom-pelvic-pain"
-   }
+   },
+   "value_system": "https://grovealliance.org/fhir/healthkit/CodeSystem/grove-symptom-severity"
   },
   "HKCategoryTypeIdentifierPersistentIntermenstrualBleeding": {
    "status": "supported",
@@ -1114,7 +1162,8 @@
    "code": {
     "system": "https://grovealliance.org/fhir/healthkit/CodeSystem/healthkit-measurement",
     "code": "persistent-intermenstrual-bleeding"
-   }
+   },
+   "value_system": "https://grovealliance.org/fhir/healthkit/CodeSystem/healthkit-persistent-intermenstrual-bleeding"
   },
   "HKCategoryTypeIdentifierPregnancy": {
    "status": "supported",
@@ -1133,7 +1182,8 @@
    "code": {
     "system": "http://loinc.org",
     "code": "82810-3"
-   }
+   },
+   "value_system": "https://grovealliance.org/fhir/healthkit/CodeSystem/healthkit-pregnancy-status"
   },
   "HKCategoryTypeIdentifierPregnancyTestResult": {
    "status": "supported",
@@ -1154,7 +1204,8 @@
    "code": {
     "system": "http://loinc.org",
     "code": "2106-3"
-   }
+   },
+   "value_system": "https://grovealliance.org/fhir/healthkit/CodeSystem/healthkit-pregnancy-test-result"
   },
   "HKCategoryTypeIdentifierProgesteroneTestResult": {
    "status": "supported",
@@ -1175,7 +1226,8 @@
    "code": {
     "system": "https://grovealliance.org/fhir/healthkit/CodeSystem/healthkit-measurement",
     "code": "progesterone-test-result"
-   }
+   },
+   "value_system": "https://grovealliance.org/fhir/healthkit/CodeSystem/healthkit-progesterone-test-result"
   },
   "HKCategoryTypeIdentifierProlongedMenstrualPeriods": {
    "status": "supported",
@@ -1195,7 +1247,8 @@
    "code": {
     "system": "https://grovealliance.org/fhir/healthkit/CodeSystem/healthkit-measurement",
     "code": "prolonged-menstrual-periods"
-   }
+   },
+   "value_system": "https://grovealliance.org/fhir/healthkit/CodeSystem/healthkit-prolonged-menstrual-periods"
   },
   "HKCategoryTypeIdentifierRapidPoundingOrFlutteringHeartbeat": {
    "status": "supported",
@@ -1218,7 +1271,8 @@
    "code": {
     "system": "https://grovealliance.org/fhir/healthkit/CodeSystem/healthkit-measurement",
     "code": "symptom-rapid-pounding-or-fluttering-heartbeat"
-   }
+   },
+   "value_system": "https://grovealliance.org/fhir/healthkit/CodeSystem/grove-symptom-severity"
   },
   "HKCategoryTypeIdentifierRunnyNose": {
    "status": "supported",
@@ -1241,7 +1295,8 @@
    "code": {
     "system": "https://grovealliance.org/fhir/healthkit/CodeSystem/healthkit-measurement",
     "code": "symptom-runny-nose"
-   }
+   },
+   "value_system": "https://grovealliance.org/fhir/healthkit/CodeSystem/grove-symptom-severity"
   },
   "HKCategoryTypeIdentifierSexualActivity": {
    "status": "supported",
@@ -1262,7 +1317,8 @@
    "code": {
     "system": "https://grovealliance.org/fhir/mobile/CodeSystem/grove-mobile-measurement",
     "code": "sexual-activity"
-   }
+   },
+   "value_system": "https://grovealliance.org/fhir/mobile/CodeSystem/grove-sexual-activity"
   },
   "HKCategoryTypeIdentifierShortnessOfBreath": {
    "status": "supported",
@@ -1285,7 +1341,8 @@
    "code": {
     "system": "https://grovealliance.org/fhir/healthkit/CodeSystem/healthkit-measurement",
     "code": "symptom-shortness-of-breath"
-   }
+   },
+   "value_system": "https://grovealliance.org/fhir/healthkit/CodeSystem/grove-symptom-severity"
   },
   "HKCategoryTypeIdentifierSinusCongestion": {
    "status": "supported",
@@ -1308,7 +1365,8 @@
    "code": {
     "system": "https://grovealliance.org/fhir/healthkit/CodeSystem/healthkit-measurement",
     "code": "symptom-sinus-congestion"
-   }
+   },
+   "value_system": "https://grovealliance.org/fhir/healthkit/CodeSystem/grove-symptom-severity"
   },
   "HKCategoryTypeIdentifierSkippedHeartbeat": {
    "status": "supported",
@@ -1331,7 +1389,8 @@
    "code": {
     "system": "https://grovealliance.org/fhir/healthkit/CodeSystem/healthkit-measurement",
     "code": "symptom-skipped-heartbeat"
-   }
+   },
+   "value_system": "https://grovealliance.org/fhir/healthkit/CodeSystem/grove-symptom-severity"
   },
   "HKCategoryTypeIdentifierSleepAnalysis": {
    "status": "supported",
@@ -1357,7 +1416,8 @@
    "code": {
     "system": "https://grovealliance.org/fhir/mobile/CodeSystem/grove-mobile-measurement",
     "code": "sleep-stage"
-   }
+   },
+   "value_system": "https://grovealliance.org/fhir/mobile/CodeSystem/grove-sleep-stage"
   },
   "HKCategoryTypeIdentifierSleepApneaEvent": {
    "status": "supported",
@@ -1376,7 +1436,8 @@
    "code": {
     "system": "https://grovealliance.org/fhir/healthkit/CodeSystem/healthkit-measurement",
     "code": "sleep-apnea-notification"
-   }
+   },
+   "value_system": "https://grovealliance.org/fhir/healthkit/CodeSystem/healthkit-sleep-apnea-notification"
   },
   "HKCategoryTypeIdentifierSleepChanges": {
    "status": "supported",
@@ -1396,7 +1457,8 @@
    "code": {
     "system": "https://grovealliance.org/fhir/healthkit/CodeSystem/healthkit-measurement",
     "code": "symptom-sleep-changes"
-   }
+   },
+   "value_system": "https://grovealliance.org/fhir/healthkit/CodeSystem/grove-symptom-severity"
   },
   "HKCategoryTypeIdentifierSoreThroat": {
    "status": "supported",
@@ -1419,7 +1481,8 @@
    "code": {
     "system": "https://grovealliance.org/fhir/healthkit/CodeSystem/healthkit-measurement",
     "code": "symptom-sore-throat"
-   }
+   },
+   "value_system": "https://grovealliance.org/fhir/healthkit/CodeSystem/grove-symptom-severity"
   },
   "HKCategoryTypeIdentifierToothbrushingEvent": {
    "status": "supported",
@@ -1459,7 +1522,8 @@
    "code": {
     "system": "https://grovealliance.org/fhir/healthkit/CodeSystem/healthkit-measurement",
     "code": "vaginal-dryness"
-   }
+   },
+   "value_system": "https://grovealliance.org/fhir/healthkit/CodeSystem/grove-symptom-severity"
   },
   "HKCategoryTypeIdentifierVomiting": {
    "status": "supported",
@@ -1482,7 +1546,8 @@
    "code": {
     "system": "https://grovealliance.org/fhir/healthkit/CodeSystem/healthkit-measurement",
     "code": "symptom-vomiting"
-   }
+   },
+   "value_system": "https://grovealliance.org/fhir/healthkit/CodeSystem/grove-symptom-severity"
   },
   "HKCategoryTypeIdentifierWheezing": {
    "status": "supported",
@@ -1505,7 +1570,8 @@
    "code": {
     "system": "https://grovealliance.org/fhir/healthkit/CodeSystem/healthkit-measurement",
     "code": "symptom-wheezing"
-   }
+   },
+   "value_system": "https://grovealliance.org/fhir/healthkit/CodeSystem/grove-symptom-severity"
   },
   "HKCharacteristicTypeIdentifierActivityMoveMode": {
    "status": "intentionally-unsupported",
@@ -1530,7 +1596,8 @@
    "code": {
     "system": "http://loinc.org",
     "code": "46098-0"
-   }
+   },
+   "value_system": "https://grovealliance.org/fhir/healthkit/CodeSystem/healthkit-biological-sex"
   },
   "HKCharacteristicTypeIdentifierBloodType": {
    "status": "supported",
@@ -1556,7 +1623,8 @@
    "code": {
     "system": "http://loinc.org",
     "code": "882-1"
-   }
+   },
+   "value_system": "https://grovealliance.org/fhir/healthkit/CodeSystem/healthkit-blood-type"
   },
   "HKCharacteristicTypeIdentifierDateOfBirth": {
    "status": "supported",
@@ -1597,7 +1665,8 @@
    "code": {
     "system": "http://loinc.org",
     "code": "66555-4"
-   }
+   },
+   "value_system": "https://grovealliance.org/fhir/healthkit/CodeSystem/healthkit-fitzpatrick-skin-type"
   },
   "HKCharacteristicTypeIdentifierWheelchairUse": {
    "status": "supported",
@@ -1617,7 +1686,8 @@
    "code": {
     "system": "https://grovealliance.org/fhir/healthkit/CodeSystem/healthkit-measurement",
     "code": "wheelchair-use"
-   }
+   },
+   "value_system": "https://grovealliance.org/fhir/healthkit/CodeSystem/healthkit-wheelchair-use"
   },
   "HKClinicalTypeIdentifierAllergyRecord": {
    "status": "platform-exclusive",

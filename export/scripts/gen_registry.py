@@ -74,6 +74,8 @@ def main() -> None:
                 allowed_values=m.get("allowedValues"),
                 code={"system": m["code"]["system"], "code": m["code"]["code"]},
             )
+            if m["valueKind"] == "codeableConcept":
+                entry["value_system"] = m["resultCodeSystem"]
         elif mids and mids[0] in STANDARD_CLAIMS:
             entry.update(STANDARD_CLAIMS[mids[0]])
         elif mids:
