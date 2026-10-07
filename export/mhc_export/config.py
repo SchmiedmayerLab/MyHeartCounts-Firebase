@@ -5,6 +5,8 @@
 
 from __future__ import annotations
 
+import hashlib
+import hmac
 import os
 from dataclasses import dataclass
 from functools import cached_property
@@ -21,6 +23,40 @@ from mhc_export.identity.grove_ids import (
 
 DEFAULT_DEPLOYMENT_ROOT = "https://myheartcounts.stanford.edu/fhir"
 DEFAULT_SCOPE_SYSTEM = "https://myheartcounts.stanford.edu/fhir/NamingSystem/healthkit-store"
+DEFAULT_PARTICIPANT_SYSTEM = "https://myheartcounts.stanford.edu/fhir/identifiers/participant"
+DEFAULT_NATIVE_RECORD_SYSTEM = "https://myheartcounts.stanford.edu/fhir/identifiers/healthkit-record"
+DEFAULT_STUDY_PROTOCOL = "https://myheartcounts.stanford.edu/fhir/PlanDefinition/5d464372-c9a3-4018-a789-47149d934bfc"
+# MHC iOS mints its Grove identities on the device under key id "store", epoch 1
+DEFAULT_PRODUCER_NAMESPACES: tuple[tuple[str, int], ...] = (("store", 1),)
+
+
+@dataclass(frozen=True)
+class GroveSettings:
+    """How Grove exchange events from the app are read. The export does not adopt the producer's opaque
+    identities as sample ids: it mints its own from the disclosed HealthKit UUID with the export key, so samples
+    match across devices, reinstalls and migrated legacy records."""
+
+    deployment_root: str = DEFAULT_DEPLOYMENT_ROOT
+    producer_namespaces: tuple[tuple[str, int], ...] = DEFAULT_PRODUCER_NAMESPACES
+    participant_system: str = DEFAULT_PARTICIPANT_SYSTEM
+    native_record_system: str = DEFAULT_NATIVE_RECORD_SYSTEM
+    study_protocol: str = DEFAULT_STUDY_PROTOCOL
+    accept_legacy: bool = False
+
+    def __post_init__(self) -> None:
+        for key_id, epoch in self.producer_namespaces:
+            if not key_id or epoch < 1:
+                raise IdentityError(f"invalid producer namespace {key_id}:{epoch}")
+
+    def describe(self) -> dict[str, object]:
+        return {
+            "deployment_root": self.deployment_root,
+            "producer_namespaces": [f"{k}:{e}" for k, e in self.producer_namespaces],
+            "participant_system": self.participant_system,
+            "native_record_system": self.native_record_system,
+            "study_protocol": self.study_protocol,
+            "accept_legacy": self.accept_legacy,
+        }
 
 
 @dataclass(frozen=True)
@@ -73,7 +109,13 @@ class IdentityConfig:
             "scope_system": self.scope_system,
             "deployment_root": self.deployment_root,
             "accepted_epochs": [f"{k}:{e}" for k, e in self.epochs],
+            "key_check": self.key_check,
         }
+
+    @cached_property
+    def key_check(self) -> str:
+        """Non-secret check value: workers with the same key id and epoch but different secrets disagree here."""
+        return hmac.new(self.key.secret, b"mhc-export key check v1", hashlib.sha256).hexdigest()[:16]
 
 
 def load_key_from_secret(secret_version: str, *, key_id: str, epoch: int, project: str | None = None) -> GroveKey:
@@ -126,4 +168,12 @@ def new_key_hex() -> str:
     return os.urandom(32).hex()
 
 
-__all__ = ["GROVE_TEST_KEY", "IdentityConfig", "check_production", "load_key", "load_key_from_secret", "new_key_hex"]
+__all__ = [
+    "GROVE_TEST_KEY",
+    "GroveSettings",
+    "IdentityConfig",
+    "check_production",
+    "load_key",
+    "load_key_from_secret",
+    "new_key_hex",
+]
