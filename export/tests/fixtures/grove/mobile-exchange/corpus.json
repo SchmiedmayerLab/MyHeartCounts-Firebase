@@ -1,0 +1,1318 @@
+{
+  "schemaVersion": 0,
+  "version": "0.6.0",
+  "bases": [
+    {
+      "id": "mobile-exchange",
+      "path": "exchange-bundle.json"
+    },
+    {
+      "id": "mobile-retraction",
+      "path": "retraction-bundle.json"
+    }
+  ],
+  "cases": [
+    {
+      "id": "missing-entry-node-key",
+      "base": "mobile-exchange",
+      "patch": [
+        {
+          "op": "remove",
+          "path": "/entry/0/extension"
+        }
+      ],
+      "expectedRule": {
+        "code": "mobile-exchange.entry-node-key",
+        "reason": "Every Bundle entry must carry exactly one complete Grove exchange entry node key.",
+        "location": "Bundle.entry[0]",
+        "severity": "error"
+      }
+    },
+    {
+      "id": "non-deterministic-full-url",
+      "base": "mobile-exchange",
+      "patch": [
+        {
+          "op": "replace",
+          "path": "/entry/1/fullUrl",
+          "value": "urn:uuid:00000000-0000-5000-8000-000000000000"
+        }
+      ],
+      "expectedRule": {
+        "code": "mobile-exchange.deterministic-full-url",
+        "reason": "Bundle.entry.fullUrl must be the UUID version 5 value derived from its complete entry identifier.",
+        "location": "Bundle.entry[1].fullUrl",
+        "severity": "error"
+      }
+    },
+    {
+      "id": "unresolved-internal-reference",
+      "base": "mobile-exchange",
+      "patch": [
+        {
+          "op": "replace",
+          "path": "/entry/2/resource/subject/reference",
+          "value": "urn:uuid:00000000-0000-5000-8000-000000000001"
+        }
+      ],
+      "expectedRule": {
+        "code": "mobile-exchange.resolved-reference",
+        "reason": "Every internal UUID URN reference must resolve to a Bundle entry fullUrl.",
+        "location": "Bundle.entry[2].resource.subject.reference",
+        "severity": "error"
+      }
+    },
+    {
+      "id": "wrong-heart-rate-unit",
+      "base": "mobile-exchange",
+      "patch": [
+        {
+          "op": "replace",
+          "path": "/entry/2/resource/valueQuantity/code",
+          "value": "kg"
+        }
+      ],
+      "expectedRule": {
+        "code": "mobile-output.fixed-quantity-unit",
+        "reason": "Every Quantity-valued catalog measurement uses the exact fixed system and code declared by its semantic profile contract.",
+        "location": "Bundle.entry[2].resource.valueQuantity.code",
+        "severity": "error"
+      }
+    },
+    {
+      "id": "non-canonical-event-identity",
+      "base": "mobile-exchange",
+      "patch": [
+        {
+          "op": "replace",
+          "path": "/identifier/value",
+          "value": "exchange-20260820-001"
+        }
+      ],
+      "expectedRule": {
+        "code": "mobile-exchange.event-identity",
+        "reason": "Bundle.identifier.value must be the canonical e0 producer UUID and positive sequence form.",
+        "location": "Bundle.identifier.value",
+        "severity": "error"
+      }
+    },
+    {
+      "id": "tampered-entry-node-digest",
+      "base": "mobile-exchange",
+      "patch": [
+        {
+          "op": "replace",
+          "path": "/entry/0/extension/0/valueIdentifier/value",
+          "value": "n0:patient:0:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+        }
+      ],
+      "expectedRule": {
+        "code": "mobile-exchange.entry-node-digest",
+        "reason": "An entry-node digest must be derived from the enclosing event identifier, role, and ordinal.",
+        "location": "Bundle.entry[0].extension.valueIdentifier.value",
+        "severity": "error"
+      }
+    },
+    {
+      "id": "misnumbered-entry-node-ordinal",
+      "base": "mobile-exchange",
+      "patch": [
+        {
+          "op": "replace",
+          "path": "/entry/0/extension/0/valueIdentifier/value",
+          "value": "n0:patient:1:qN9xaTdoz-LfvONC7FgEUNMz06zyWhfzD0khPhtjVig"
+        }
+      ],
+      "expectedRule": {
+        "code": "mobile-exchange.entry-node-ordinal",
+        "reason": "An entry-node ordinal is the zero-based position of its entry among the entries sharing that node-role, in Bundle entry order.",
+        "location": "Bundle.entry[0].extension.valueIdentifier.value",
+        "severity": "error"
+      }
+    },
+    {
+      "id": "missing-source-output-identity",
+      "base": "mobile-exchange",
+      "patch": [
+        {
+          "op": "remove",
+          "path": "/entry/2/resource/identifier/1"
+        }
+      ],
+      "expectedRule": {
+        "code": "mobile-output.source-output-required",
+        "reason": "Every active clinical output must carry its exact typed source-output identity in addition to source-record identity.",
+        "location": "Bundle.entry[2].resource.identifier",
+        "severity": "error"
+      }
+    },
+    {
+      "id": "identity-system-changes-role",
+      "base": "mobile-exchange",
+      "patch": [
+        {
+          "op": "replace",
+          "path": "/entry/2/resource/identifier/1/system",
+          "value": "https://study.example.org/fhir/NamingSystem/grove-source-record-v0/test-key/1"
+        }
+      ],
+      "expectedRule": {
+        "code": "mobile-exchange.identity-system-role",
+        "reason": "Within one event graph, each Grove Identifier.system names exactly one Grove identifier role; one namespace cannot change meaning between nodes.",
+        "location": "Bundle",
+        "severity": "error"
+      }
+    },
+    {
+      "id": "missing-transform-provenance",
+      "base": "mobile-exchange",
+      "patch": [
+        {
+          "op": "remove",
+          "path": "/entry/3"
+        }
+      ],
+      "expectedRule": {
+        "code": "mobile-exchange.transform-provenance",
+        "reason": "An active event must contain exactly one transform Provenance and no retraction Provenance.",
+        "location": "Bundle.entry",
+        "severity": "error"
+      }
+    },
+    {
+      "id": "retraction-literal-target",
+      "base": "mobile-retraction",
+      "patch": [
+        {
+          "op": "add",
+          "path": "/entry/0/resource/target/0/reference",
+          "value": "Observation/prior-output"
+        }
+      ],
+      "expectedRule": {
+        "code": "mobile-retraction.logical-target",
+        "reason": "A retraction target must be a typed logical Reference without a literal reference.",
+        "location": "Provenance.target[0]",
+        "severity": "error"
+      }
+    },
+    {
+      "id": "retraction-unknown-target-role",
+      "base": "mobile-retraction",
+      "patch": [
+        {
+          "op": "replace",
+          "path": "/entry/0/resource/target/0/extension/0/valueCode",
+          "value": "delete-command"
+        }
+      ],
+      "expectedRule": {
+        "code": "mobile-retraction.target-role",
+        "reason": "Every retraction target must carry exactly one closed Grove target-role code.",
+        "location": "Provenance.target[0].extension",
+        "severity": "error"
+      }
+    },
+    {
+      "id": "retraction-clear-target-identity",
+      "base": "mobile-retraction",
+      "patch": [
+        {
+          "op": "replace",
+          "path": "/entry/0/resource/target/0/identifier/value",
+          "value": "prior-output-001"
+        }
+      ],
+      "expectedRule": {
+        "code": "mobile-retraction.opaque-target",
+        "reason": "A retraction target must use the exact canonical v0 HMAC identity previously emitted.",
+        "location": "Provenance.target[0].identifier.value",
+        "severity": "error"
+      }
+    },
+    {
+      "id": "retraction-copied-clinical-resource",
+      "base": "mobile-retraction",
+      "patch": [
+        {
+          "op": "replace",
+          "path": "/entry/0/resource/resourceType",
+          "value": "Observation"
+        }
+      ],
+      "expectedRule": {
+        "code": "mobile-retraction.no-clinical-copy",
+        "reason": "A retraction event contains its lifecycle Provenance and optional Device agents, never a copied or mutilated clinical resource.",
+        "location": "Bundle.entry[0].resource",
+        "severity": "error"
+      }
+    },
+    {
+      "id": "ambiguous-active-lifecycle-coding",
+      "base": "mobile-exchange",
+      "patch": [
+        {
+          "op": "add",
+          "path": "/entry/3/resource/activity/coding/-",
+          "value": {
+            "system": "http://terminology.hl7.org/CodeSystem/iso-21089-lifecycle",
+            "code": "amend"
+          }
+        }
+      ],
+      "expectedRule": {
+        "code": "mobile-exchange.lifecycle-coding",
+        "reason": "A lifecycle Provenance must carry exactly one coding across the ISO transform and Grove retraction lifecycle systems; translations from other systems remain open.",
+        "location": "Provenance.activity.coding",
+        "severity": "error"
+      }
+    },
+    {
+      "id": "contradictory-retraction-lifecycle-coding",
+      "base": "mobile-retraction",
+      "patch": [
+        {
+          "op": "add",
+          "path": "/entry/0/resource/activity/coding/-",
+          "value": {
+            "system": "http://terminology.hl7.org/CodeSystem/iso-21089-lifecycle",
+            "code": "transform"
+          }
+        }
+      ],
+      "expectedRule": {
+        "code": "mobile-exchange.lifecycle-coding",
+        "reason": "A lifecycle Provenance must carry exactly one coding across the ISO transform and Grove retraction lifecycle systems; translations from other systems remain open.",
+        "location": "Provenance.activity.coding",
+        "severity": "error"
+      }
+    },
+    {
+      "id": "unprofiled-active-observation",
+      "base": "mobile-exchange",
+      "patch": [
+        {
+          "op": "remove",
+          "path": "/entry/2/resource/meta/profile"
+        }
+      ],
+      "expectedRule": {
+        "code": "mobile-output.semantic-profile",
+        "reason": "Every active Observation must directly claim one admitted Grove semantic profile shape; an empty claim cannot bypass semantic validation.",
+        "location": "Observation.meta.profile",
+        "severity": "error"
+      }
+    },
+    {
+      "id": "wrong-subject-target-type",
+      "base": "mobile-exchange",
+      "patch": [
+        {
+          "op": "replace",
+          "path": "/entry/2/resource/subject/reference",
+          "value": "urn:uuid:aef62dba-db7e-5a99-a854-3b5ec312312f"
+        }
+      ],
+      "expectedRule": {
+        "code": "mobile-exchange.reference-target-type",
+        "reason": "Every governed Patient reference resolves to a Patient entry, not merely to any existing fullUrl.",
+        "location": "Observation.subject.reference",
+        "severity": "error"
+      }
+    },
+    {
+      "id": "false-reference-declared-type",
+      "base": "mobile-exchange",
+      "patch": [
+        {
+          "op": "add",
+          "path": "/entry/2/resource/subject/type",
+          "value": "Device"
+        }
+      ],
+      "expectedRule": {
+        "code": "mobile-exchange.reference-declared-type",
+        "reason": "When Reference.type is present it must equal the referenced entry's actual resourceType token.",
+        "location": "Observation.subject.type",
+        "severity": "error"
+      }
+    },
+    {
+      "id": "transform-literal-source-entity",
+      "base": "mobile-exchange",
+      "patch": [
+        {
+          "op": "add",
+          "path": "/entry/3/resource/entity/0/what/reference",
+          "value": "urn:uuid:d5137e30-79b1-5110-a09c-bd2528e25085"
+        }
+      ],
+      "expectedRule": {
+        "code": "mobile-exchange.logical-source-entity",
+        "reason": "Lifecycle Provenance carries exactly one logical source-record Identifier entity and never a literal source Reference.",
+        "location": "Provenance.entity[0].what",
+        "severity": "error"
+      }
+    },
+    {
+      "id": "retraction-role-target-type-mismatch",
+      "base": "mobile-retraction",
+      "patch": [
+        {
+          "op": "replace",
+          "path": "/entry/0/resource/target/0/type",
+          "value": "Device"
+        }
+      ],
+      "expectedRule": {
+        "code": "mobile-retraction.role-target-type",
+        "reason": "Every retraction target role fixes its admitted resource type and Identifier role.",
+        "location": "Provenance.target[0].type",
+        "severity": "error"
+      }
+    },
+    {
+      "id": "retraction-additional-source-entity",
+      "base": "mobile-retraction",
+      "patch": [
+        {
+          "op": "add",
+          "path": "/entry/0/resource/entity/-",
+          "value": {
+            "role": "source",
+            "what": {
+              "identifier": {
+                "type": {
+                  "coding": [
+                    {
+                      "system": "https://grovealliance.org/fhir/mobile/CodeSystem/grove-identifier-role",
+                      "code": "source-record"
+                    }
+                  ]
+                },
+                "system": "https://study.example.org/fhir/NamingSystem/grove-source-record-v0/test-key/1",
+                "value": "v0:test-key:1:ptHr751zWyYfaR2WIvrP1TfnVEK4bInC__ibP_AYfVY"
+              }
+            }
+          }
+        }
+      ],
+      "expectedRule": {
+        "code": "mobile-exchange.single-source-entity",
+        "reason": "A lifecycle Provenance identifies exactly one source-record entity.",
+        "location": "Provenance.entity",
+        "severity": "error"
+      }
+    },
+    {
+      "id": "mixed-literal-logical-patient-reference",
+      "base": "mobile-exchange",
+      "patch": [
+        {
+          "op": "add",
+          "path": "/entry/2/resource/subject/identifier",
+          "value": {
+            "system": "https://deployment.example/fhir/NamingSystem/patient-pseudonym",
+            "value": "participant-42"
+          }
+        }
+      ],
+      "expectedRule": {
+        "code": "mobile-exchange.reference-shape",
+        "reason": "Each governed path has its declared singular or repeating shape and contains valid Reference objects that are exclusively resolving-literal or identifier-only logical, never both.",
+        "location": "Observation.subject",
+        "severity": "error"
+      }
+    },
+    {
+      "id": "untyped-logical-patient-reference",
+      "base": "mobile-exchange",
+      "patch": [
+        {
+          "op": "replace",
+          "path": "/entry/2/resource/subject",
+          "value": {
+            "identifier": {
+              "system": "https://deployment.example/fhir/NamingSystem/patient-pseudonym",
+              "value": "participant-42"
+            }
+          }
+        }
+      ],
+      "expectedRule": {
+        "code": "mobile-exchange.logical-patient-reference",
+        "reason": "An identifier-only logical Patient Reference carries the exact Patient type and one complete absolute-system pseudonym Identifier without a Grove role or protocol-reserved system.",
+        "location": "Observation.subject",
+        "severity": "error"
+      }
+    },
+    {
+      "id": "unadmitted-condition-resource",
+      "base": "mobile-exchange",
+      "patch": [
+        {
+          "op": "replace",
+          "path": "/entry/0/resource/resourceType",
+          "value": "Condition"
+        }
+      ],
+      "expectedRule": {
+        "code": "mobile-exchange.entry-resource-type",
+        "reason": "An active event admits only its closed output, supporting, and lifecycle resource type set.",
+        "location": "Bundle.entry[0].resource.resourceType",
+        "severity": "error"
+      }
+    },
+    {
+      "id": "adapter-only-output-without-adapter-profile",
+      "base": "mobile-exchange",
+      "patch": [
+        {
+          "op": "replace",
+          "path": "/entry/2/resource/resourceType",
+          "value": "Specimen"
+        }
+      ],
+      "expectedRule": {
+        "code": "mobile-output.adapter-only-profile",
+        "reason": "An adapter-only active output type must directly claim exactly its one admitted adapter profile.",
+        "location": "Specimen.meta.profile",
+        "severity": "error"
+      }
+    },
+    {
+      "id": "contained-resource-prohibited",
+      "base": "mobile-exchange",
+      "patch": [
+        {
+          "op": "add",
+          "path": "/entry/2/resource/contained",
+          "value": [
+            {
+              "resourceType": "Patient",
+              "id": "hidden-patient"
+            }
+          ]
+        }
+      ],
+      "expectedRule": {
+        "code": "mobile-exchange.contained-resource-prohibited",
+        "reason": "Mobile exchange events prohibit contained resources; every graph node must be an addressable Bundle entry.",
+        "location": "Bundle.entry[2].resource.contained",
+        "severity": "error"
+      }
+    },
+    {
+      "id": "unadmitted-device-metric-resource",
+      "base": "mobile-exchange",
+      "patch": [
+        {
+          "op": "replace",
+          "path": "/entry/0/resource/resourceType",
+          "value": "DeviceMetric"
+        }
+      ],
+      "expectedRule": {
+        "code": "mobile-exchange.entry-resource-type",
+        "reason": "An active event admits only its closed output, supporting, and lifecycle resource type set.",
+        "location": "Bundle.entry[0].resource.resourceType",
+        "severity": "error"
+      }
+    },
+    {
+      "id": "unprofiled-active-document-reference",
+      "base": "mobile-exchange",
+      "patch": [
+        {
+          "op": "replace",
+          "path": "/entry/2/resource",
+          "value": {
+            "resourceType": "DocumentReference",
+            "identifier": [
+              {
+                "type": {
+                  "coding": [
+                    {
+                      "system": "https://grovealliance.org/fhir/mobile/CodeSystem/grove-identifier-role",
+                      "code": "source-record"
+                    }
+                  ]
+                },
+                "system": "https://study.example.org/fhir/NamingSystem/grove-source-record-v0/test-key/1",
+                "value": "v0:test-key:1:ptHr751zWyYfaR2WIvrP1TfnVEK4bInC__ibP_AYfVY"
+              },
+              {
+                "type": {
+                  "coding": [
+                    {
+                      "system": "https://grovealliance.org/fhir/mobile/CodeSystem/grove-identifier-role",
+                      "code": "source-output"
+                    }
+                  ]
+                },
+                "system": "https://study.example.org/fhir/NamingSystem/grove-source-output-v0/test-key/1",
+                "value": "v0:test-key:1:PPULnf0LKpASjIj8mU5TKafPKig_oqWND3_dHFShGd8"
+              }
+            ],
+            "status": "current",
+            "subject": {
+              "reference": "urn:uuid:d5137e30-79b1-5110-a09c-bd2528e25085"
+            },
+            "date": "2026-08-19T17:30:00Z",
+            "content": [
+              {
+                "attachment": {
+                  "contentType": "application/octet-stream",
+                  "url": "https://example.org/recording.bin"
+                }
+              }
+            ]
+          }
+        }
+      ],
+      "expectedRule": {
+        "code": "mobile-output.document-profile",
+        "reason": "Every active DocumentReference must directly claim exactly one admitted recording or clinical-document profile mode.",
+        "location": "DocumentReference.meta.profile",
+        "severity": "error"
+      }
+    },
+    {
+      "id": "unprofiled-active-device",
+      "base": "mobile-exchange",
+      "patch": [
+        {
+          "op": "remove",
+          "path": "/entry/1/resource/meta/profile"
+        }
+      ],
+      "expectedRule": {
+        "code": "mobile-support.device-profile",
+        "reason": "Every active Device must directly claim exactly one admitted Grove Device profile mode.",
+        "location": "Device.meta.profile",
+        "severity": "error"
+      }
+    },
+    {
+      "id": "unprofiled-active-provenance",
+      "base": "mobile-exchange",
+      "patch": [
+        {
+          "op": "remove",
+          "path": "/entry/3/resource/meta/profile"
+        }
+      ],
+      "expectedRule": {
+        "code": "mobile-exchange.provenance-profile",
+        "reason": "The sole active lifecycle Provenance must directly claim exactly one admitted Mobile or adapter conversion profile.",
+        "location": "Provenance.meta.profile",
+        "severity": "error"
+      }
+    },
+    {
+      "id": "questionnaire-response-subject-wrong-target",
+      "base": "mobile-exchange",
+      "patch": [
+        {
+          "op": "replace",
+          "path": "/entry/4/resource/subject",
+          "value": {
+            "reference": "urn:uuid:aef62dba-db7e-5a99-a854-3b5ec312312f"
+          }
+        }
+      ],
+      "expectedRule": {
+        "code": "mobile-exchange.reference-target-type",
+        "reason": "Every governed Patient reference resolves to a Patient entry, not merely to any existing fullUrl.",
+        "location": "QuestionnaireResponse.subject.reference",
+        "severity": "error"
+      }
+    },
+    {
+      "id": "questionnaire-response-subject-reserved-system",
+      "base": "mobile-exchange",
+      "patch": [
+        {
+          "op": "replace",
+          "path": "/entry/4/resource/subject/identifier/system",
+          "value": "https://grovealliance.org/fhir/mobile/CodeSystem/grove-identifier-role"
+        }
+      ],
+      "expectedRule": {
+        "code": "mobile-exchange.logical-patient-reference",
+        "reason": "An identifier-only logical Patient Reference carries the exact Patient type and one complete absolute-system pseudonym Identifier without a Grove role or protocol-reserved system.",
+        "location": "QuestionnaireResponse.subject.identifier.system",
+        "severity": "error"
+      }
+    },
+    {
+      "id": "questionnaire-response-subject-grove-role",
+      "base": "mobile-exchange",
+      "patch": [
+        {
+          "op": "add",
+          "path": "/entry/4/resource/subject/identifier/type",
+          "value": {
+            "coding": [
+              {
+                "system": "https://grovealliance.org/fhir/mobile/CodeSystem/grove-identifier-role",
+                "code": "source-record"
+              }
+            ]
+          }
+        }
+      ],
+      "expectedRule": {
+        "code": "mobile-exchange.logical-patient-reference",
+        "reason": "An identifier-only logical Patient Reference carries the exact Patient type and one complete absolute-system pseudonym Identifier without a Grove role or protocol-reserved system.",
+        "location": "QuestionnaireResponse.subject.identifier.type",
+        "severity": "error"
+      }
+    },
+    {
+      "id": "disconnected-supporting-patient",
+      "base": "mobile-exchange",
+      "patch": [
+        {
+          "op": "add",
+          "path": "/entry/-",
+          "value": {
+            "fullUrl": "urn:uuid:27d2d3da-934e-52bd-ad54-d720752df13f",
+            "extension": [
+              {
+                "url": "https://grovealliance.org/fhir/mobile/StructureDefinition/grove-exchange-entry-node-key",
+                "valueIdentifier": {
+                  "type": {
+                    "coding": [
+                      {
+                        "system": "https://grovealliance.org/fhir/mobile/CodeSystem/grove-identifier-role",
+                        "code": "entry-node"
+                      }
+                    ]
+                  },
+                  "system": "https://study.example.org/fhir/NamingSystem/grove-entry-node-v0",
+                  "value": "n0:patient:1:qN9xaTdoz-LfvONC7FgEUNMz06zyWhfzD0khPhtjVig"
+                }
+              }
+            ],
+            "resource": {
+              "resourceType": "Patient",
+              "identifier": [
+                {
+                  "system": "https://deployment.example/fhir/NamingSystem/patient-pseudonym",
+                  "value": "participant-99"
+                }
+              ]
+            }
+          }
+        }
+      ],
+      "expectedRule": {
+        "code": "mobile-support.connected",
+        "reason": "Every supporting resource must be connected to an output or the lifecycle Provenance.",
+        "location": "Bundle.entry",
+        "severity": "error"
+      }
+    },
+    {
+      "id": "retraction-native-identifier-uses-grove-role",
+      "base": "mobile-retraction",
+      "patch": [
+        {
+          "op": "add",
+          "path": "/entry/0/resource/target/0/extension/1/valueIdentifier/type",
+          "value": {
+            "coding": [
+              {
+                "system": "https://grovealliance.org/fhir/mobile/CodeSystem/grove-identifier-role",
+                "code": "source-record"
+              }
+            ]
+          }
+        }
+      ],
+      "expectedRule": {
+        "code": "mobile-retraction.native-record-identifier",
+        "reason": "An optional retraction native record identifier carries one complete Identifier in the adapter's own absolute native key space and never a Grove identifier-role coding.",
+        "location": "Provenance.target[0].extension.valueIdentifier.type",
+        "severity": "error"
+      }
+    },
+    {
+      "id": "both-exchange-profiles-claimed",
+      "base": "mobile-exchange",
+      "patch": [
+        {
+          "op": "add",
+          "path": "/meta/profile/-",
+          "value": "https://grovealliance.org/fhir/mobile/StructureDefinition/grove-mobile-retraction-bundle"
+        }
+      ],
+      "expectedRule": {
+        "code": "mobile-exchange.bundle-profile",
+        "reason": "An exchange Bundle directly claims exactly the Grove Mobile exchange or retraction Bundle profile for its event kind.",
+        "location": "Bundle.meta.profile",
+        "severity": "error"
+      }
+    },
+    {
+      "id": "empty-entry-list",
+      "base": "mobile-exchange",
+      "patch": [
+        {
+          "op": "replace",
+          "path": "/entry",
+          "value": []
+        }
+      ],
+      "expectedRule": {
+        "code": "mobile-exchange.entry-required",
+        "reason": "An exchange event carries at least one entry; an empty Bundle is not an event.",
+        "location": "Bundle.entry",
+        "severity": "error"
+      }
+    },
+    {
+      "id": "repeated-entry-key",
+      "base": "mobile-exchange",
+      "patch": [
+        {
+          "op": "add",
+          "path": "/entry/-",
+          "value": {
+            "extension": [
+              {
+                "url": "https://grovealliance.org/fhir/mobile/StructureDefinition/grove-exchange-entry-node-key",
+                "valueIdentifier": {
+                  "type": {
+                    "coding": [
+                      {
+                        "code": "device-snapshot",
+                        "system": "https://grovealliance.org/fhir/mobile/CodeSystem/grove-identifier-role",
+                        "display": "Device snapshot"
+                      }
+                    ]
+                  },
+                  "system": "https://study.example.org/fhir/NamingSystem/grove-device-snapshot-v0/test-key/1",
+                  "value": "v0:test-key:1:Q2sME_dGFj94xyprI1HtMokER94GYsHINZi0ilnsnRY"
+                }
+              }
+            ],
+            "fullUrl": "urn:uuid:aef62dba-db7e-5a99-a854-3b5ec312312f",
+            "resource": {
+              "resourceType": "Device",
+              "id": "GroveMobileExchangeApplicationExample",
+              "meta": {
+                "profile": [
+                  "https://grovealliance.org/fhir/mobile/StructureDefinition/grove-application-device"
+                ]
+              },
+              "identifier": [
+                {
+                  "type": {
+                    "coding": [
+                      {
+                        "code": "device-snapshot",
+                        "system": "https://grovealliance.org/fhir/mobile/CodeSystem/grove-identifier-role"
+                      }
+                    ]
+                  },
+                  "system": "https://study.example.org/fhir/NamingSystem/grove-device-snapshot-v0/test-key/1",
+                  "value": "v0:test-key:1:Q2sME_dGFj94xyprI1HtMokER94GYsHINZi0ilnsnRY"
+                }
+              ],
+              "deviceName": [
+                {
+                  "type": "user-friendly-name",
+                  "name": "Mobile Study"
+                }
+              ],
+              "status": "active"
+            }
+          }
+        }
+      ],
+      "expectedRule": {
+        "code": "mobile-exchange.distinct-entry-key",
+        "reason": "No two entries of one event carry the same entry key system and value pair.",
+        "location": "Bundle.entry[5].extension.valueIdentifier",
+        "severity": "error"
+      }
+    },
+    {
+      "id": "lower-priority-entry-key",
+      "base": "mobile-exchange",
+      "patch": [
+        {
+          "op": "replace",
+          "path": "/entry/2/extension/0/valueIdentifier",
+          "value": {
+            "type": {
+              "coding": [
+                {
+                  "code": "source-record",
+                  "system": "https://grovealliance.org/fhir/mobile/CodeSystem/grove-identifier-role"
+                }
+              ]
+            },
+            "system": "https://study.example.org/fhir/NamingSystem/grove-source-record-v0/test-key/1",
+            "value": "v0:test-key:1:ptHr751zWyYfaR2WIvrP1TfnVEK4bInC__ibP_AYfVY"
+          }
+        }
+      ],
+      "expectedRule": {
+        "code": "mobile-exchange.entry-key-selection",
+        "reason": "An entry key is the entry resource's highest-priority typed business identifier, or its entry-node key when the resource carries none.",
+        "location": "Bundle.entry[2].extension.valueIdentifier",
+        "severity": "error"
+      }
+    },
+    {
+      "id": "non-canonical-entry-node-key",
+      "base": "mobile-exchange",
+      "patch": [
+        {
+          "op": "replace",
+          "path": "/entry/0/extension/0/valueIdentifier/value",
+          "value": "patient-node-0"
+        }
+      ],
+      "expectedRule": {
+        "code": "mobile-exchange.entry-key-selection",
+        "reason": "An entry key is the entry resource's highest-priority typed business identifier, or its entry-node key when the resource carries none.",
+        "location": "Bundle.entry[0].extension.valueIdentifier",
+        "severity": "error"
+      }
+    },
+    {
+      "id": "event-identifier-with-two-roles",
+      "base": "mobile-exchange",
+      "patch": [
+        {
+          "op": "add",
+          "path": "/identifier/type/coding/-",
+          "value": {
+            "code": "source-record",
+            "system": "https://grovealliance.org/fhir/mobile/CodeSystem/grove-identifier-role"
+          }
+        }
+      ],
+      "expectedRule": {
+        "code": "mobile-exchange.identifier-role",
+        "reason": "A Grove-typed resource Identifier carries exactly one closed Grove identifier-role coding.",
+        "location": "Bundle.identifier",
+        "severity": "error"
+      }
+    },
+    {
+      "id": "repeated-identifier-role-coding",
+      "base": "mobile-exchange",
+      "patch": [
+        {
+          "op": "add",
+          "path": "/entry/2/resource/identifier/0/type/coding/-",
+          "value": {
+            "code": "source-record",
+            "system": "https://grovealliance.org/fhir/mobile/CodeSystem/grove-identifier-role"
+          }
+        }
+      ],
+      "expectedRule": {
+        "code": "mobile-exchange.identifier-role",
+        "reason": "A Grove-typed resource Identifier carries exactly one closed Grove identifier-role coding.",
+        "location": "Observation.identifier[0]",
+        "severity": "error"
+      }
+    },
+    {
+      "id": "clear-source-record-identity",
+      "base": "mobile-exchange",
+      "patch": [
+        {
+          "op": "replace",
+          "path": "/entry/2/resource/identifier/0/value",
+          "value": "record-heart-001"
+        }
+      ],
+      "expectedRule": {
+        "code": "mobile-exchange.opaque-resource-identity",
+        "reason": "A resource Identifier typed with an opaque Grove identifier role is one complete pair whose system is absolute and whose value is a canonical v0 HMAC identity.",
+        "location": "Observation.identifier[0]",
+        "severity": "error"
+      }
+    },
+    {
+      "id": "repeated-source-record-identifier",
+      "base": "mobile-exchange",
+      "patch": [
+        {
+          "op": "add",
+          "path": "/entry/2/resource/identifier/-",
+          "value": {
+            "type": {
+              "coding": [
+                {
+                  "code": "source-record",
+                  "system": "https://grovealliance.org/fhir/mobile/CodeSystem/grove-identifier-role"
+                }
+              ]
+            },
+            "system": "https://study.example.org/fhir/NamingSystem/grove-source-record-v0/test-key/1",
+            "value": "v0:test-key:1:ptHr751zWyYfaR2WIvrP1TfnVEK4bInC__ibP_AYfVY"
+          }
+        }
+      ],
+      "expectedRule": {
+        "code": "mobile-exchange.distinct-resource-identity-role",
+        "reason": "A resource carries at most one Identifier for each Grove identifier role.",
+        "location": "Observation.identifier[2]",
+        "severity": "error"
+      }
+    },
+    {
+      "id": "active-event-without-output",
+      "base": "mobile-exchange",
+      "patch": [
+        {
+          "op": "replace",
+          "path": "/entry/2/resource/resourceType",
+          "value": "ResearchStudy"
+        }
+      ],
+      "expectedRule": {
+        "code": "mobile-exchange.output-required",
+        "reason": "An active event carries at least one clinical or source-artifact output.",
+        "location": "Bundle.entry",
+        "severity": "error"
+      }
+    },
+    {
+      "id": "transform-provenance-without-target",
+      "base": "mobile-exchange",
+      "patch": [
+        {
+          "op": "remove",
+          "path": "/entry/3/resource/target/0"
+        }
+      ],
+      "expectedRule": {
+        "code": "mobile-exchange.provenance-targets",
+        "reason": "A conversion Provenance targets every active clinical output of its event and nothing else.",
+        "location": "Provenance.target",
+        "severity": "error"
+      }
+    },
+    {
+      "id": "adapter-provenance-without-adapter-output",
+      "base": "mobile-exchange",
+      "patch": [
+        {
+          "op": "replace",
+          "path": "/entry/3/resource/meta/profile/0",
+          "value": "https://grovealliance.org/fhir/sensorkit/StructureDefinition/sensorkit-conversion-provenance"
+        }
+      ],
+      "expectedRule": {
+        "code": "mobile-exchange.adapter-provenance-graph",
+        "reason": "Every adapter output of an event claims the adapter profile its conversion Provenance governs, and a source-neutral event claims no adapter output.",
+        "location": "Provenance.entity",
+        "severity": "error"
+      }
+    },
+    {
+      "id": "source-marker-on-source-neutral-output",
+      "base": "mobile-exchange",
+      "patch": [
+        {
+          "op": "add",
+          "path": "/entry/2/resource/extension/-",
+          "value": {
+            "url": "https://grovealliance.org/fhir/healthkit/StructureDefinition/healthkit-source-type",
+            "valueCode": "HKQuantityTypeIdentifierHeartRate"
+          }
+        }
+      ],
+      "expectedRule": {
+        "code": "mobile-output.adapter-source-marker",
+        "reason": "An adapter's source marker appears exactly once on each catalog-owned output of that adapter and never on a source-neutral or different-adapter output.",
+        "location": "Observation.extension",
+        "severity": "error"
+      }
+    },
+    {
+      "id": "health-connect-provenance-without-data-origin",
+      "base": "mobile-exchange",
+      "patch": [
+        {
+          "op": "replace",
+          "path": "/entry/3/resource/meta/profile/0",
+          "value": "https://grovealliance.org/fhir/health-connect/StructureDefinition/health-connect-conversion-provenance"
+        }
+      ],
+      "expectedRule": {
+        "code": "health-connect-provenance.data-origin-agent",
+        "reason": "A Health Connect data origin is one enterer agent whose typed identifier-only logical Device Reference names the Android package in the package-name namespace.",
+        "location": "Provenance.entity[0].agent",
+        "severity": "error"
+      }
+    },
+    {
+      "id": "tampered-embedded-recording-hash",
+      "base": "mobile-exchange",
+      "patch": [
+        {
+          "op": "replace",
+          "path": "/entry/2/resource",
+          "value": {
+            "resourceType": "DocumentReference",
+            "meta": {
+              "profile": [
+                "https://grovealliance.org/fhir/sensor/StructureDefinition/grove-sensor-recording-document"
+              ]
+            },
+            "identifier": [
+              {
+                "type": {
+                  "coding": [
+                    {
+                      "code": "source-record",
+                      "system": "https://grovealliance.org/fhir/mobile/CodeSystem/grove-identifier-role"
+                    }
+                  ]
+                },
+                "system": "https://study.example.org/fhir/NamingSystem/grove-source-record-v0/test-key/1",
+                "value": "v0:test-key:1:ptHr751zWyYfaR2WIvrP1TfnVEK4bInC__ibP_AYfVY"
+              },
+              {
+                "type": {
+                  "coding": [
+                    {
+                      "code": "source-output",
+                      "system": "https://grovealliance.org/fhir/mobile/CodeSystem/grove-identifier-role"
+                    }
+                  ]
+                },
+                "system": "https://study.example.org/fhir/NamingSystem/grove-source-output-v0/test-key/1",
+                "value": "v0:test-key:1:PPULnf0LKpASjIj8mU5TKafPKig_oqWND3_dHFShGd8"
+              },
+              {
+                "type": {
+                  "coding": [
+                    {
+                      "code": "source-artifact",
+                      "system": "https://grovealliance.org/fhir/mobile/CodeSystem/grove-identifier-role"
+                    }
+                  ]
+                },
+                "system": "https://study.example.org/fhir/NamingSystem/grove-source-artifact-v0/test-key/1",
+                "value": "v0:test-key:1:ZWmx94XtgArrE8XO6W6LQ7QYbkiWCIn-K1JVw8hxwrI"
+              }
+            ],
+            "status": "current",
+            "subject": {
+              "reference": "urn:uuid:d5137e30-79b1-5110-a09c-bd2528e25085"
+            },
+            "date": "2026-08-20T17:30:02Z",
+            "context": {
+              "related": [
+                {
+                  "reference": "urn:uuid:e516dd51-04d0-502d-abcf-b5c870915c17"
+                }
+              ]
+            },
+            "content": [
+              {
+                "attachment": {
+                  "contentType": "text/csv",
+                  "data": "dGltZXN0YW1wLHZhbHVlLGNvbmZpZGVuY2UsZGV2aWNlCjE3NTU3MDc0MDAuMjUxLDcyLDIsV2F0Y2g3Cg==",
+                  "size": 61,
+                  "hash": "k9bJPZp20n7DRi57V95d8etFvHs="
+                },
+                "format": {
+                  "system": "https://grovealliance.org/fhir/sensor/CodeSystem/grove-recording-format",
+                  "code": "heart-rate-samples"
+                }
+              }
+            ]
+          }
+        }
+      ],
+      "expectedRule": {
+        "code": "sensor-recording-document.embedded-integrity",
+        "reason": "An embedded recording attachment's size and SHA-1 hash match its decoded bytes.",
+        "location": "DocumentReference.content[0].attachment.hash",
+        "severity": "error"
+      }
+    },
+    {
+      "id": "unregistered-recording-format",
+      "base": "mobile-exchange",
+      "patch": [
+        {
+          "op": "replace",
+          "path": "/entry/2/resource",
+          "value": {
+            "resourceType": "DocumentReference",
+            "meta": {
+              "profile": [
+                "https://grovealliance.org/fhir/sensor/StructureDefinition/grove-sensor-recording-document"
+              ]
+            },
+            "identifier": [
+              {
+                "type": {
+                  "coding": [
+                    {
+                      "code": "source-record",
+                      "system": "https://grovealliance.org/fhir/mobile/CodeSystem/grove-identifier-role"
+                    }
+                  ]
+                },
+                "system": "https://study.example.org/fhir/NamingSystem/grove-source-record-v0/test-key/1",
+                "value": "v0:test-key:1:ptHr751zWyYfaR2WIvrP1TfnVEK4bInC__ibP_AYfVY"
+              },
+              {
+                "type": {
+                  "coding": [
+                    {
+                      "code": "source-output",
+                      "system": "https://grovealliance.org/fhir/mobile/CodeSystem/grove-identifier-role"
+                    }
+                  ]
+                },
+                "system": "https://study.example.org/fhir/NamingSystem/grove-source-output-v0/test-key/1",
+                "value": "v0:test-key:1:PPULnf0LKpASjIj8mU5TKafPKig_oqWND3_dHFShGd8"
+              },
+              {
+                "type": {
+                  "coding": [
+                    {
+                      "code": "source-artifact",
+                      "system": "https://grovealliance.org/fhir/mobile/CodeSystem/grove-identifier-role"
+                    }
+                  ]
+                },
+                "system": "https://study.example.org/fhir/NamingSystem/grove-source-artifact-v0/test-key/1",
+                "value": "v0:test-key:1:ZWmx94XtgArrE8XO6W6LQ7QYbkiWCIn-K1JVw8hxwrI"
+              }
+            ],
+            "status": "current",
+            "subject": {
+              "reference": "urn:uuid:d5137e30-79b1-5110-a09c-bd2528e25085"
+            },
+            "date": "2026-08-20T17:30:02Z",
+            "context": {
+              "related": [
+                {
+                  "reference": "urn:uuid:e516dd51-04d0-502d-abcf-b5c870915c17"
+                }
+              ]
+            },
+            "content": [
+              {
+                "attachment": {
+                  "contentType": "text/csv",
+                  "data": "dGltZXN0YW1wLHZhbHVlLGNvbmZpZGVuY2UsZGV2aWNlCjE3NTU3MDc0MDAuMjUxLDcyLDIsV2F0Y2g3Cg==",
+                  "size": 61,
+                  "hash": "z3GFc1fkRzogDOGJOm9gm9H0RrE="
+                },
+                "format": {
+                  "system": "https://grovealliance.org/fhir/sensor/CodeSystem/grove-recording-format",
+                  "code": "heart-rate-waveform"
+                }
+              }
+            ]
+          }
+        }
+      ],
+      "expectedRule": {
+        "code": "sensor-recording-document.format",
+        "reason": "A recording attachment's format coding and content type match one active entry of the Grove recording-format registry, with no Coding.version.",
+        "location": "DocumentReference.content[0].format.code",
+        "severity": "error"
+      }
+    },
+    {
+      "id": "retraction-with-transform-activity",
+      "base": "mobile-retraction",
+      "patch": [
+        {
+          "op": "replace",
+          "path": "/entry/0/resource/activity/coding/0",
+          "value": {
+            "code": "transform",
+            "system": "http://terminology.hl7.org/CodeSystem/iso-21089-lifecycle"
+          }
+        }
+      ],
+      "expectedRule": {
+        "code": "mobile-retraction.provenance",
+        "reason": "A retraction event carries exactly one retraction Provenance and no transform Provenance.",
+        "location": "Bundle.entry",
+        "severity": "error"
+      }
+    },
+    {
+      "id": "retraction-without-target",
+      "base": "mobile-retraction",
+      "patch": [
+        {
+          "op": "replace",
+          "path": "/entry/0/resource/target",
+          "value": []
+        }
+      ],
+      "expectedRule": {
+        "code": "mobile-retraction.target-required",
+        "reason": "A retraction Provenance names at least one logical target.",
+        "location": "Provenance.target",
+        "severity": "error"
+      }
+    },
+    {
+      "id": "repeated-retraction-target",
+      "base": "mobile-retraction",
+      "patch": [
+        {
+          "op": "add",
+          "path": "/entry/0/resource/target/-",
+          "value": {
+            "extension": [
+              {
+                "url": "https://grovealliance.org/fhir/mobile/StructureDefinition/grove-retraction-target-role",
+                "valueCode": "primary-output"
+              },
+              {
+                "url": "https://grovealliance.org/fhir/mobile/StructureDefinition/grove-retraction-target-native-identifier",
+                "valueIdentifier": {
+                  "system": "https://study.example.org/fhir/NamingSystem/native-record/health-connect/1f5c58aa-6ec6-4e79-a682-829a9debd3f5",
+                  "value": "record-heart-001"
+                }
+              }
+            ],
+            "type": "Observation",
+            "identifier": {
+              "type": {
+                "coding": [
+                  {
+                    "code": "source-output",
+                    "system": "https://grovealliance.org/fhir/mobile/CodeSystem/grove-identifier-role",
+                    "display": "Source output"
+                  }
+                ]
+              },
+              "system": "https://study.example.org/fhir/NamingSystem/grove-source-output-v0/test-key/1",
+              "value": "v0:test-key:1:PPULnf0LKpASjIj8mU5TKafPKig_oqWND3_dHFShGd8"
+            }
+          }
+        }
+      ],
+      "expectedRule": {
+        "code": "mobile-retraction.distinct-target",
+        "reason": "No two retraction targets carry the same Identifier system and value pair.",
+        "location": "Provenance.target[1].identifier",
+        "severity": "error"
+      }
+    }
+  ]
+}
