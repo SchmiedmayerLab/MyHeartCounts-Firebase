@@ -3,7 +3,7 @@
 # SPDX-FileCopyrightText: 2026 Stanford University and the project authors (see CONTRIBUTORS.md)
 # SPDX-License-Identifier: MIT
 
-"""Generate schemas/healthkit-types.json from the grove-fhir catalogs.
+"""Generate mhc_export/schemas/healthkit-types.json from the grove-fhir catalogs.
 
 Usage: uv run python scripts/gen_registry.py /path/to/grove-fhir [--ref origin/main]
 """
@@ -41,7 +41,9 @@ def main() -> None:
     parser.add_argument("grove_repo", type=Path)
     parser.add_argument("--ref", default="origin/main")
     parser.add_argument(
-        "--out", type=Path, default=Path(__file__).resolve().parents[1] / "schemas" / "healthkit-types.json"
+        "--out",
+        type=Path,
+        default=Path(__file__).resolve().parents[1] / "mhc_export" / "schemas" / "healthkit-types.json",
     )
     args = parser.parse_args()
 
@@ -59,12 +61,15 @@ def main() -> None:
         if len(mids) == 1 and mids[0] in measurements:
             m = measurements[mids[0]]
             quantity = m.get("quantity") or {}
+            domain = quantity.get("valueDomain") or {}
             entry.update(
                 measurement_id=mids[0],
                 profile=m["profile"],
                 value_kind=m["valueKind"],
                 unit=quantity.get("code"),
-                integer_only=bool((quantity.get("valueDomain") or {}).get("integerOnly")),
+                integer_only=bool(domain.get("integerOnly")),
+                minimum=domain.get("minimum"),
+                maximum=domain.get("maximum"),
                 effective=m["effective"],
                 allowed_values=m.get("allowedValues"),
                 code={"system": m["code"]["system"], "code": m["code"]["code"]},

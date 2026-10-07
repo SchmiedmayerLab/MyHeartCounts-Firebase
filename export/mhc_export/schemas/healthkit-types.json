@@ -15,6 +15,8 @@
    "value_kind": "codeableConcept",
    "unit": null,
    "integer_only": false,
+   "minimum": null,
+   "maximum": null,
    "effective": "Period",
    "allowed_values": [
     "not-present",
@@ -36,6 +38,8 @@
    "value_kind": "codeableConcept",
    "unit": null,
    "integer_only": false,
+   "minimum": null,
+   "maximum": null,
    "effective": "Period",
    "allowed_values": [
     "not-present",
@@ -57,6 +61,8 @@
    "value_kind": "codeableConcept",
    "unit": null,
    "integer_only": false,
+   "minimum": null,
+   "maximum": null,
    "effective": "Period",
    "allowed_values": [
     "no-change",
@@ -77,6 +83,8 @@
    "value_kind": "codeableConcept",
    "unit": null,
    "integer_only": false,
+   "minimum": null,
+   "maximum": null,
    "effective": "Period",
    "allowed_values": [
     "stood",
@@ -95,6 +103,8 @@
    "value_kind": "codeableConcept",
    "unit": null,
    "integer_only": false,
+   "minimum": null,
+   "maximum": null,
    "effective": "Period",
    "allowed_values": [
     "low",
@@ -113,6 +123,8 @@
    "value_kind": "codeableConcept",
    "unit": null,
    "integer_only": false,
+   "minimum": null,
+   "maximum": null,
    "effective": "Period",
    "allowed_values": [
     "momentary-limit"
@@ -130,6 +142,8 @@
    "value_kind": "codeableConcept",
    "unit": null,
    "integer_only": false,
+   "minimum": null,
+   "maximum": null,
    "effective": "dateTime",
    "allowed_values": [
     "not-present",
@@ -151,6 +165,8 @@
    "value_kind": "codeableConcept",
    "unit": null,
    "integer_only": false,
+   "minimum": null,
+   "maximum": null,
    "effective": "dateTime",
    "allowed_values": [
     "unspecified",
@@ -172,6 +188,8 @@
    "value_kind": "codeableConcept",
    "unit": null,
    "integer_only": false,
+   "minimum": null,
+   "maximum": null,
    "effective": "dateTime",
    "allowed_values": [
     "unspecified",
@@ -193,6 +211,8 @@
    "value_kind": "codeableConcept",
    "unit": null,
    "integer_only": false,
+   "minimum": null,
+   "maximum": null,
    "effective": "Period",
    "allowed_values": [
     "not-present",
@@ -214,6 +234,8 @@
    "value_kind": "codeableConcept",
    "unit": null,
    "integer_only": false,
+   "minimum": null,
+   "maximum": null,
    "effective": "Period",
    "allowed_values": [
     "not-present",
@@ -235,6 +257,8 @@
    "value_kind": "codeableConcept",
    "unit": null,
    "integer_only": false,
+   "minimum": null,
+   "maximum": null,
    "effective": "dateTime",
    "allowed_values": [
     "dry",
@@ -258,6 +282,8 @@
    "value_kind": "codeableConcept",
    "unit": null,
    "integer_only": false,
+   "minimum": null,
+   "maximum": null,
    "effective": "Period",
    "allowed_values": [
     "not-present",
@@ -279,6 +305,8 @@
    "value_kind": "codeableConcept",
    "unit": null,
    "integer_only": false,
+   "minimum": null,
+   "maximum": null,
    "effective": "Period",
    "allowed_values": [
     "not-present",
@@ -300,6 +328,8 @@
    "value_kind": "codeableConcept",
    "unit": null,
    "integer_only": false,
+   "minimum": null,
+   "maximum": null,
    "effective": "Period",
    "allowed_values": [
     "not-present",
@@ -321,6 +351,8 @@
    "value_kind": "codeableConcept",
    "unit": null,
    "integer_only": false,
+   "minimum": null,
+   "maximum": null,
    "effective": "Period",
    "allowed_values": [
     "unspecified",
@@ -344,6 +376,8 @@
    "value_kind": "codeableConcept",
    "unit": null,
    "integer_only": false,
+   "minimum": null,
+   "maximum": null,
    "effective": "Period",
    "allowed_values": [
     "not-present",
@@ -365,6 +399,8 @@
    "value_kind": "codeableConcept",
    "unit": null,
    "integer_only": false,
+   "minimum": null,
+   "maximum": null,
    "effective": "Period",
    "allowed_values": [
     "not-present",
@@ -386,6 +422,8 @@
    "value_kind": "codeableConcept",
    "unit": null,
    "integer_only": false,
+   "minimum": null,
+   "maximum": null,
    "effective": "Period",
    "allowed_values": [
     "not-present",
@@ -407,6 +445,8 @@
    "value_kind": "codeableConcept",
    "unit": null,
    "integer_only": false,
+   "minimum": null,
+   "maximum": null,
    "effective": "Period",
    "allowed_values": [
     "not-present",
@@ -428,6 +468,8 @@
    "value_kind": "codeableConcept",
    "unit": null,
    "integer_only": false,
+   "minimum": null,
+   "maximum": null,
    "effective": "Period",
    "allowed_values": [
     "not-present",
@@ -449,6 +491,8 @@
    "value_kind": "codeableConcept",
    "unit": null,
    "integer_only": false,
+   "minimum": null,
+   "maximum": null,
    "effective": "Period",
    "allowed_values": [
     "not-present",
@@ -470,6 +514,8 @@
    "value_kind": "codeableConcept",
    "unit": null,
    "integer_only": false,
+   "minimum": null,
+   "maximum": null,
    "effective": "Period",
    "allowed_values": [
     "not-present",
@@ -491,6 +537,8 @@
    "value_kind": "codeableConcept",
    "unit": null,
    "integer_only": false,
+   "minimum": null,
+   "maximum": null,
    "effective": "Period",
    "allowed_values": [
     "not-present",
@@ -512,6 +560,8 @@
    "value_kind": "codeableConcept",
    "unit": null,
    "integer_only": false,
+   "minimum": null,
+   "maximum": null,
    "effective": "Period",
    "allowed_values": [
     "not-present",
@@ -533,6 +583,8 @@
    "value_kind": "quantity",
    "unit": "s",
    "integer_only": false,
+   "minimum": null,
+   "maximum": null,
    "effective": "Period",
    "allowed_values": null,
    "code": {
@@ -548,6 +600,8 @@
    "value_kind": "codeableConcept",
    "unit": null,
    "integer_only": false,
+   "minimum": null,
+   "maximum": null,
    "effective": "Period",
    "allowed_values": [
     "not-present",
@@ -569,6 +623,8 @@
    "value_kind": "codeableConcept",
    "unit": null,
    "integer_only": false,
+   "minimum": null,
+   "maximum": null,
    "effective": "Period",
    "allowed_values": [
     "seven-day-limit"
@@ -586,6 +642,8 @@
    "value_kind": "codeableConcept",
    "unit": null,
    "integer_only": false,
+   "minimum": null,
+   "maximum": null,
    "effective": "Period",
    "allowed_values": [
     "not-present",
@@ -607,6 +665,8 @@
    "value_kind": "codeableConcept",
    "unit": null,
    "integer_only": false,
+   "minimum": null,
+   "maximum": null,
    "effective": "Period",
    "allowed_values": [
     "occurred"
@@ -624,6 +684,8 @@
    "value_kind": "codeableConcept",
    "unit": null,
    "integer_only": false,
+   "minimum": null,
+   "maximum": null,
    "effective": "Period",
    "allowed_values": [
     "not-present",
@@ -645,6 +707,8 @@
    "value_kind": "codeableConcept",
    "unit": null,
    "integer_only": false,
+   "minimum": null,
+   "maximum": null,
    "effective": "Period",
    "allowed_values": [
     "occurred"
@@ -662,6 +726,8 @@
    "value_kind": "codeableConcept",
    "unit": null,
    "integer_only": false,
+   "minimum": null,
+   "maximum": null,
    "effective": "Period",
    "allowed_values": [
     "present",
@@ -680,6 +746,8 @@
    "value_kind": "codeableConcept",
    "unit": null,
    "integer_only": false,
+   "minimum": null,
+   "maximum": null,
    "effective": "dateTime",
    "allowed_values": [
     "present"
@@ -697,6 +765,8 @@
    "value_kind": "codeableConcept",
    "unit": null,
    "integer_only": false,
+   "minimum": null,
+   "maximum": null,
    "effective": "Period",
    "allowed_values": [
     "occurred"
@@ -714,6 +784,8 @@
    "value_kind": "codeableConcept",
    "unit": null,
    "integer_only": false,
+   "minimum": null,
+   "maximum": null,
    "effective": "Period",
    "allowed_values": [
     "present",
@@ -732,6 +804,8 @@
    "value_kind": "codeableConcept",
    "unit": null,
    "integer_only": false,
+   "minimum": null,
+   "maximum": null,
    "effective": "Period",
    "allowed_values": [
     "lactating"
@@ -749,6 +823,8 @@
    "value_kind": "codeableConcept",
    "unit": null,
    "integer_only": false,
+   "minimum": null,
+   "maximum": null,
    "effective": "Period",
    "allowed_values": [
     "not-present",
@@ -770,6 +846,8 @@
    "value_kind": "codeableConcept",
    "unit": null,
    "integer_only": false,
+   "minimum": null,
+   "maximum": null,
    "effective": "Period",
    "allowed_values": [
     "not-present",
@@ -791,6 +869,8 @@
    "value_kind": "codeableConcept",
    "unit": null,
    "integer_only": false,
+   "minimum": null,
+   "maximum": null,
    "effective": "Period",
    "allowed_values": [
     "low-fitness"
@@ -808,6 +888,8 @@
    "value_kind": "codeableConcept",
    "unit": null,
    "integer_only": false,
+   "minimum": null,
+   "maximum": null,
    "effective": "Period",
    "allowed_values": [
     "occurred"
@@ -825,6 +907,8 @@
    "value_kind": "codeableConcept",
    "unit": null,
    "integer_only": false,
+   "minimum": null,
+   "maximum": null,
    "effective": "Period",
    "allowed_values": [
     "not-present",
@@ -846,6 +930,8 @@
    "value_kind": "codeableConcept",
    "unit": null,
    "integer_only": false,
+   "minimum": null,
+   "maximum": null,
    "effective": "Period",
    "allowed_values": [
     "not-present",
@@ -867,6 +953,8 @@
    "value_kind": "codeableConcept",
    "unit": null,
    "integer_only": false,
+   "minimum": null,
+   "maximum": null,
    "effective": "dateTime",
    "allowed_values": [
     "unspecified",
@@ -888,6 +976,8 @@
    "value_kind": "quantity",
    "unit": "min",
    "integer_only": false,
+   "minimum": null,
+   "maximum": null,
    "effective": "Period",
    "allowed_values": null,
    "code": {
@@ -903,6 +993,8 @@
    "value_kind": "codeableConcept",
    "unit": null,
    "integer_only": false,
+   "minimum": null,
+   "maximum": null,
    "effective": "Period",
    "allowed_values": [
     "not-present",
@@ -921,6 +1013,8 @@
    "value_kind": "codeableConcept",
    "unit": null,
    "integer_only": false,
+   "minimum": null,
+   "maximum": null,
    "effective": "Period",
    "allowed_values": [
     "not-present",
@@ -942,6 +1036,8 @@
    "value_kind": "codeableConcept",
    "unit": null,
    "integer_only": false,
+   "minimum": null,
+   "maximum": null,
    "effective": "Period",
    "allowed_values": [
     "not-present",
@@ -963,6 +1059,8 @@
    "value_kind": "codeableConcept",
    "unit": null,
    "integer_only": false,
+   "minimum": null,
+   "maximum": null,
    "effective": "dateTime",
    "allowed_values": [
     "negative",
@@ -983,6 +1081,8 @@
    "value_kind": "codeableConcept",
    "unit": null,
    "integer_only": false,
+   "minimum": null,
+   "maximum": null,
    "effective": "Period",
    "allowed_values": [
     "not-present",
@@ -1004,6 +1104,8 @@
    "value_kind": "codeableConcept",
    "unit": null,
    "integer_only": false,
+   "minimum": null,
+   "maximum": null,
    "effective": "Period",
    "allowed_values": [
     "present",
@@ -1022,6 +1124,8 @@
    "value_kind": "codeableConcept",
    "unit": null,
    "integer_only": false,
+   "minimum": null,
+   "maximum": null,
    "effective": "Period",
    "allowed_values": [
     "pregnant"
@@ -1039,6 +1143,8 @@
    "value_kind": "codeableConcept",
    "unit": null,
    "integer_only": false,
+   "minimum": null,
+   "maximum": null,
    "effective": "dateTime",
    "allowed_values": [
     "negative",
@@ -1058,6 +1164,8 @@
    "value_kind": "codeableConcept",
    "unit": null,
    "integer_only": false,
+   "minimum": null,
+   "maximum": null,
    "effective": "dateTime",
    "allowed_values": [
     "negative",
@@ -1077,6 +1185,8 @@
    "value_kind": "codeableConcept",
    "unit": null,
    "integer_only": false,
+   "minimum": null,
+   "maximum": null,
    "effective": "Period",
    "allowed_values": [
     "present",
@@ -1095,6 +1205,8 @@
    "value_kind": "codeableConcept",
    "unit": null,
    "integer_only": false,
+   "minimum": null,
+   "maximum": null,
    "effective": "Period",
    "allowed_values": [
     "not-present",
@@ -1116,6 +1228,8 @@
    "value_kind": "codeableConcept",
    "unit": null,
    "integer_only": false,
+   "minimum": null,
+   "maximum": null,
    "effective": "Period",
    "allowed_values": [
     "not-present",
@@ -1137,6 +1251,8 @@
    "value_kind": "codeableConcept",
    "unit": null,
    "integer_only": false,
+   "minimum": null,
+   "maximum": null,
    "effective": "dateTime",
    "allowed_values": [
     "protected",
@@ -1156,6 +1272,8 @@
    "value_kind": "codeableConcept",
    "unit": null,
    "integer_only": false,
+   "minimum": null,
+   "maximum": null,
    "effective": "Period",
    "allowed_values": [
     "not-present",
@@ -1177,6 +1295,8 @@
    "value_kind": "codeableConcept",
    "unit": null,
    "integer_only": false,
+   "minimum": null,
+   "maximum": null,
    "effective": "Period",
    "allowed_values": [
     "not-present",
@@ -1198,6 +1318,8 @@
    "value_kind": "codeableConcept",
    "unit": null,
    "integer_only": false,
+   "minimum": null,
+   "maximum": null,
    "effective": "Period",
    "allowed_values": [
     "not-present",
@@ -1219,6 +1341,8 @@
    "value_kind": "codeableConcept",
    "unit": null,
    "integer_only": false,
+   "minimum": null,
+   "maximum": null,
    "effective": "Period",
    "allowed_values": [
     "awake",
@@ -1243,6 +1367,8 @@
    "value_kind": "codeableConcept",
    "unit": null,
    "integer_only": false,
+   "minimum": null,
+   "maximum": null,
    "effective": "Period",
    "allowed_values": [
     "occurred"
@@ -1260,6 +1386,8 @@
    "value_kind": "codeableConcept",
    "unit": null,
    "integer_only": false,
+   "minimum": null,
+   "maximum": null,
    "effective": "Period",
    "allowed_values": [
     "not-present",
@@ -1278,6 +1406,8 @@
    "value_kind": "codeableConcept",
    "unit": null,
    "integer_only": false,
+   "minimum": null,
+   "maximum": null,
    "effective": "Period",
    "allowed_values": [
     "not-present",
@@ -1299,6 +1429,8 @@
    "value_kind": "quantity",
    "unit": "s",
    "integer_only": false,
+   "minimum": null,
+   "maximum": null,
    "effective": "Period",
    "allowed_values": null,
    "code": {
@@ -1314,6 +1446,8 @@
    "value_kind": "codeableConcept",
    "unit": null,
    "integer_only": false,
+   "minimum": null,
+   "maximum": null,
    "effective": "dateTime",
    "allowed_values": [
     "not-present",
@@ -1335,6 +1469,8 @@
    "value_kind": "codeableConcept",
    "unit": null,
    "integer_only": false,
+   "minimum": null,
+   "maximum": null,
    "effective": "Period",
    "allowed_values": [
     "not-present",
@@ -1356,6 +1492,8 @@
    "value_kind": "codeableConcept",
    "unit": null,
    "integer_only": false,
+   "minimum": null,
+   "maximum": null,
    "effective": "Period",
    "allowed_values": [
     "not-present",
@@ -1381,6 +1519,8 @@
    "value_kind": "codeableConcept",
    "unit": null,
    "integer_only": false,
+   "minimum": null,
+   "maximum": null,
    "effective": "dateTime",
    "allowed_values": [
     "female",
@@ -1400,6 +1540,8 @@
    "value_kind": "codeableConcept",
    "unit": null,
    "integer_only": false,
+   "minimum": null,
+   "maximum": null,
    "effective": "dateTime",
    "allowed_values": [
     "a-positive",
@@ -1424,6 +1566,8 @@
    "value_kind": "dateTime",
    "unit": null,
    "integer_only": false,
+   "minimum": null,
+   "maximum": null,
    "effective": "dateTime",
    "allowed_values": null,
    "code": {
@@ -1439,6 +1583,8 @@
    "value_kind": "codeableConcept",
    "unit": null,
    "integer_only": false,
+   "minimum": null,
+   "maximum": null,
    "effective": "dateTime",
    "allowed_values": [
     "type-i",
@@ -1461,6 +1607,8 @@
    "value_kind": "codeableConcept",
    "unit": null,
    "integer_only": false,
+   "minimum": null,
+   "maximum": null,
    "effective": "dateTime",
    "allowed_values": [
     "uses-wheelchair",
@@ -1515,6 +1663,8 @@
    "value_kind": "components",
    "unit": null,
    "integer_only": false,
+   "minimum": null,
+   "maximum": null,
    "effective": "dateTime",
    "allowed_values": null,
    "code": {
@@ -1530,6 +1680,8 @@
    "value_kind": "grouping",
    "unit": null,
    "integer_only": false,
+   "minimum": null,
+   "maximum": null,
    "effective": "Period",
    "allowed_values": null,
    "code": {
@@ -1545,6 +1697,8 @@
    "value_kind": "components",
    "unit": null,
    "integer_only": false,
+   "minimum": null,
+   "maximum": null,
    "effective": "dateTime",
    "allowed_values": null,
    "code": {
@@ -1573,6 +1727,14 @@
    "value_kind": "quantity",
    "unit": "1",
    "integer_only": false,
+   "minimum": {
+    "value": -1,
+    "inclusive": true
+   },
+   "maximum": {
+    "value": 1,
+    "inclusive": true
+   },
    "effective": "Period",
    "allowed_values": null,
    "code": {
@@ -1600,6 +1762,8 @@
    "value_kind": "quantity",
    "unit": "kcal",
    "integer_only": false,
+   "minimum": null,
+   "maximum": null,
    "effective": "Period",
    "allowed_values": null,
    "code": {
@@ -1615,6 +1779,8 @@
    "value_kind": "quantity",
    "unit": "min",
    "integer_only": false,
+   "minimum": null,
+   "maximum": null,
    "effective": "Period",
    "allowed_values": null,
    "code": {
@@ -1630,6 +1796,8 @@
    "value_kind": "quantity",
    "unit": "min",
    "integer_only": false,
+   "minimum": null,
+   "maximum": null,
    "effective": "Period",
    "allowed_values": null,
    "code": {
@@ -1645,6 +1813,8 @@
    "value_kind": "quantity",
    "unit": "/h",
    "integer_only": false,
+   "minimum": null,
+   "maximum": null,
    "effective": "Period",
    "allowed_values": null,
    "code": {
@@ -1660,6 +1830,8 @@
    "value_kind": "quantity",
    "unit": "Cel",
    "integer_only": false,
+   "minimum": null,
+   "maximum": null,
    "effective": "dateTime",
    "allowed_values": null,
    "code": {
@@ -1675,6 +1847,8 @@
    "value_kind": "quantity",
    "unit": "min",
    "integer_only": false,
+   "minimum": null,
+   "maximum": null,
    "effective": "Period",
    "allowed_values": null,
    "code": {
@@ -1690,6 +1864,14 @@
    "value_kind": "quantity",
    "unit": "%",
    "integer_only": false,
+   "minimum": {
+    "value": 0,
+    "inclusive": true
+   },
+   "maximum": {
+    "value": 100,
+    "inclusive": true
+   },
    "effective": "Period",
    "allowed_values": null,
    "code": {
@@ -1705,6 +1887,14 @@
    "value_kind": "quantity",
    "unit": "%",
    "integer_only": false,
+   "minimum": {
+    "value": 0,
+    "inclusive": true
+   },
+   "maximum": {
+    "value": 100,
+    "inclusive": true
+   },
    "effective": "Period",
    "allowed_values": null,
    "code": {
@@ -1720,6 +1910,8 @@
    "value_kind": "quantity",
    "unit": "Cel",
    "integer_only": false,
+   "minimum": null,
+   "maximum": null,
    "effective": "dateTime",
    "allowed_values": null,
    "code": {
@@ -1735,6 +1927,8 @@
    "value_kind": "quantity",
    "unit": "kcal",
    "integer_only": false,
+   "minimum": null,
+   "maximum": null,
    "effective": "Period",
    "allowed_values": null,
    "code": {
@@ -1750,6 +1944,14 @@
    "value_kind": "quantity",
    "unit": "%",
    "integer_only": false,
+   "minimum": {
+    "value": 0,
+    "inclusive": true
+   },
+   "maximum": {
+    "value": 100,
+    "inclusive": true
+   },
    "effective": "dateTime",
    "allowed_values": null,
    "code": {
@@ -1765,6 +1967,8 @@
    "value_kind": "quantity",
    "unit": "mg/dL",
    "integer_only": false,
+   "minimum": null,
+   "maximum": null,
    "effective": "dateTime",
    "allowed_values": null,
    "code": {
@@ -1788,6 +1992,14 @@
    "value_kind": "quantity",
    "unit": "%",
    "integer_only": false,
+   "minimum": {
+    "value": 0,
+    "inclusive": true
+   },
+   "maximum": {
+    "value": 100,
+    "inclusive": true
+   },
    "effective": "dateTime",
    "allowed_values": null,
    "code": {
@@ -1803,6 +2015,8 @@
    "value_kind": "quantity",
    "unit": "kg",
    "integer_only": false,
+   "minimum": null,
+   "maximum": null,
    "effective": "dateTime",
    "allowed_values": null,
    "code": {
@@ -1833,6 +2047,8 @@
    "value_kind": "quantity",
    "unit": "Cel",
    "integer_only": false,
+   "minimum": null,
+   "maximum": null,
    "effective": "dateTime",
    "allowed_values": null,
    "code": {
@@ -1848,6 +2064,8 @@
    "value_kind": "quantity",
    "unit": "m/s",
    "integer_only": false,
+   "minimum": null,
+   "maximum": null,
    "effective": "dateTime",
    "allowed_values": null,
    "code": {
@@ -1863,6 +2081,8 @@
    "value_kind": "quantity",
    "unit": "/min",
    "integer_only": false,
+   "minimum": null,
+   "maximum": null,
    "effective": "dateTime",
    "allowed_values": null,
    "code": {
@@ -1878,6 +2098,8 @@
    "value_kind": "quantity",
    "unit": "W",
    "integer_only": false,
+   "minimum": null,
+   "maximum": null,
    "effective": "dateTime",
    "allowed_values": null,
    "code": {
@@ -1893,6 +2115,8 @@
    "value_kind": "quantity",
    "unit": "W",
    "integer_only": false,
+   "minimum": null,
+   "maximum": null,
    "effective": "dateTime",
    "allowed_values": null,
    "code": {
@@ -1908,6 +2132,8 @@
    "value_kind": "quantity",
    "unit": "m/s",
    "integer_only": false,
+   "minimum": null,
+   "maximum": null,
    "effective": "dateTime",
    "allowed_values": null,
    "code": {
@@ -1923,6 +2149,8 @@
    "value_kind": "quantity",
    "unit": "ug",
    "integer_only": false,
+   "minimum": null,
+   "maximum": null,
    "effective": "Period",
    "allowed_values": null,
    "code": {
@@ -1938,6 +2166,8 @@
    "value_kind": "quantity",
    "unit": "mg",
    "integer_only": false,
+   "minimum": null,
+   "maximum": null,
    "effective": "Period",
    "allowed_values": null,
    "code": {
@@ -1953,6 +2183,8 @@
    "value_kind": "quantity",
    "unit": "mg",
    "integer_only": false,
+   "minimum": null,
+   "maximum": null,
    "effective": "Period",
    "allowed_values": null,
    "code": {
@@ -1968,6 +2200,8 @@
    "value_kind": "quantity",
    "unit": "g",
    "integer_only": false,
+   "minimum": null,
+   "maximum": null,
    "effective": "Period",
    "allowed_values": null,
    "code": {
@@ -1983,6 +2217,8 @@
    "value_kind": "quantity",
    "unit": "mg",
    "integer_only": false,
+   "minimum": null,
+   "maximum": null,
    "effective": "Period",
    "allowed_values": null,
    "code": {
@@ -1998,6 +2234,8 @@
    "value_kind": "quantity",
    "unit": "mg",
    "integer_only": false,
+   "minimum": null,
+   "maximum": null,
    "effective": "Period",
    "allowed_values": null,
    "code": {
@@ -2013,6 +2251,8 @@
    "value_kind": "quantity",
    "unit": "ug",
    "integer_only": false,
+   "minimum": null,
+   "maximum": null,
    "effective": "Period",
    "allowed_values": null,
    "code": {
@@ -2028,6 +2268,8 @@
    "value_kind": "quantity",
    "unit": "ug",
    "integer_only": false,
+   "minimum": null,
+   "maximum": null,
    "effective": "Period",
    "allowed_values": null,
    "code": {
@@ -2043,6 +2285,8 @@
    "value_kind": "quantity",
    "unit": "kcal",
    "integer_only": false,
+   "minimum": null,
+   "maximum": null,
    "effective": "Period",
    "allowed_values": null,
    "code": {
@@ -2058,6 +2302,8 @@
    "value_kind": "quantity",
    "unit": "g",
    "integer_only": false,
+   "minimum": null,
+   "maximum": null,
    "effective": "Period",
    "allowed_values": null,
    "code": {
@@ -2073,6 +2319,8 @@
    "value_kind": "quantity",
    "unit": "g",
    "integer_only": false,
+   "minimum": null,
+   "maximum": null,
    "effective": "Period",
    "allowed_values": null,
    "code": {
@@ -2088,6 +2336,8 @@
    "value_kind": "quantity",
    "unit": "g",
    "integer_only": false,
+   "minimum": null,
+   "maximum": null,
    "effective": "Period",
    "allowed_values": null,
    "code": {
@@ -2103,6 +2353,8 @@
    "value_kind": "quantity",
    "unit": "g",
    "integer_only": false,
+   "minimum": null,
+   "maximum": null,
    "effective": "Period",
    "allowed_values": null,
    "code": {
@@ -2118,6 +2370,8 @@
    "value_kind": "quantity",
    "unit": "g",
    "integer_only": false,
+   "minimum": null,
+   "maximum": null,
    "effective": "Period",
    "allowed_values": null,
    "code": {
@@ -2133,6 +2387,8 @@
    "value_kind": "quantity",
    "unit": "ug",
    "integer_only": false,
+   "minimum": null,
+   "maximum": null,
    "effective": "Period",
    "allowed_values": null,
    "code": {
@@ -2148,6 +2404,8 @@
    "value_kind": "quantity",
    "unit": "ug",
    "integer_only": false,
+   "minimum": null,
+   "maximum": null,
    "effective": "Period",
    "allowed_values": null,
    "code": {
@@ -2163,6 +2421,8 @@
    "value_kind": "quantity",
    "unit": "mg",
    "integer_only": false,
+   "minimum": null,
+   "maximum": null,
    "effective": "Period",
    "allowed_values": null,
    "code": {
@@ -2178,6 +2438,8 @@
    "value_kind": "quantity",
    "unit": "mg",
    "integer_only": false,
+   "minimum": null,
+   "maximum": null,
    "effective": "Period",
    "allowed_values": null,
    "code": {
@@ -2193,6 +2455,8 @@
    "value_kind": "quantity",
    "unit": "mg",
    "integer_only": false,
+   "minimum": null,
+   "maximum": null,
    "effective": "Period",
    "allowed_values": null,
    "code": {
@@ -2208,6 +2472,8 @@
    "value_kind": "quantity",
    "unit": "ug",
    "integer_only": false,
+   "minimum": null,
+   "maximum": null,
    "effective": "Period",
    "allowed_values": null,
    "code": {
@@ -2223,6 +2489,8 @@
    "value_kind": "quantity",
    "unit": "mg",
    "integer_only": false,
+   "minimum": null,
+   "maximum": null,
    "effective": "Period",
    "allowed_values": null,
    "code": {
@@ -2238,6 +2506,8 @@
    "value_kind": "quantity",
    "unit": "mg",
    "integer_only": false,
+   "minimum": null,
+   "maximum": null,
    "effective": "Period",
    "allowed_values": null,
    "code": {
@@ -2253,6 +2523,8 @@
    "value_kind": "quantity",
    "unit": "mg",
    "integer_only": false,
+   "minimum": null,
+   "maximum": null,
    "effective": "Period",
    "allowed_values": null,
    "code": {
@@ -2268,6 +2540,8 @@
    "value_kind": "quantity",
    "unit": "mg",
    "integer_only": false,
+   "minimum": null,
+   "maximum": null,
    "effective": "Period",
    "allowed_values": null,
    "code": {
@@ -2283,6 +2557,8 @@
    "value_kind": "quantity",
    "unit": "g",
    "integer_only": false,
+   "minimum": null,
+   "maximum": null,
    "effective": "Period",
    "allowed_values": null,
    "code": {
@@ -2298,6 +2574,8 @@
    "value_kind": "quantity",
    "unit": "mg",
    "integer_only": false,
+   "minimum": null,
+   "maximum": null,
    "effective": "Period",
    "allowed_values": null,
    "code": {
@@ -2313,6 +2591,8 @@
    "value_kind": "quantity",
    "unit": "ug",
    "integer_only": false,
+   "minimum": null,
+   "maximum": null,
    "effective": "Period",
    "allowed_values": null,
    "code": {
@@ -2328,6 +2608,8 @@
    "value_kind": "quantity",
    "unit": "mg",
    "integer_only": false,
+   "minimum": null,
+   "maximum": null,
    "effective": "Period",
    "allowed_values": null,
    "code": {
@@ -2343,6 +2625,8 @@
    "value_kind": "quantity",
    "unit": "g",
    "integer_only": false,
+   "minimum": null,
+   "maximum": null,
    "effective": "Period",
    "allowed_values": null,
    "code": {
@@ -2358,6 +2642,8 @@
    "value_kind": "quantity",
    "unit": "mg",
    "integer_only": false,
+   "minimum": null,
+   "maximum": null,
    "effective": "Period",
    "allowed_values": null,
    "code": {
@@ -2373,6 +2659,8 @@
    "value_kind": "quantity",
    "unit": "ug",
    "integer_only": false,
+   "minimum": null,
+   "maximum": null,
    "effective": "Period",
    "allowed_values": null,
    "code": {
@@ -2388,6 +2676,8 @@
    "value_kind": "quantity",
    "unit": "ug",
    "integer_only": false,
+   "minimum": null,
+   "maximum": null,
    "effective": "Period",
    "allowed_values": null,
    "code": {
@@ -2403,6 +2693,8 @@
    "value_kind": "quantity",
    "unit": "mg",
    "integer_only": false,
+   "minimum": null,
+   "maximum": null,
    "effective": "Period",
    "allowed_values": null,
    "code": {
@@ -2418,6 +2710,8 @@
    "value_kind": "quantity",
    "unit": "mg",
    "integer_only": false,
+   "minimum": null,
+   "maximum": null,
    "effective": "Period",
    "allowed_values": null,
    "code": {
@@ -2433,6 +2727,8 @@
    "value_kind": "quantity",
    "unit": "ug",
    "integer_only": false,
+   "minimum": null,
+   "maximum": null,
    "effective": "Period",
    "allowed_values": null,
    "code": {
@@ -2448,6 +2744,8 @@
    "value_kind": "quantity",
    "unit": "mg",
    "integer_only": false,
+   "minimum": null,
+   "maximum": null,
    "effective": "Period",
    "allowed_values": null,
    "code": {
@@ -2463,6 +2761,8 @@
    "value_kind": "quantity",
    "unit": "ug",
    "integer_only": false,
+   "minimum": null,
+   "maximum": null,
    "effective": "Period",
    "allowed_values": null,
    "code": {
@@ -2478,6 +2778,8 @@
    "value_kind": "quantity",
    "unit": "mL",
    "integer_only": false,
+   "minimum": null,
+   "maximum": null,
    "effective": "Period",
    "allowed_values": null,
    "code": {
@@ -2493,6 +2795,8 @@
    "value_kind": "quantity",
    "unit": "mg",
    "integer_only": false,
+   "minimum": null,
+   "maximum": null,
    "effective": "Period",
    "allowed_values": null,
    "code": {
@@ -2508,6 +2812,8 @@
    "value_kind": "quantity",
    "unit": "m",
    "integer_only": false,
+   "minimum": null,
+   "maximum": null,
    "effective": "Period",
    "allowed_values": null,
    "code": {
@@ -2523,6 +2829,8 @@
    "value_kind": "quantity",
    "unit": "m",
    "integer_only": false,
+   "minimum": null,
+   "maximum": null,
    "effective": "Period",
    "allowed_values": null,
    "code": {
@@ -2538,6 +2846,8 @@
    "value_kind": "quantity",
    "unit": "m",
    "integer_only": false,
+   "minimum": null,
+   "maximum": null,
    "effective": "Period",
    "allowed_values": null,
    "code": {
@@ -2553,6 +2863,8 @@
    "value_kind": "quantity",
    "unit": "m",
    "integer_only": false,
+   "minimum": null,
+   "maximum": null,
    "effective": "Period",
    "allowed_values": null,
    "code": {
@@ -2568,6 +2880,8 @@
    "value_kind": "quantity",
    "unit": "m",
    "integer_only": false,
+   "minimum": null,
+   "maximum": null,
    "effective": "Period",
    "allowed_values": null,
    "code": {
@@ -2583,6 +2897,8 @@
    "value_kind": "quantity",
    "unit": "m",
    "integer_only": false,
+   "minimum": null,
+   "maximum": null,
    "effective": "Period",
    "allowed_values": null,
    "code": {
@@ -2598,6 +2914,8 @@
    "value_kind": "quantity",
    "unit": "m",
    "integer_only": false,
+   "minimum": null,
+   "maximum": null,
    "effective": "Period",
    "allowed_values": null,
    "code": {
@@ -2613,6 +2931,8 @@
    "value_kind": "quantity",
    "unit": "m",
    "integer_only": false,
+   "minimum": null,
+   "maximum": null,
    "effective": "Period",
    "allowed_values": null,
    "code": {
@@ -2628,6 +2948,8 @@
    "value_kind": "quantity",
    "unit": "m",
    "integer_only": false,
+   "minimum": null,
+   "maximum": null,
    "effective": "Period",
    "allowed_values": null,
    "code": {
@@ -2643,6 +2965,8 @@
    "value_kind": "quantity",
    "unit": "uS",
    "integer_only": false,
+   "minimum": null,
+   "maximum": null,
    "effective": "dateTime",
    "allowed_values": null,
    "code": {
@@ -2658,6 +2982,8 @@
    "value_kind": "quantity",
    "unit": "dB[SPL]",
    "integer_only": false,
+   "minimum": null,
+   "maximum": null,
    "effective": "Period",
    "allowed_values": null,
    "code": {
@@ -2673,6 +2999,8 @@
    "value_kind": "quantity",
    "unit": "dB[SPL]",
    "integer_only": false,
+   "minimum": null,
+   "maximum": null,
    "effective": "Period",
    "allowed_values": null,
    "code": {
@@ -2688,6 +3016,8 @@
    "value_kind": "quantity",
    "unit": "{score}",
    "integer_only": false,
+   "minimum": null,
+   "maximum": null,
    "effective": "Period",
    "allowed_values": null,
    "code": {
@@ -2703,6 +3033,11 @@
    "value_kind": "quantity",
    "unit": "{flights}",
    "integer_only": true,
+   "minimum": {
+    "value": 0,
+    "inclusive": true
+   },
+   "maximum": null,
    "effective": "Period",
    "allowed_values": null,
    "code": {
@@ -2718,6 +3053,8 @@
    "value_kind": "quantity",
    "unit": "L",
    "integer_only": false,
+   "minimum": null,
+   "maximum": null,
    "effective": "dateTime",
    "allowed_values": null,
    "code": {
@@ -2733,6 +3070,8 @@
    "value_kind": "quantity",
    "unit": "L",
    "integer_only": false,
+   "minimum": null,
+   "maximum": null,
    "effective": "dateTime",
    "allowed_values": null,
    "code": {
@@ -2748,6 +3087,8 @@
    "value_kind": "quantity",
    "unit": "dB[SPL]",
    "integer_only": false,
+   "minimum": null,
+   "maximum": null,
    "effective": "Period",
    "allowed_values": null,
    "code": {
@@ -2763,6 +3104,8 @@
    "value_kind": "quantity",
    "unit": "/min",
    "integer_only": false,
+   "minimum": null,
+   "maximum": null,
    "effective": "dateTime-or-Period",
    "allowed_values": null,
    "code": {
@@ -2778,6 +3121,8 @@
    "value_kind": "quantity",
    "unit": "/min",
    "integer_only": false,
+   "minimum": null,
+   "maximum": null,
    "effective": "dateTime",
    "allowed_values": null,
    "code": {
@@ -2793,6 +3138,8 @@
    "value_kind": "quantity",
    "unit": "ms",
    "integer_only": false,
+   "minimum": null,
+   "maximum": null,
    "effective": "dateTime",
    "allowed_values": null,
    "code": {
@@ -2808,6 +3155,8 @@
    "value_kind": "quantity",
    "unit": "cm",
    "integer_only": false,
+   "minimum": null,
+   "maximum": null,
    "effective": "dateTime",
    "allowed_values": null,
    "code": {
@@ -2823,6 +3172,11 @@
    "value_kind": "quantity",
    "unit": "{puff}",
    "integer_only": true,
+   "minimum": {
+    "value": 0,
+    "inclusive": true
+   },
+   "maximum": null,
    "effective": "Period",
    "allowed_values": null,
    "code": {
@@ -2838,6 +3192,8 @@
    "value_kind": "quantity",
    "unit": "[iU]",
    "integer_only": false,
+   "minimum": null,
+   "maximum": null,
    "effective": "Period",
    "allowed_values": null,
    "code": {
@@ -2853,6 +3209,8 @@
    "value_kind": "quantity",
    "unit": "kg",
    "integer_only": false,
+   "minimum": null,
+   "maximum": null,
    "effective": "dateTime",
    "allowed_values": null,
    "code": {
@@ -2872,6 +3230,11 @@
    "value_kind": "quantity",
    "unit": "{drinks}",
    "integer_only": true,
+   "minimum": {
+    "value": 0,
+    "inclusive": true
+   },
+   "maximum": null,
    "effective": "Period",
    "allowed_values": null,
    "code": {
@@ -2887,6 +3250,11 @@
    "value_kind": "quantity",
    "unit": "{falls}",
    "integer_only": true,
+   "minimum": {
+    "value": 0,
+    "inclusive": true
+   },
+   "maximum": null,
    "effective": "Period",
    "allowed_values": null,
    "code": {
@@ -2902,6 +3270,14 @@
    "value_kind": "quantity",
    "unit": "%",
    "integer_only": false,
+   "minimum": {
+    "value": 0,
+    "inclusive": true
+   },
+   "maximum": {
+    "value": 100,
+    "inclusive": true
+   },
    "effective": "dateTime",
    "allowed_values": null,
    "code": {
@@ -2917,6 +3293,8 @@
    "value_kind": "quantity",
    "unit": "m/s",
    "integer_only": false,
+   "minimum": null,
+   "maximum": null,
    "effective": "dateTime",
    "allowed_values": null,
    "code": {
@@ -2932,6 +3310,8 @@
    "value_kind": "quantity",
    "unit": "L/min",
    "integer_only": false,
+   "minimum": null,
+   "maximum": null,
    "effective": "dateTime",
    "allowed_values": null,
    "code": {
@@ -2947,6 +3327,14 @@
    "value_kind": "quantity",
    "unit": "%",
    "integer_only": false,
+   "minimum": {
+    "value": 0,
+    "inclusive": true
+   },
+   "maximum": {
+    "value": 100,
+    "inclusive": true
+   },
    "effective": "dateTime",
    "allowed_values": null,
    "code": {
@@ -2962,6 +3350,8 @@
    "value_kind": "quantity",
    "unit": "kcal/kg/h",
    "integer_only": false,
+   "minimum": null,
+   "maximum": null,
    "effective": "Period",
    "allowed_values": null,
    "code": {
@@ -2977,6 +3367,11 @@
    "value_kind": "quantity",
    "unit": "{pushes}",
    "integer_only": true,
+   "minimum": {
+    "value": 0,
+    "inclusive": true
+   },
+   "maximum": null,
    "effective": "Period",
    "allowed_values": null,
    "code": {
@@ -2992,6 +3387,8 @@
    "value_kind": "quantity",
    "unit": "/min",
    "integer_only": false,
+   "minimum": null,
+   "maximum": null,
    "effective": "dateTime",
    "allowed_values": null,
    "code": {
@@ -3007,6 +3404,8 @@
    "value_kind": "quantity",
    "unit": "/min",
    "integer_only": false,
+   "minimum": null,
+   "maximum": null,
    "effective": "dateTime",
    "allowed_values": null,
    "code": {
@@ -3022,6 +3421,8 @@
    "value_kind": "quantity",
    "unit": "m/s",
    "integer_only": false,
+   "minimum": null,
+   "maximum": null,
    "effective": "dateTime",
    "allowed_values": null,
    "code": {
@@ -3037,6 +3438,8 @@
    "value_kind": "quantity",
    "unit": "ms",
    "integer_only": false,
+   "minimum": null,
+   "maximum": null,
    "effective": "dateTime",
    "allowed_values": null,
    "code": {
@@ -3052,6 +3455,8 @@
    "value_kind": "quantity",
    "unit": "W",
    "integer_only": false,
+   "minimum": null,
+   "maximum": null,
    "effective": "dateTime",
    "allowed_values": null,
    "code": {
@@ -3067,6 +3472,8 @@
    "value_kind": "quantity",
    "unit": "m/s",
    "integer_only": false,
+   "minimum": null,
+   "maximum": null,
    "effective": "dateTime",
    "allowed_values": null,
    "code": {
@@ -3082,6 +3489,8 @@
    "value_kind": "quantity",
    "unit": "m",
    "integer_only": false,
+   "minimum": null,
+   "maximum": null,
    "effective": "dateTime",
    "allowed_values": null,
    "code": {
@@ -3097,6 +3506,8 @@
    "value_kind": "quantity",
    "unit": "cm",
    "integer_only": false,
+   "minimum": null,
+   "maximum": null,
    "effective": "dateTime",
    "allowed_values": null,
    "code": {
@@ -3112,6 +3523,8 @@
    "value_kind": "quantity",
    "unit": "m",
    "integer_only": false,
+   "minimum": null,
+   "maximum": null,
    "effective": "Period",
    "allowed_values": null,
    "code": {
@@ -3127,6 +3540,8 @@
    "value_kind": "quantity",
    "unit": "m/s",
    "integer_only": false,
+   "minimum": null,
+   "maximum": null,
    "effective": "dateTime",
    "allowed_values": null,
    "code": {
@@ -3142,6 +3557,8 @@
    "value_kind": "quantity",
    "unit": "m/s",
    "integer_only": false,
+   "minimum": null,
+   "maximum": null,
    "effective": "dateTime",
    "allowed_values": null,
    "code": {
@@ -3157,6 +3574,11 @@
    "value_kind": "quantity",
    "unit": "{steps}",
    "integer_only": true,
+   "minimum": {
+    "value": 0,
+    "inclusive": true
+   },
+   "maximum": null,
    "effective": "Period",
    "allowed_values": null,
    "code": {
@@ -3172,6 +3594,11 @@
    "value_kind": "quantity",
    "unit": "{strokes}",
    "integer_only": true,
+   "minimum": {
+    "value": 0,
+    "inclusive": true
+   },
+   "maximum": null,
    "effective": "Period",
    "allowed_values": null,
    "code": {
@@ -3187,6 +3614,8 @@
    "value_kind": "quantity",
    "unit": "min",
    "integer_only": false,
+   "minimum": null,
+   "maximum": null,
    "effective": "Period",
    "allowed_values": null,
    "code": {
@@ -3202,6 +3631,8 @@
    "value_kind": "quantity",
    "unit": "{uvindex}",
    "integer_only": false,
+   "minimum": null,
+   "maximum": null,
    "effective": "Period",
    "allowed_values": null,
    "code": {
@@ -3217,6 +3648,8 @@
    "value_kind": "quantity",
    "unit": "m",
    "integer_only": false,
+   "minimum": null,
+   "maximum": null,
    "effective": "dateTime",
    "allowed_values": null,
    "code": {
@@ -3232,6 +3665,8 @@
    "value_kind": "quantity",
    "unit": "mL/kg/min",
    "integer_only": false,
+   "minimum": null,
+   "maximum": null,
    "effective": "dateTime",
    "allowed_values": null,
    "code": {
@@ -3247,6 +3682,8 @@
    "value_kind": "quantity",
    "unit": "cm",
    "integer_only": false,
+   "minimum": null,
+   "maximum": null,
    "effective": "dateTime",
    "allowed_values": null,
    "code": {
@@ -3262,6 +3699,14 @@
    "value_kind": "quantity",
    "unit": "%",
    "integer_only": false,
+   "minimum": {
+    "value": 0,
+    "inclusive": true
+   },
+   "maximum": {
+    "value": 100,
+    "inclusive": true
+   },
    "effective": "dateTime",
    "allowed_values": null,
    "code": {
@@ -3277,6 +3722,14 @@
    "value_kind": "quantity",
    "unit": "%",
    "integer_only": false,
+   "minimum": {
+    "value": 0,
+    "inclusive": true
+   },
+   "maximum": {
+    "value": 100,
+    "inclusive": true
+   },
    "effective": "dateTime",
    "allowed_values": null,
    "code": {
@@ -3292,6 +3745,8 @@
    "value_kind": "quantity",
    "unit": "/min",
    "integer_only": false,
+   "minimum": null,
+   "maximum": null,
    "effective": "Period",
    "allowed_values": null,
    "code": {
@@ -3307,6 +3762,8 @@
    "value_kind": "quantity",
    "unit": "m/s",
    "integer_only": false,
+   "minimum": null,
+   "maximum": null,
    "effective": "dateTime",
    "allowed_values": null,
    "code": {
@@ -3322,6 +3779,8 @@
    "value_kind": "quantity",
    "unit": "cm",
    "integer_only": false,
+   "minimum": null,
+   "maximum": null,
    "effective": "dateTime",
    "allowed_values": null,
    "code": {
@@ -3337,6 +3796,8 @@
    "value_kind": "quantity",
    "unit": "Cel",
    "integer_only": false,
+   "minimum": null,
+   "maximum": null,
    "effective": "dateTime",
    "allowed_values": null,
    "code": {
@@ -3352,6 +3813,8 @@
    "value_kind": "quantity",
    "unit": "{score}",
    "integer_only": false,
+   "minimum": null,
+   "maximum": null,
    "effective": "Period",
    "allowed_values": null,
    "code": {
@@ -3367,6 +3830,8 @@
    "value_kind": "quantity",
    "unit": "{score}",
    "integer_only": false,
+   "minimum": null,
+   "maximum": null,
    "effective": "dateTime",
    "allowed_values": null,
    "code": {
@@ -3382,6 +3847,8 @@
    "value_kind": "quantity",
    "unit": "{score}",
    "integer_only": false,
+   "minimum": null,
+   "maximum": null,
    "effective": "dateTime",
    "allowed_values": null,
    "code": {

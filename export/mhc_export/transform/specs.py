@@ -10,11 +10,12 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass, field
 from functools import cache
+from importlib import resources
 from pathlib import Path
 
 import pyarrow as pa
 
-REGISTRY_PATH = Path(__file__).resolve().parents[2] / "schemas" / "healthkit-types.json"
+REGISTRY_PATH = Path(str(resources.files("mhc_export") / "schemas" / "healthkit-types.json"))
 
 TIMESTAMP = pa.timestamp("us", tz="UTC")
 TIMESTAMP_MS = pa.timestamp("ms", tz="UTC")
@@ -71,6 +72,8 @@ class TypeSpec:
     integer_only: bool
     effective: str | None
     allowed_values: tuple[str, ...] | None
+    minimum: tuple[float, bool] | None = None
+    maximum: tuple[float, bool] | None = None
     extra_columns: tuple[tuple[str, pa.DataType], ...] = field(default_factory=tuple)
 
     @property
@@ -105,6 +108,8 @@ class Registry:
                 integer_only=bool(entry.get("integer_only")),
                 effective=entry.get("effective"),
                 allowed_values=tuple(entry["allowed_values"]) if entry.get("allowed_values") else None,
+                minimum=_bound(entry.get("minimum")),
+                maximum=_bound(entry.get("maximum")),
                 extra_columns=tuple(EXTRA_COLUMNS.get(sample_type, [])),
             )
 
@@ -120,6 +125,12 @@ class Registry:
 
     def exportable_types(self) -> list[str]:
         return sorted(t for t, s in self._specs.items() if s.exportable)
+
+
+def _bound(raw: dict | None) -> tuple[float, bool] | None:
+    if not raw or raw.get("value") is None:
+        return None
+    return float(raw["value"]), bool(raw.get("inclusive", True))
 
 
 @cache
