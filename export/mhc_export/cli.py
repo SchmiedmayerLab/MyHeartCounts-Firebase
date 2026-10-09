@@ -72,6 +72,23 @@ def _add_key_args(parser: argparse.ArgumentParser) -> None:
 DEFAULT_MAX_UNIT_BYTES = 400_000_000
 
 
+def _fetch_threads(text: str) -> int:
+    value = int(text)
+    if not 1 <= value <= 32:
+        raise argparse.ArgumentTypeError("--fetch-threads must be between 1 and 32")
+    return value
+
+
+def _add_fetch_arg(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument(
+        "--fetch-threads",
+        type=_fetch_threads,
+        default=8,
+        help="download threads per worker; up to twice as many of the unit's objects are queued ahead of the one "
+        "being processed, within 64 MB; does not change the output",
+    )
+
+
 def _add_shard_arg(parser: argparse.ArgumentParser) -> None:
     parser.add_argument(
         "--max-unit-bytes",
@@ -183,6 +200,7 @@ def cmd_run_local(args: argparse.Namespace) -> int:
         tolerate_unreadable=args.tolerate_fatal > 0,
         max_unit_rows=args.max_unit_rows,
         grove=grove,
+        fetch_threads=args.fetch_threads,
     )
     phases = set(args.phases.split(","))
     report_path = run_dir / "report.json"
@@ -579,7 +597,7 @@ def cmd_work(args: argparse.Namespace) -> int:
         units = units[: args.limit_units]
     filtered = bool(args.unit_id or args.limit_units)
     source_root = units[0].objects[0].uri if units and units[0].objects else args.state
-    read_store = store_for(source_root, project=args.project)
+    read_store = store_for(source_root, project=args.project, pool_size=args.fetch_threads + 4)
     if args.state.startswith("gs://"):
         write_store = store_for(args.state, project=args.project)
         staging_prefix = f"{args.state.rstrip('/')}/staging/{args.run_id}"
@@ -601,6 +619,7 @@ def cmd_work(args: argparse.Namespace) -> int:
         tolerate_unreadable=args.tolerate_fatal > 0,
         max_unit_rows=args.max_unit_rows,
         grove=grove,
+        fetch_threads=args.fetch_threads,
     )
     if args.leases:
         if filtered:
@@ -688,9 +707,19 @@ def cmd_bq_load(args: argparse.Namespace) -> int:
 
     lake, prefix = _store(args.lake, args.project)
     nonce = datetime.now(UTC).isoformat() if args.full else ""
-    record = load_committed(lake, prefix, args.project, args.dataset, full=args.full, nonce=nonce)
+    record = load_committed(
+        lake,
+        prefix,
+        args.project,
+        args.dataset,
+        full=args.full,
+        nonce=nonce,
+        concurrency=args.concurrency,
+        max_per_table=args.max_per_table,
+    )
     print(
-        f"loaded {len(record['loads'])} partitions and deleted {len(record['deletes'])} for run {record['run_id']} "
+        f"ran {len(record['loads'])} load jobs ({len(record['whole_tables'])} whole tables) and deleted "
+        f"{len(record['deletes'])} partitions in {record['seconds']}s for run {record['run_id']} "
         f"into {args.project}.{args.dataset}"
     )
     return 0
@@ -736,6 +765,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--max-unit-rows", type=int, default=5_000_000, help="fail a unit above this many rows")
     p.add_argument("--user-flags", help="JSON {uid: user document fields}; without it eligibility is unchecked")
     _add_shard_arg(p)
+    _add_fetch_arg(p)
     _add_key_args(p)
     _add_grove_args(p)
     p.set_defaults(func=cmd_run_local)
@@ -827,6 +857,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--worker-id", help="lease owner name; defaults to host and process id")
     p.add_argument("--lease-seconds", type=int, default=1800, help="lease time to live; renewed every third of it")
     p.add_argument("--max-attempts", type=int, default=3, help="attempts per unit before it fails for good")
+    _add_fetch_arg(p)
     _add_key_args(p)
     _add_grove_args(p)
     p.set_defaults(func=cmd_work)
@@ -854,6 +885,8 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="reload every partition, not only those that differ from what the destination holds",
     )
+    p.add_argument("--concurrency", type=int, default=8, help="load jobs running at once")
+    p.add_argument("--max-per-table", type=int, default=2, help="load jobs running at once into one table")
     p.set_defaults(func=cmd_bq_load)
     return parser
 
