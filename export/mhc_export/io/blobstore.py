@@ -13,11 +13,12 @@ import json
 import os
 import shutil
 import tempfile
+import threading
 from collections.abc import Iterator
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Protocol
+from typing import Any, Protocol
 
 
 @dataclass(frozen=True)
@@ -39,7 +40,7 @@ class BlobConflict(RuntimeError):
 
 class BlobStore(Protocol):
     def list(self, prefix: str) -> Iterator[ObjectInfo]: ...
-    def read(self, uri: str, generation: int | None = None) -> bytes: ...
+    def read(self, uri: str, generation: int | None = None, stop: threading.Event | None = None) -> bytes: ...
     def write(self, uri: str, data: bytes, *, overwrite: bool, metadata: dict[str, str] | None = None) -> None: ...
     def copy(self, src: str, dst: str, *, overwrite: bool) -> None: ...
     def exists(self, uri: str) -> bool: ...
@@ -84,7 +85,7 @@ class LocalBlobStore:
                 metadata={},
             )
 
-    def read(self, uri: str, generation: int | None = None) -> bytes:
+    def read(self, uri: str, generation: int | None = None, stop: threading.Event | None = None) -> bytes:
         return self._path(uri).read_bytes()
 
     def write(self, uri: str, data: bytes, *, overwrite: bool, metadata: dict[str, str] | None = None) -> None:
@@ -173,13 +174,30 @@ def _place(tmp: Path, dst: Path, overwrite: bool, uri: str) -> None:
         tmp.unlink(missing_ok=True)
 
 
-class GcsBlobStore:
-    """URIs are `gs://bucket/name`."""
+READ_RETRY_SECONDS = 600
+READ_TIMEOUT = (10, 60)  # connect, read per attempt
 
-    def __init__(self, project: str | None = None) -> None:
+
+def widen_pool(session: Any, size: int) -> None:
+    """Let a requests session keep `size` https connections; an mTLS adapter is left as it is."""
+    import requests
+
+    if size <= 10 or getattr(session, "is_mtls", False):
+        return
+    old = session.adapters.get("https://")
+    session.mount("https://", requests.adapters.HTTPAdapter(pool_connections=4, pool_maxsize=size))
+    if old is not None:
+        old.close()
+
+
+class GcsBlobStore:
+    """URIs are `gs://bucket/name`. One client serves every thread; its connection pool is sized for them."""
+
+    def __init__(self, project: str | None = None, pool_size: int = 10) -> None:
         from google.cloud import storage
 
         self._client = storage.Client(project=project)
+        widen_pool(self._client._http, pool_size)
 
     @staticmethod
     def split(uri: str) -> tuple[str, str]:
@@ -199,10 +217,16 @@ class GcsBlobStore:
                 metadata=dict(blob.metadata or {}),
             )
 
-    def read(self, uri: str, generation: int | None = None) -> bytes:
+    def read(self, uri: str, generation: int | None = None, stop: threading.Event | None = None) -> bytes:
+        """`stop`, once set, ends the retries, so a failed or interrupted unit does not wait out the budget."""
         bucket, name = self.split(uri)
+        from google.cloud.storage.retry import DEFAULT_RETRY, _should_retry
+
+        retry = DEFAULT_RETRY.with_timeout(READ_RETRY_SECONDS).with_predicate(
+            lambda exc: not (stop is not None and stop.is_set()) and _should_retry(exc)
+        )
         blob = self._client.bucket(bucket).blob(name, generation=generation)
-        return blob.download_as_bytes()
+        return blob.download_as_bytes(retry=retry, timeout=READ_TIMEOUT)
 
     def write(self, uri: str, data: bytes, *, overwrite: bool, metadata: dict[str, str] | None = None) -> None:
         from google.api_core.exceptions import PreconditionFailed
@@ -296,10 +320,10 @@ class RoutedStore:
     def list(self, prefix: str) -> Iterator[ObjectInfo]:
         return self._read.list(prefix)
 
-    def read(self, uri: str, generation: int | None = None) -> bytes:
+    def read(self, uri: str, generation: int | None = None, stop: threading.Event | None = None) -> bytes:
         if generation is None and self._write.exists(uri):
             return self._write.read(uri)
-        return self._read.read(uri, generation)
+        return self._read.read(uri, generation, stop)
 
     def write(self, uri: str, data: bytes, *, overwrite: bool, metadata: dict[str, str] | None = None) -> None:
         self._write.write(uri, data, overwrite=overwrite, metadata=metadata)
@@ -329,10 +353,10 @@ class RoutedStore:
         self._write.write_versioned(uri, data, token)
 
 
-def store_for(uri: str, *, project: str | None = None) -> BlobStore:
+def store_for(uri: str, *, project: str | None = None, pool_size: int = 10) -> BlobStore:
     """gs:// URIs get a GCS store; local URIs are absolute paths served from the filesystem root."""
     if uri.startswith("gs://"):
-        return GcsBlobStore(project=project)
+        return GcsBlobStore(project=project, pool_size=pool_size)
     return LocalBlobStore("/")
 
 
