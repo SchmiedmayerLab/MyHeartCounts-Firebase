@@ -11,6 +11,7 @@ import io
 import json
 import logging
 import sys
+import threading
 import time
 from collections import Counter
 from dataclasses import dataclass, field
@@ -29,8 +30,9 @@ from mhc_export.grove.view import ObservationView, parse_observation
 from mhc_export.identity.participants import ParticipantLookup
 from mhc_export.io.blobstore import BlobStore
 from mhc_export.io.codec import CodecError, decode, decode_csv
+from mhc_export.io.prefetch import DEFAULT_WINDOW_BYTES, Prefetcher
 from mhc_export.run.inputs import LEDGER_DIR
-from mhc_export.run.models import Unit, UnitResult, UploadKind
+from mhc_export.run.models import SourceObject, Unit, UnitResult, UploadKind
 from mhc_export.transform.dedup import dedup, dedup_conflicts, tuple_collisions
 from mhc_export.transform.project import ProjectContext, ProjectError, project
 from mhc_export.transform.specs import Coverage, Registry, TypeSpec, default_coverage
@@ -52,6 +54,8 @@ class Deps:
     tolerate_unreadable: bool = False
     coverage: Coverage = field(default_factory=default_coverage)
     grove: GroveSettings = field(default_factory=GroveSettings)
+    fetch_threads: int = 8
+    fetch_window_bytes: int = DEFAULT_WINDOW_BYTES
 
 
 # Projection failures that signal a broken producer, never an expected exclusion. Every GroveError is fatal too.
@@ -107,55 +111,63 @@ def process_unit(unit: Unit, deps: Deps) -> UnitResult:
         for warning in projected.warnings:
             warnings[warning] += 1
 
-    for obj in unit.objects:
-        try:
-            blob = deps.store.read(obj.uri, obj.generation)
-        except Exception as exc:  # noqa: BLE001 - any read failure fails the unit
-            raise RuntimeError(f"read failed for {obj.uri}: {exc}") from exc
-        if obj.upload_kind == UploadKind.DELETIONS and _is_csv(obj.uri):
+    stop = threading.Event()
+
+    def read(obj: SourceObject) -> bytes:
+        return deps.store.read(obj.uri, obj.generation, stop)
+
+    with Prefetcher(unit.objects, read, deps.fetch_threads, deps.fetch_window_bytes, stop.set) as stream:
+        for obj, blob in stream:
+            if obj.upload_kind == UploadKind.DELETIONS and _is_csv(obj.uri):
+                try:
+                    stones, malformed = tombstones_from_csv(decode_csv(blob))
+                except CodecError as exc:
+                    _fatal(deps, fatal, "unreadable_deletions", f"{obj.uri}@{obj.generation}: {exc}")
+                    continue
+                tombstones.extend(stones)
+                if malformed:
+                    _fatal(deps, fatal, "malformed_deletion_row", f"{obj.uri}: {malformed} rows", count=malformed)
+                continue
             try:
-                stones, malformed = tombstones_from_csv(decode_csv(blob))
+                resources = decode(blob)
             except CodecError as exc:
-                _fatal(deps, fatal, "unreadable_deletions", f"{obj.uri}@{obj.generation}: {exc}")
+                _fatal(deps, fatal, "unreadable_object", f"{obj.uri}@{obj.generation}: {exc}")
                 continue
-            tombstones.extend(stones)
-            if malformed:
-                _fatal(deps, fatal, "malformed_deletion_row", f"{obj.uri}: {malformed} rows", count=malformed)
-            continue
-        try:
-            resources = decode(blob)
-        except CodecError as exc:
-            _fatal(deps, fatal, "unreadable_object", f"{obj.uri}@{obj.generation}: {exc}")
-            continue
-        del blob
-        ctx = ProjectContext(participant_id, identity, deps.run_id, obj.upload_kind, True)
-        legacy = deps.grove.accept_legacy and obj.upload_kind != UploadKind.DELETIONS
-        if not legacy and (rejected := sum(1 for r in resources if r.get("resourceType") != "Bundle")):
-            why = (
-                "deletions carry retraction events only"
-                if obj.upload_kind == UploadKind.DELETIONS
-                else ("legacy resources need --accept-legacy")
-            )
-            _fatal(deps, fatal, "grove_not_bundle", f"{obj.uri}: {rejected} elements are not Bundles; {why}", rejected)
-        for element in resources:
-            if element.get("resourceType") != "Bundle":
-                if not legacy:
+            del blob
+            ctx = ProjectContext(participant_id, identity, deps.run_id, obj.upload_kind, True)
+            legacy = deps.grove.accept_legacy and obj.upload_kind != UploadKind.DELETIONS
+            if not legacy and (rejected := sum(1 for r in resources if r.get("resourceType") != "Bundle")):
+                why = (
+                    "deletions carry retraction events only"
+                    if obj.upload_kind == UploadKind.DELETIONS
+                    else ("legacy resources need --accept-legacy")
+                )
+                _fatal(
+                    deps, fatal, "grove_not_bundle", f"{obj.uri}: {rejected} elements are not Bundles; {why}", rejected
+                )
+            for element in resources:
+                if element.get("resourceType") != "Bundle":
+                    if not legacy:
+                        continue
+                    view = parse_observation(element)
+                    if view.shape == "grove":
+                        # Grove identities are only trusted after the exchange event around them was validated
+                        _fatal(
+                            deps, fatal, "grove_not_bundle", f"{obj.uri}: a Grove resource outside an exchange Bundle"
+                        )
+                        continue
+                    take(view, ctx)
                     continue
-                view = parse_observation(element)
-                if view.shape == "grove":
-                    # Grove identities are only trusted after the exchange event around them was validated
-                    _fatal(deps, fatal, "grove_not_bundle", f"{obj.uri}: a Grove resource outside an exchange Bundle")
+                try:
+                    natives, views = _read_event(
+                        element, obj.upload_kind, unit.uid, spec, deps.grove, event_cfg, warnings
+                    )
+                except GroveError as exc:
+                    _fatal(deps, fatal, exc.reason, f"{obj.uri}@{obj.generation}: {exc.message}")
                     continue
-                take(view, ctx)
-                continue
-            try:
-                natives, views = _read_event(element, obj.upload_kind, unit.uid, spec, deps.grove, event_cfg, warnings)
-            except GroveError as exc:
-                _fatal(deps, fatal, exc.reason, f"{obj.uri}@{obj.generation}: {exc.message}")
-                continue
-            retracted_natives.update(natives)
-            for view in views:
-                take(view, ctx)
+                retracted_natives.update(natives)
+                for view in views:
+                    take(view, ctx)
 
     table = rows.to_table()  # releases the buffered chunks
     result.arrow_mb = int(pa.total_allocated_bytes() / (1024 * 1024))

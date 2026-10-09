@@ -323,7 +323,7 @@ def test_sync_prefix_removes_untracked_local_files(tmp_path: Path) -> None:
         def list(self, prefix):
             yield ObjectInfo("gs://b/s/T/year=2026/month=01/u.parquet", 4, 1, None, {})
 
-        def read(self, uri, generation=None):
+        def read(self, uri, generation=None, stop=None):
             return b"aaaa"
 
     local = tmp_path / "w"

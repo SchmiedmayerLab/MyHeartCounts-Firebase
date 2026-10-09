@@ -566,7 +566,7 @@ def test_sync_prefix_redownloads_when_generation_changes(tmp_path: Path) -> None
                 if uri.startswith(prefix):
                     yield ObjectInfo(uri, len(data), gen, None, {})
 
-        def read(self, uri: str, generation=None) -> bytes:
+        def read(self, uri: str, generation=None, stop=None) -> bytes:
             self.reads += 1
             return self.objects[uri][0]
 
