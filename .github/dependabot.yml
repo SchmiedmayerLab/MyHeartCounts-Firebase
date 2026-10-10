@@ -17,10 +17,10 @@ updates:
     patterns: ["*"]
     multi-ecosystem-group: "weekly-dependencies"
   - package-ecosystem: "npm"
-    directory: "/"
+    directories: ["/", "/functions"]
     patterns: ["*"]
     multi-ecosystem-group: "weekly-dependencies"
-  - package-ecosystem: "npm"
-    directory: "/functions"
-    patterns: ["*"]
-    multi-ecosystem-group: "weekly-dependencies"
+    groups:
+      npm-security-updates:
+        applies-to: security-updates
+        patterns: ["*"]
