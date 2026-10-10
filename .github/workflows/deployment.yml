@@ -43,7 +43,7 @@ jobs:
       region: ${{ steps.set-region.outputs.region }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
       - name: Determine Environment
         id: set-env
         env:
