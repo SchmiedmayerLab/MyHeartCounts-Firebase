@@ -1,0 +1,21 @@
+#
+# This source file is part of the My Heart Counts Firebase open-source project
+#
+# SPDX-FileCopyrightText: 2026 Stanford University and the project authors (see CONTRIBUTORS.md)
+#
+# SPDX-License-Identifier: MIT
+#
+
+coverage:
+  status:
+    # Coverage may not fall more than 0.5 points below the base commit.
+    project:
+      default:
+        target: auto
+        threshold: 0.5%
+    # New code must be better covered than the project average, so the average climbs.
+    patch:
+      default:
+        target: 90%
+
+comment: false
