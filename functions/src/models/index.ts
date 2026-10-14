@@ -24,6 +24,7 @@ export * from "./helpers/dateConverter.js";
 export * from "./helpers/lazy.js";
 export * from "./helpers/optionalish.js";
 export * from "./helpers/schemaConverter.js";
+export * from "./types/healthStats.js";
 export * from "./types/isoCountryCode.js";
 export * from "./types/localizedText.js";
 export * from "./types/observation.js";

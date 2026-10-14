@@ -1,0 +1,63 @@
+{
+  "authored": "2026-09-01T15:42:35.343619942+02:00",
+  "extension": [
+    {
+      "extension": [
+        {
+          "url": "https://myheartcounts.stanford.edu/fhir/core/mhcAppRevision/version",
+          "valueString": "4.0.0"
+        },
+        {
+          "url": "https://myheartcounts.stanford.edu/fhir/core/mhcAppRevision/build",
+          "valueInteger": 1
+        },
+        {
+          "url": "https://myheartcounts.stanford.edu/fhir/core/mhcAppRevision/bundleIdentifier",
+          "valueString": "edu.stanford.MyHeartCounts"
+        },
+        {
+          "url": "https://myheartcounts.stanford.edu/fhir/core/mhcAppRevision/osVersion",
+          "valueString": "26.6.1"
+        }
+      ],
+      "url": "https://myheartcounts.stanford.edu/fhir/core/mhcAppRevision"
+    }
+  ],
+  "id": "4A075C57-7392-4FA8-AF6B-2A62764360FF",
+  "identifier": {
+    "value": "4A075C57-7392-4FA8-AF6B-2A62764360FF"
+  },
+  "item": [
+    {
+      "answer": [
+        {
+          "valueCoding": {
+            "code": "direct",
+            "display": "Direct",
+            "system": "https://myheartcounts.stanford.edu/fhir/bmi-entry"
+          }
+        }
+      ],
+      "linkId": "mode"
+    },
+    {
+      "answer": [
+        {
+          "valueDecimal": 25
+        }
+      ],
+      "linkId": "bmi-entered"
+    },
+    {
+      "answer": [
+        {
+          "valueDecimal": 25
+        }
+      ],
+      "linkId": "bmi"
+    }
+  ],
+  "questionnaire": "https://myheartcounts.stanford.edu/fhir/survey/bmi",
+  "resourceType": "QuestionnaireResponse",
+  "status": "completed"
+}

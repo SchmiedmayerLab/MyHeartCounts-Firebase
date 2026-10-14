@@ -43,6 +43,7 @@
     "@stanfordspezi/spezi-web-configurations": "^0.6.0",
     "@types/chai": "^5.2.3",
     "@types/d3": "^7.4.3",
+    "@types/fhir": "^0.0.44",
     "@types/jsdom": "^27.0.0",
     "@types/luxon": "^3.4.2",
     "@types/mocha": "^10.0.7",

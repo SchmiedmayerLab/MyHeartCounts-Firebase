@@ -9,14 +9,21 @@ import { type ServiceFactory } from "./serviceFactory.js";
 import { Lazy } from "../../models/index.js";
 import { Credential } from "../credential/credential.js";
 import { FirestoreService } from "../database/firestoreService.js";
+import {
+  DatabaseHealthStatsService,
+  type HealthStatsService,
+} from "../healthStats/healthStatsService.js";
 import { DatabaseHistoryService } from "../history/databaseHistoryService.js";
 import { type HistoryService } from "../history/historyService.js";
+import { HealthStatsMeasurementProjection } from "../measurementExtraction/healthStatsMeasurementProjection.js";
+import { LdlObservationMeasurementProjection } from "../measurementExtraction/ldlObservationMeasurementProjection.js";
 import {
   DietScoreCalculator,
   DietScoringQuestionnaireResponseService,
 } from "../questionnaireResponse/dietScoringService.js";
 import { HeartRiskLdlParsingQuestionnaireResponseService } from "../questionnaireResponse/heartRiskLdlParsingService.js";
 import { HeartRiskNicotineScoringQuestionnaireResponseService } from "../questionnaireResponse/heartRiskNicotineScoringService.js";
+import { MeasurementExtractionQuestionnaireResponseService } from "../questionnaireResponse/measurementExtractionQuestionnaireResponseService.js";
 import { MultiQuestionnaireResponseService } from "../questionnaireResponse/multiQuestionnaireResponseService.js";
 import {
   DefaultNicotineScoreCalculator,
@@ -63,6 +70,10 @@ export class DefaultServiceFactory implements ServiceFactory {
       ),
   );
 
+  private readonly healthStatsService = new Lazy(
+    () => new DatabaseHealthStatsService(this.databaseService.value),
+  );
+
   private readonly historyService = new Lazy(
     () => new DatabaseHistoryService(this.databaseService.value),
   );
@@ -87,6 +98,12 @@ export class DefaultServiceFactory implements ServiceFactory {
         }),
         new HeartRiskLdlParsingQuestionnaireResponseService({
           databaseService: this.databaseService.value,
+        }),
+        new MeasurementExtractionQuestionnaireResponseService({
+          projections: [
+            new HealthStatsMeasurementProjection(this.healthStatsService.value),
+            new LdlObservationMeasurementProjection(this.databaseService.value),
+          ],
         }),
       ]),
   );
@@ -131,6 +148,12 @@ export class DefaultServiceFactory implements ServiceFactory {
 
   questionnaireResponse(): QuestionnaireResponseService {
     return this.questionnaireResponseService.value;
+  }
+
+  // Methods - Health Stats
+
+  healthStats(): HealthStatsService {
+    return this.healthStatsService.value;
   }
 
   // Methods - Trigger
