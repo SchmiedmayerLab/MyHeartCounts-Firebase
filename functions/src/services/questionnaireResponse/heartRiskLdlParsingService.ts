@@ -33,7 +33,7 @@ export class HeartRiskLdlParsingQuestionnaireResponseService extends Questionnai
       "https://myheartcounts.stanford.edu/fhir/survey/heartRisk",
     ];
 
-    if (!targetQuestionnaireUrls.includes(response.content.questionnaire)) {
+    if (!this.targetsQuestionnaire(response.content, targetQuestionnaireUrls)) {
       return false;
     }
 

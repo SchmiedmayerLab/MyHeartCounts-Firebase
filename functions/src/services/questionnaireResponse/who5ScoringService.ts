@@ -78,7 +78,7 @@ export class Who5ScoringQuestionnaireResponseService extends QuestionnaireRespon
       "https://myheartcounts.stanford.edu/fhir/survey/who5",
     ];
 
-    if (!targetQuestionnaireUrls.includes(response.content.questionnaire)) {
+    if (!this.targetsQuestionnaire(response.content, targetQuestionnaireUrls)) {
       return false;
     }
 

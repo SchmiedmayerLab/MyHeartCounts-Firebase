@@ -153,7 +153,7 @@ export class DietScoringQuestionnaireResponseService extends QuestionnaireRespon
       "https://myheartcounts.stanford.edu/fhir/survey/dietScore",
     ];
 
-    if (!targetQuestionnaireUrls.includes(response.content.questionnaire)) {
+    if (!this.targetsQuestionnaire(response.content, targetQuestionnaireUrls)) {
       return false;
     }
 
