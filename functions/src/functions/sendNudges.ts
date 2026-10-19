@@ -204,7 +204,7 @@ export const onScheduleNotificationProcessor = onSchedule(
   {
     schedule: "*/15 * * * *",
     timeZone: "UTC",
-    timeoutSeconds: 300,
+    timeoutSeconds: 780,
     serviceAccount: privilegedServiceAccount,
   },
   async () => {
