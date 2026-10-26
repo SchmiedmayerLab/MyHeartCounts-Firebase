@@ -18,6 +18,7 @@ import {
   getSmtpUsername,
 } from "../env.js";
 import { privilegedServiceAccount } from "./helpers.js";
+import { getServiceFactory } from "../services/factory/getServiceFactory.js";
 
 // Renders in the submitter's timezone when the feedback carries one, e.g.
 // "Jul 31, 2026, 12:33:47 PM PDT".
@@ -38,11 +39,27 @@ const formatTimestamp = (
   }
 };
 
+const lookupUserEmail = async (
+  accountId: unknown,
+): Promise<string | undefined> => {
+  if (typeof accountId !== "string") return undefined;
+  try {
+    const auth = await getServiceFactory().user().getAuth(accountId);
+    return auth.email;
+  } catch (error) {
+    logger.warn(
+      `onFeedbackCreated: Could not look up email for ${accountId}: ${String(error)}`,
+    );
+    return undefined;
+  }
+};
+
 const formatFeedbackEmail = (
   feedbackId: string,
   data: Record<string, unknown>,
+  userEmail: string | undefined,
 ): { subject: string; text: string } => {
-  const subject = `[MyHeartCounts] New Feedback Received (ID: ${feedbackId})`;
+  const subject = `Secure: [MyHeartCounts] New Feedback Received (ID: ${feedbackId})`;
 
   const { accountId, ...rest } = data;
   const lines: string[] = [
@@ -50,6 +67,7 @@ const formatFeedbackEmail = (
     ``,
     `Feedback ID: ${feedbackId}`,
     `From user: ${typeof accountId === "string" ? accountId : "unknown"}`,
+    `User email: ${userEmail ?? "unknown"}`,
     ``,
     `--- Feedback Content ---`,
   ];
@@ -82,7 +100,8 @@ export const onFeedbackCreated = onDocumentCreated(
 
     const feedbackId = event.params.feedbackId;
     const data = snapshot.data();
-    const { subject, text } = formatFeedbackEmail(feedbackId, data);
+    const userEmail = await lookupUserEmail(data.accountId);
+    const { subject, text } = formatFeedbackEmail(feedbackId, data, userEmail);
 
     try {
       // requireTLS/forceAuth make the transport fail loudly if the server does
