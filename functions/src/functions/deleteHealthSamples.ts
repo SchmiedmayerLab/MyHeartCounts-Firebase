@@ -47,8 +47,7 @@ export const deleteHealthSamples = validatedOnCall(
       .doc(userId)
       .get();
     const userDataContent = userData.data() as
-      | { hasWithdrawnFromStudy?: boolean }
-      | undefined;
+      { hasWithdrawnFromStudy?: boolean } | undefined;
     const hasWithdrawnFromStudy =
       userDataContent?.hasWithdrawnFromStudy ?? false;
 

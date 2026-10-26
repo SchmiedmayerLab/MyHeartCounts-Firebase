@@ -65,6 +65,9 @@ enum EducationLevel {
   DOCTORAL_DEGREE = "doctoralDegree",
 }
 
+const toEducationLevel = (value: string): EducationLevel | undefined =>
+  Object.values(EducationLevel).find((level) => (level as string) === value);
+
 const mhcGenderIdentityMap: Partial<Record<number, string>> = {
   0: "prefer not to state",
   1: "male",
@@ -530,7 +533,7 @@ export class PosttrialNudgeService {
         // Build education level context
         let educationContext = "";
         if (educationLevel) {
-          switch (educationLevel as EducationLevel) {
+          switch (toEducationLevel(educationLevel)) {
             case EducationLevel.DID_NOT_ATTEND_SCHOOL:
             case EducationLevel.GRADE_SCHOOL:
             case EducationLevel.HIGH_SCHOOL:
