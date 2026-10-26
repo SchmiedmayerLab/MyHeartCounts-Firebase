@@ -7,7 +7,6 @@ import { Timestamp } from "firebase-admin/firestore";
 import { logger } from "firebase-functions";
 import { onDocumentCreated } from "firebase-functions/v2/firestore";
 import { createTransport } from "nodemailer";
-import type SMTPTransport from "nodemailer/lib/smtp-transport";
 import {
   feedbackEmailSecretParams,
   getFeedbackCoordinatorEmail,
@@ -86,9 +85,7 @@ export const onFeedbackCreated = onDocumentCreated(
 
     try {
       // requireTLS/forceAuth make the transport fail loudly if the server does
-      // not offer STARTTLS or AUTH, instead of silently sending
-      // unauthenticated. forceAuth is supported by nodemailer at runtime but
-      // missing from @types/nodemailer, so the options object needs a cast.
+      // not offer STARTTLS or AUTH, instead of silently sending unauthenticated.
       const port = Number(getSmtpPort());
       const transporter = createTransport({
         host: getSmtpHost(),
@@ -101,7 +98,7 @@ export const onFeedbackCreated = onDocumentCreated(
           user: getSmtpUsername(),
           pass: getSmtpPassword(),
         },
-      } as SMTPTransport.Options);
+      });
 
       await transporter.sendMail({
         from: `"MyHeart Counts" <${getFeedbackSenderEmail()}>`,
