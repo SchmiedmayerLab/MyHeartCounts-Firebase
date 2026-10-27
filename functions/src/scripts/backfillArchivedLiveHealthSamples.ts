@@ -80,8 +80,7 @@ const listUserIds = async (
       pageToken,
     });
     const apiResponse = result[2] as
-      | { prefixes?: string[]; nextPageToken?: string }
-      | undefined;
+      { prefixes?: string[]; nextPageToken?: string } | undefined;
 
     const prefixes: string[] = apiResponse?.prefixes ?? [];
     for (const p of prefixes) {
