@@ -3,8 +3,6 @@
 // SPDX-FileCopyrightText: 2026 Stanford University and the project authors (see CONTRIBUTORS.md)
 // SPDX-License-Identifier: MIT
 
-/* eslint-disable @typescript-eslint/no-unused-expressions */
-
 import { expect } from "chai";
 import { describe, it } from "mocha";
 import {
@@ -31,22 +29,23 @@ describe("scoreToObservation", () => {
   );
 
   it("should code the sample type under the Grove and the superseded system", () => {
-    expect(
-      observation.code.coding?.map((coding) => coding.system),
-    ).to.deep.equal([
-      CodingSystem.mhcSampleType,
-      CodingSystem.mhcSampleTypeSuperseded,
+    expect(observation.code.coding).to.deep.equal([
+      {
+        code: "MHCCustomSampleTypeNicotineExposure",
+        display: "Nicotine Exposure Score",
+        system: CodingSystem.mhcSampleType,
+      },
+      {
+        code: "MHCCustomSampleTypeNicotineExposure",
+        display: "Nicotine Exposure Score",
+        system: CodingSystem.mhcSampleTypeSuperseded,
+      },
     ]);
-    expect(
-      observation.code.coding?.every(
-        (coding) => coding.code === "MHCCustomSampleTypeNicotineExposure",
-      ),
-    ).to.be.true;
   });
 
   it("should write a final observation with a UCUM count quantity", () => {
     expect(observation.status).to.equal(FHIRObservationStatus.final);
-    expect(observation.valueQuantity).to.deep.include({
+    expect(observation.valueQuantity).to.deep.equal({
       value: 3,
       unit: "count",
       system: CodingSystem.ucum,
@@ -57,18 +56,15 @@ describe("scoreToObservation", () => {
     );
   });
 
-  it("should name the source revision under the Grove extension url", () => {
-    const urls = observation.extension?.map((extension) => extension.url) ?? [];
-    expect(urls).to.include(
-      "https://grovealliance.org/fhir/core/StructureDefinition/sourceRevision/version",
-    );
-    expect(urls).to.include(
-      "https://bdh.stanford.edu/fhir/defs/sampleUploadTimeZone",
-    );
+  it("should keep the MHC time zone extension and use the Grove source revision urls", () => {
     expect(
-      urls.some((url) =>
-        url.includes("bdh.stanford.edu/fhir/defs/sourceRevision"),
-      ),
-    ).to.be.false;
+      observation.extension?.map((extension) => extension.url),
+    ).to.deep.equal([
+      "https://bdh.stanford.edu/fhir/defs/sampleUploadTimeZone",
+      "https://grovealliance.org/fhir/core/StructureDefinition/sourceRevision/source/name",
+      "https://grovealliance.org/fhir/core/StructureDefinition/sourceRevision/source/bundleIdentifier",
+      "https://grovealliance.org/fhir/core/StructureDefinition/sourceRevision/version",
+      "https://grovealliance.org/fhir/core/StructureDefinition/sourceRevision/OSVersion",
+    ]);
   });
 });

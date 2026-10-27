@@ -4,7 +4,6 @@
 // SPDX-License-Identifier: MIT
 
 import { expect } from "chai";
-import { Timestamp } from "firebase-admin/firestore";
 import { describe, it } from "mocha";
 import {
   FHIRQuestionnaireResponse,
@@ -29,39 +28,42 @@ import {
   DefaultWho5ScoreCalculator,
   Who5ScoringQuestionnaireResponseService,
 } from "../../../services/questionnaireResponse/who5ScoringService.js";
-
-const survey = "https://myheartcounts.stanford.edu/fhir/survey";
+import {
+  preGroveQuestionnaireResponse,
+  questionnaireResponseDocument,
+  surveyUrl,
+  testUserId,
+} from "../../helpers/questionnaireResponses.js";
 
 describe("questionnaireCanonicalUrl", () => {
   it("should return the url of an unversioned canonical", () => {
-    expect(questionnaireCanonicalUrl(`${survey}/who5`)).to.equal(
-      `${survey}/who5`,
+    expect(questionnaireCanonicalUrl(`${surveyUrl}/who5`)).to.equal(
+      `${surveyUrl}/who5`,
     );
   });
 
   it("should return the url of a versioned canonical", () => {
-    expect(questionnaireCanonicalUrl(`${survey}/who5|0.0.0`)).to.equal(
-      `${survey}/who5`,
+    expect(questionnaireCanonicalUrl(`${surveyUrl}/who5|0.0.0`)).to.equal(
+      `${surveyUrl}/who5`,
     );
   });
 
   for (const canonical of [
     "",
     "|0.0.0",
-    `${survey}/who5|`,
-    `${survey}/who5|0.0.0|1.0.0`,
-    `${survey}/who5#fragment`,
-    `${survey}/who5|0.0.0#fragment`,
+    `${surveyUrl}/who5|`,
+    `${surveyUrl}/who5|0.0.0|1.0.0`,
+    `${surveyUrl}/who5#fragment`,
+    `${surveyUrl}/who5|0.0.0#fragment`,
   ]) {
     it(`should reject the malformed canonical '${canonical}'`, () => {
-      // eslint-disable-next-line @typescript-eslint/no-unused-expressions
-      expect(questionnaireCanonicalUrl(canonical)).to.be.null;
+      expect(questionnaireCanonicalUrl(canonical)).to.equal(null);
     });
   }
 });
 
 describe("QuestionnaireResponseService canonical matching", () => {
-  const databaseService = {
+  const rejectingDatabaseService = {
     getQuery: () => Promise.reject(new Error("unexpected database access")),
     runTransaction: () =>
       Promise.reject(new Error("unexpected database access")),
@@ -71,31 +73,33 @@ describe("QuestionnaireResponseService canonical matching", () => {
     [
       "dietScore",
       new DietScoringQuestionnaireResponseService({
-        databaseService,
+        databaseService: rejectingDatabaseService,
         scoreCalculator: new DietScoreCalculator(),
       }),
     ],
     [
       "heartRisk",
-      new HeartRiskLdlParsingQuestionnaireResponseService({ databaseService }),
+      new HeartRiskLdlParsingQuestionnaireResponseService({
+        databaseService: rejectingDatabaseService,
+      }),
     ],
     [
       "heartRisk",
       new HeartRiskNicotineScoringQuestionnaireResponseService({
-        databaseService,
+        databaseService: rejectingDatabaseService,
       }),
     ],
     [
       "nicotineExposure",
       new NicotineScoringQuestionnaireResponseService({
-        databaseService,
+        databaseService: rejectingDatabaseService,
         scoreCalculator: new DefaultNicotineScoreCalculator(),
       }),
     ],
     [
       "who5",
       new Who5ScoringQuestionnaireResponseService({
-        databaseService,
+        databaseService: rejectingDatabaseService,
         scoreCalculator: new DefaultWho5ScoreCalculator(),
       }),
     ],
@@ -104,77 +108,71 @@ describe("QuestionnaireResponseService canonical matching", () => {
   for (const [instrument, service] of services) {
     it(`${service.constructor.name} should ignore malformed ${instrument} canonicals`, async () => {
       for (const canonical of [
-        `${survey}/${instrument}|`,
-        `${survey}/${instrument}|0.0.0|1.0.0`,
-        `${survey}/${instrument}|0.0.0#fragment`,
+        `${surveyUrl}/${instrument}|`,
+        `${surveyUrl}/${instrument}|0.0.0|1.0.0`,
+        `${surveyUrl}/${instrument}|0.0.0#fragment`,
       ]) {
         const handled = await service.handle(
-          "test-user",
-          {
-            id: "test-response-id",
-            path: "users/test-user/questionnaireResponses/test-response-id",
-            lastUpdate: new Date(),
-            content: new FHIRQuestionnaireResponse({
+          testUserId,
+          questionnaireResponseDocument(
+            "test-response-id",
+            new FHIRQuestionnaireResponse({
               id: "test-response",
               authored: new Date(),
               questionnaire: canonical,
               item: [],
             }),
-          },
+          ),
           { isNew: true },
         );
-        // eslint-disable-next-line @typescript-eslint/no-unused-expressions
-        expect(handled, canonical).to.be.false;
+        expect(handled, canonical).to.equal(false);
       }
     });
   }
 
-  it("should score a pre-Grove questionnaire response as the shipped app stores it", async () => {
-    const content = fhirQuestionnaireResponseConverter.value.schema.parse({
-      resourceType: "QuestionnaireResponse",
-      id: "6c1d2e3f-4a5b-4c6d-8e7f-9a0b1c2d3e4f",
-      questionnaire: `${survey}/nicotineExposure`,
-      status: "completed",
-      authored: Timestamp.fromDate(new Date("2026-08-28T15:32:00.000Z")),
-      item: [
-        {
-          linkId: "dcb2277e-fe96-4f45-844a-ef58a9516380",
-          answer: [
-            {
-              valueCoding: {
-                system: "urn:uuid:049cbbd0-02fa-4fcd-83a7-65a112c1f607",
-                code: "never-smoked/vaped",
-                display: "Never smoked/vaped",
-              },
-            },
-          ],
-        },
-      ],
-    });
-    expect(content.authored.toISOString()).to.equal("2026-08-28T15:32:00.000Z");
-
-    const service = new NicotineScoringQuestionnaireResponseService({
-      databaseService: {
-        getQuery: () => Promise.resolve([]),
-        runTransaction: () => Promise.resolve(),
-      } as Partial<DatabaseService> as DatabaseService,
+  const scoringDatabaseService = {
+    getQuery: () => Promise.resolve([]),
+    runTransaction: () => Promise.resolve(),
+  } as Partial<DatabaseService> as DatabaseService;
+  const nicotineScoringService =
+    new NicotineScoringQuestionnaireResponseService({
+      databaseService: scoringDatabaseService,
       scoreCalculator: new DefaultNicotineScoreCalculator(),
     });
-    const handled = await service.handle(
-      "test-user",
-      {
-        id: "6c1d2e3f-4a5b-4c6d-8e7f-9a0b1c2d3e4f",
-        path: "users/test-user/questionnaireResponses/6c1d2e3f-4a5b-4c6d-8e7f-9a0b1c2d3e4f",
-        lastUpdate: new Date(),
-        content,
-      },
+  const neverSmokedAnswer = [
+    {
+      linkId: "dcb2277e-fe96-4f45-844a-ef58a9516380",
+      answer: [
+        {
+          valueCoding: {
+            system: "urn:uuid:049cbbd0-02fa-4fcd-83a7-65a112c1f607",
+            code: "never-smoked/vaped",
+            display: "Never smoked/vaped",
+          },
+        },
+      ],
+    },
+  ];
+
+  it("should score a pre-Grove questionnaire response as the shipped app stores it", async () => {
+    const id = "6c1d2e3f-4a5b-4c6d-8e7f-9a0b1c2d3e4f";
+    const content = preGroveQuestionnaireResponse(
+      "nicotineExposure",
+      id,
+      neverSmokedAnswer,
+    );
+    expect(content.authored.toISOString()).to.equal("2026-08-28T15:32:00.000Z");
+
+    const handled = await nicotineScoringService.handle(
+      testUserId,
+      questionnaireResponseDocument(id, content),
       { isNew: true },
     );
-    // eslint-disable-next-line @typescript-eslint/no-unused-expressions
-    expect(handled).to.be.true;
+    expect(handled).to.equal(true);
   });
 
   it("should score a Grove questionnaire response as the app stores it", async () => {
+    const id = "f4c1e7a2-5b0d-4d8e-9a3f-2c6b1e8d7a90";
     const content = fhirQuestionnaireResponseConverter.value.schema.parse({
       resourceType: "QuestionnaireResponse",
       extension: [
@@ -198,54 +196,29 @@ describe("QuestionnaireResponseService canonical matching", () => {
         },
       ],
       identifier: {
-        system: `${survey}/nicotineExposure`,
-        value: "f4c1e7a2-5b0d-4d8e-9a3f-2c6b1e8d7a90",
+        system: `${surveyUrl}/nicotineExposure`,
+        value: id,
       },
-      questionnaire: `${survey}/nicotineExposure|0.0.0`,
+      questionnaire: `${surveyUrl}/nicotineExposure|0.0.0`,
       status: "completed",
       subject: {
         identifier: {
           system:
             "https://myheartcounts.stanford.edu/fhir/identifiers/participant",
-          value: "test-user",
+          value: testUserId,
         },
         type: "Patient",
       },
       authored: "2026-08-28T08:32:00-07:00",
-      item: [
-        {
-          linkId: "dcb2277e-fe96-4f45-844a-ef58a9516380",
-          answer: [
-            {
-              valueCoding: {
-                system: "urn:uuid:049cbbd0-02fa-4fcd-83a7-65a112c1f607",
-                code: "never-smoked/vaped",
-              },
-            },
-          ],
-        },
-      ],
+      item: neverSmokedAnswer,
     });
     expect(content.authored.toISOString()).to.equal("2026-08-28T15:32:00.000Z");
 
-    const service = new NicotineScoringQuestionnaireResponseService({
-      databaseService: {
-        getQuery: () => Promise.resolve([]),
-        runTransaction: () => Promise.resolve(),
-      } as Partial<DatabaseService> as DatabaseService,
-      scoreCalculator: new DefaultNicotineScoreCalculator(),
-    });
-    const handled = await service.handle(
-      "test-user",
-      {
-        id: "f4c1e7a2-5b0d-4d8e-9a3f-2c6b1e8d7a90",
-        path: "users/test-user/questionnaireResponses/f4c1e7a2-5b0d-4d8e-9a3f-2c6b1e8d7a90",
-        lastUpdate: new Date(),
-        content,
-      },
+    const handled = await nicotineScoringService.handle(
+      testUserId,
+      questionnaireResponseDocument(id, content),
       { isNew: true },
     );
-    // eslint-disable-next-line @typescript-eslint/no-unused-expressions
-    expect(handled).to.be.true;
+    expect(handled).to.equal(true);
   });
 });
