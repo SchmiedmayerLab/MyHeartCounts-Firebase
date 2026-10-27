@@ -23,12 +23,15 @@ jobs:
         with:
           app-id: ${{ secrets.APP_ID }}
           private-key: ${{ secrets.PRIVATE_KEY }}
+          permission-contents: write
+          permission-actions: write
 
       - name: Checkout repository
         uses: actions/checkout@v7
         with:
           ref: ${{ github.event.release.target_commitish }}
           token: ${{ steps.app-token.outputs.token }}
+          persist-credentials: false
 
       - name: Update root package.json
         uses: BellCubeDev/update-package-version-by-release-tag@v2
@@ -44,12 +47,13 @@ jobs:
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
           APP_SLUG: ${{ steps.app-token.outputs.app-slug }}
+          TAG_NAME: ${{ github.event.release.tag_name }}
         run: |
           APP_USER_ID=$(gh api "/users/${APP_SLUG}[bot]" --jq '.id')
           git config --local user.email "${APP_USER_ID}+${APP_SLUG}[bot]@users.noreply.github.com"
           git config --local user.name "${APP_SLUG}[bot]"
           git add package.json functions/package.json
-          git diff --staged --quiet || git commit -m "chore: update version to ${{ github.event.release.tag_name }}"
+          git diff --staged --quiet || git commit -m "chore: update version to ${TAG_NAME}"
 
       - name: Push changes
         uses: ad-m/github-push-action@master
@@ -60,14 +64,18 @@ jobs:
       - name: Update release tag to version-bumped commit
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          TAG_NAME: ${{ github.event.release.tag_name }}
         run: |
+          gh auth setup-git
           NEW_SHA=$(git rev-parse HEAD)
-          git tag -f ${{ github.event.release.tag_name }} "$NEW_SHA"
-          git push -f origin ${{ github.event.release.tag_name }}
-          gh release edit ${{ github.event.release.tag_name }} --target "$NEW_SHA"
+          git tag -f "$TAG_NAME" "$NEW_SHA"
+          git push -f origin "$TAG_NAME"
+          gh release edit "$TAG_NAME" --target "$NEW_SHA"
 
       - name: Trigger deployment
         uses: actions/github-script@v9
+        env:
+          TARGET_COMMITISH: ${{ github.event.release.target_commitish }}
         with:
           github-token: ${{ steps.app-token.outputs.token }}
           script: |
@@ -75,7 +83,7 @@ jobs:
               owner: context.repo.owner,
               repo: context.repo.repo,
               workflow_id: 'deployment.yml',
-              ref: '${{ github.event.release.target_commitish }}',
+              ref: process.env.TARGET_COMMITISH,
               inputs: {
                 environment: 'production'
               }
