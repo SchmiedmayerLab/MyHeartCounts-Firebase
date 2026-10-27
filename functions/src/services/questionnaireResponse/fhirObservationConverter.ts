@@ -8,42 +8,47 @@ import {
   FHIRObservation,
   FHIRObservationStatus,
   mhcSampleTypeCodings,
+  MhcSampleTypeCode,
   QuantityUnit,
+  type FHIRCoding,
   type Score,
-  type FHIRCodeableConcept,
 } from "../../models/index.js";
 
 export interface QuestionnaireObservationConfig {
-  customCode: string;
+  customCode: MhcSampleTypeCode;
   display: string;
   unit: QuantityUnit;
 }
 
-export const scoreToObservation = (
-  score: Score,
-  config: QuestionnaireObservationConfig,
-  questionnaireResponseId: string,
-  observationId: string,
-  userId: string,
-): FHIRObservation => {
-  const codeableConcept: FHIRCodeableConcept = {
-    coding: mhcSampleTypeCodings(config.customCode, config.display),
-    text: config.display,
-  };
-
+export const questionnaireObservation = (input: {
+  config: QuestionnaireObservationConfig;
+  value: number;
+  date: Date;
+  questionnaireResponseId: string;
+  observationId: string;
+  userId: string;
+  extraCodings?: FHIRCoding[];
+}): FHIRObservation => {
+  const { config } = input;
   return new FHIRObservation({
-    id: observationId,
+    id: input.observationId,
     status: FHIRObservationStatus.final,
     subject: {
-      reference: `user/${userId}`,
+      reference: `user/${input.userId}`,
     },
-    code: codeableConcept,
-    valueQuantity: config.unit.fhirQuantity(score.overallScore),
-    effectiveDateTime: score.date,
+    code: {
+      coding: [
+        ...(input.extraCodings ?? []),
+        ...mhcSampleTypeCodings(config.customCode, config.display),
+      ],
+      text: config.display,
+    },
+    valueQuantity: config.unit.fhirQuantity(input.value),
+    effectiveDateTime: input.date,
     issued: new Date(),
     derivedFrom: [
       {
-        reference: `QuestionnaireResponse/${questionnaireResponseId}`,
+        reference: `QuestionnaireResponse/${input.questionnaireResponseId}`,
       },
     ],
     extension: [
@@ -71,21 +76,43 @@ export const scoreToObservation = (
   });
 };
 
+export const scoreToObservation = (
+  score: Score,
+  config: QuestionnaireObservationConfig,
+  questionnaireResponseId: string,
+  observationId: string,
+  userId: string,
+): FHIRObservation =>
+  questionnaireObservation({
+    config,
+    value: score.overallScore,
+    date: score.date,
+    questionnaireResponseId,
+    observationId,
+    userId,
+  });
+
 export const getDietObservationConfig = (): QuestionnaireObservationConfig => ({
-  customCode: "MHCCustomSampleTypeDietMEPAScore",
+  customCode: MhcSampleTypeCode.dietMEPAScore,
   display: "Diet MEPA Score",
   unit: QuantityUnit.score,
 });
 
 export const getNicotineObservationConfig =
   (): QuestionnaireObservationConfig => ({
-    customCode: "MHCCustomSampleTypeNicotineExposure",
+    customCode: MhcSampleTypeCode.nicotineExposure,
     display: "Nicotine Exposure Score",
     unit: QuantityUnit.score,
   });
 
 export const getWho5ObservationConfig = (): QuestionnaireObservationConfig => ({
-  customCode: "MHCCustomSampleTypeWHO5Score",
+  customCode: MhcSampleTypeCode.who5Score,
   display: "WHO-5 Well-Being Score",
   unit: QuantityUnit.score,
+});
+
+export const getLdlObservationConfig = (): QuestionnaireObservationConfig => ({
+  customCode: MhcSampleTypeCode.bloodLipidMeasurement,
+  display: "LDL Cholesterol",
+  unit: QuantityUnit.mg_dL,
 });
