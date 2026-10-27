@@ -5,8 +5,10 @@
 
 import { getPackageVersion } from "../../helpers/packageVersion.js";
 import {
+  CodingSystem,
   FHIRObservation,
   FHIRObservationStatus,
+  type FHIRCoding,
   type Score,
   type FHIRCodeableConcept,
 } from "../../models/index.js";
@@ -19,6 +21,14 @@ export interface QuestionnaireObservationConfig {
   ucumCode?: string;
 }
 
+export const mhcSampleTypeCodings = (
+  code: string,
+  display: string,
+): FHIRCoding[] =>
+  [CodingSystem.mhcSampleType, CodingSystem.mhcSampleTypeSuperseded].map(
+    (system) => ({ code, display, system }),
+  );
+
 export const scoreToObservation = (
   score: Score,
   config: QuestionnaireObservationConfig,
@@ -27,13 +37,7 @@ export const scoreToObservation = (
   userId: string,
 ): FHIRObservation => {
   const codeableConcept: FHIRCodeableConcept = {
-    coding: [
-      {
-        code: config.customCode,
-        display: config.display,
-        system: "https://spezi.stanford.edu",
-      },
-    ],
+    coding: mhcSampleTypeCodings(config.customCode, config.display),
     text: config.display,
   };
 
@@ -63,19 +67,19 @@ export const scoreToObservation = (
         valueString: Intl.DateTimeFormat().resolvedOptions().timeZone,
       },
       {
-        url: "https://bdh.stanford.edu/fhir/defs/sourceRevision/source/name",
+        url: "https://grovealliance.org/fhir/core/StructureDefinition/sourceRevision/source/name",
         valueString: "My Heart Counts Firebase",
       },
       {
-        url: "https://bdh.stanford.edu/fhir/defs/sourceRevision/source/bundleIdentifier",
+        url: "https://grovealliance.org/fhir/core/StructureDefinition/sourceRevision/source/bundleIdentifier",
         valueString: "edu.stanford.MyHeartCounts",
       },
       {
-        url: "https://bdh.stanford.edu/fhir/defs/sourceRevision/version",
+        url: "https://grovealliance.org/fhir/core/StructureDefinition/sourceRevision/version",
         valueString: getPackageVersion(),
       },
       {
-        url: "https://bdh.stanford.edu/fhir/defs/sourceRevision/OSVersion",
+        url: "https://grovealliance.org/fhir/core/StructureDefinition/sourceRevision/OSVersion",
         valueString: process.version,
       },
     ],
@@ -86,7 +90,7 @@ export const getDietObservationConfig = (): QuestionnaireObservationConfig => ({
   customCode: "MHCCustomSampleTypeDietMEPAScore",
   display: "Diet MEPA Score",
   unit: "count",
-  unitSystem: "http://unitsofmeasure.org",
+  unitSystem: CodingSystem.ucum,
   ucumCode: "{count}",
 });
 
@@ -95,7 +99,7 @@ export const getNicotineObservationConfig =
     customCode: "MHCCustomSampleTypeNicotineExposure",
     display: "Nicotine Exposure Score",
     unit: "count",
-    unitSystem: "http://unitsofmeasure.org",
+    unitSystem: CodingSystem.ucum,
     ucumCode: "{count}",
   });
 
@@ -103,6 +107,6 @@ export const getWho5ObservationConfig = (): QuestionnaireObservationConfig => ({
   customCode: "MHCCustomSampleTypeWHO5Score",
   display: "WHO-5 Well-Being Score",
   unit: "count",
-  unitSystem: "http://unitsofmeasure.org",
+  unitSystem: CodingSystem.ucum,
   ucumCode: "{count}",
 });

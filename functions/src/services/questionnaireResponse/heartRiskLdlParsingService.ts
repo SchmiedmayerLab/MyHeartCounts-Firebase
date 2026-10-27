@@ -5,8 +5,10 @@
 
 import { randomUUID } from "crypto";
 import { logger } from "firebase-functions";
+import { mhcSampleTypeCodings } from "./fhirObservationConverter.js";
 import { QuestionnaireResponseService } from "./questionnaireResponseService.js";
 import {
+  CodingSystem,
   FHIRObservation,
   FHIRObservationStatus,
   type FHIRQuestionnaireResponse,
@@ -122,20 +124,19 @@ export class HeartRiskLdlParsingQuestionnaireResponseService extends Questionnai
         coding: [
           {
             code: "18262-6",
-            system: "http://loinc.org",
+            system: CodingSystem.loinc,
           },
-          {
-            code: "MHCCustomSampleTypeBloodLipidMeasurement",
-            display: "LDL Cholesterol",
-            system: "https://spezi.stanford.edu",
-          },
+          ...mhcSampleTypeCodings(
+            "MHCCustomSampleTypeBloodLipidMeasurement",
+            "LDL Cholesterol",
+          ),
         ],
       },
       valueQuantity: {
         value: ldlValue,
         unit: "mg/dL",
-        code: "18262-6",
-        system: "http://loinc.org",
+        code: "mg/dL",
+        system: CodingSystem.ucum,
       },
       effectiveDateTime: authoredDateTime,
       issued: new Date(),
