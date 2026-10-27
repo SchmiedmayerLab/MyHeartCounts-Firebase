@@ -8,16 +8,24 @@
 /* eslint-disable @typescript-eslint/no-unused-expressions */
 
 import { expect } from "chai";
-import { Timestamp } from "firebase-admin/firestore";
+import { type Firestore } from "firebase-admin/firestore";
 import { describe, it } from "mocha";
 import {
   CodingSystem,
   type FHIRObservation,
   FHIRQuestionnaireResponse,
-  fhirQuestionnaireResponseConverter,
+  QuantityUnit,
 } from "../../../models/index.js";
-import type { DatabaseService } from "../../../services/database/databaseService.js";
+import { FirestoreService } from "../../../services/database/firestoreService.js";
 import { HeartRiskLdlParsingQuestionnaireResponseService } from "../../../services/questionnaireResponse/heartRiskLdlParsingService.js";
+import {
+  authoredAt,
+  groveQuestionnaireResponse,
+  preGroveQuestionnaireResponse,
+  questionnaireResponseDocument,
+  testUserId,
+} from "../../helpers/questionnaireResponses.js";
+import { MockFirestore } from "../../mocks/firestore.js";
 
 describe("HeartRiskLdlParsingQuestionnaireResponseService", () => {
   describe("handle method", () => {
@@ -343,158 +351,97 @@ describe("HeartRiskLdlParsingQuestionnaireResponseService", () => {
   });
 });
 
-interface WrittenObservation {
-  collection: string;
-  id: string;
-  observation: FHIRObservation;
-}
-
-const capturingDatabaseService = (
-  written: WrittenObservation[],
-): DatabaseService =>
-  ({
-    runTransaction: (
-      run: (collections: unknown, transaction: unknown) => unknown,
-    ) =>
-      Promise.resolve(
-        run(
-          {
-            userHealthObservations: (_userId: string, collection: string) => ({
-              doc: (id: string) => ({ collection, id }),
-            }),
-          },
-          {
-            set: (
-              ref: { collection: string; id: string },
-              observation: FHIRObservation,
-            ) => {
-              written.push({ ...ref, observation });
-            },
-          },
-        ),
-      ),
-  }) as unknown as DatabaseService;
-
-const survey = "https://myheartcounts.stanford.edu/fhir/survey";
 const ldlLinkId = "1574e238-8804-4a17-fa5e-a764f094bd2b";
+const ldlCollection =
+  "HealthObservations_MHCCustomSampleTypeBloodLipidMeasurement";
 
-const expectLdlObservation = (written: WrittenObservation[], value: number) => {
-  expect(written).to.have.length(1);
-  const { collection, id, observation } = written[0];
-  expect(collection).to.equal(
-    "HealthObservations_MHCCustomSampleTypeBloodLipidMeasurement",
+const storeLdlObservation = async (
+  id: string,
+  content: FHIRQuestionnaireResponse,
+): Promise<FHIRObservation> => {
+  const databaseService = new FirestoreService(
+    new MockFirestore() as unknown as Firestore,
   );
-  expect(id).to.equal(observation.id);
-  expect(observation.code.coding?.map((coding) => coding.system)).to.deep.equal(
-    [
-      CodingSystem.loinc,
-      CodingSystem.mhcSampleType,
-      CodingSystem.mhcSampleTypeSuperseded,
-    ],
-  );
-  expect(observation.valueQuantity).to.deep.include({
-    value,
-    unit: "mg/dL",
-    system: CodingSystem.ucum,
-    code: "mg/dL",
+  const service = new HeartRiskLdlParsingQuestionnaireResponseService({
+    databaseService,
   });
+  const handled = await service.handle(
+    testUserId,
+    questionnaireResponseDocument(id, content),
+    { isNew: true },
+  );
+  expect(handled).to.equal(true);
+
+  const stored = await databaseService.getQuery((collections) =>
+    collections.userHealthObservations(testUserId, ldlCollection),
+  );
+  expect(stored).to.have.length(1);
+  expect(stored[0].path).to.equal(
+    `users/${testUserId}/${ldlCollection}/${stored[0].content.id}`,
+  );
+  expect(stored[0].content.derivedFrom?.[0].reference).to.equal(
+    `QuestionnaireResponse/${id}`,
+  );
+  return stored[0].content;
+};
+
+const expectLdlObservation = (observation: FHIRObservation, value: number) => {
+  expect(
+    observation.code.coding?.map(({ system, code, display }) => ({
+      system,
+      code,
+      display,
+    })),
+  ).to.deep.equal([
+    { system: CodingSystem.loinc, code: "18262-6", display: undefined },
+    {
+      system: CodingSystem.mhcSampleType,
+      code: "MHCCustomSampleTypeBloodLipidMeasurement",
+      display: "LDL Cholesterol",
+    },
+    {
+      system: CodingSystem.mhcSampleTypeSuperseded,
+      code: "MHCCustomSampleTypeBloodLipidMeasurement",
+      display: "LDL Cholesterol",
+    },
+  ]);
+  expect(observation.valueQuantity).to.deep.include(
+    QuantityUnit.mg_dL.fhirQuantity(value),
+  );
   expect(observation.effectiveDateTime?.toISOString()).to.equal(
-    "2026-08-28T15:32:00.000Z",
+    authoredAt.toISOString(),
   );
 };
 
 describe("HeartRiskLdlParsingQuestionnaireResponseService observation shape", () => {
-  it("should store the LDL value of a Grove heart risk response", async () => {
-    const written: WrittenObservation[] = [];
-    const service = new HeartRiskLdlParsingQuestionnaireResponseService({
-      databaseService: capturingDatabaseService(written),
-    });
-    const content = fhirQuestionnaireResponseConverter.value.schema.parse({
-      resourceType: "QuestionnaireResponse",
-      meta: {
-        profile: [
-          "https://grovealliance.org/fhir/questionnaire/StructureDefinition/grove-questionnaire-response",
+  it("should store a Grove LDL answer as an observation both app generations read", async () => {
+    const id = "2f9d7c1a-4b3e-4a5c-8d6e-7f8a9b0c1d2e";
+    const content = groveQuestionnaireResponse("heartRisk", id, [
+      {
+        linkId: ldlLinkId,
+        answer: [
+          {
+            valueQuantity: {
+              value: 132,
+              unit: "milligram per deciliter",
+              system: CodingSystem.ucum,
+              code: "mg/dL",
+            },
+          },
         ],
       },
-      identifier: {
-        system: `${survey}/heartRisk`,
-        value: "2f9d7c1a-4b3e-4a5c-8d6e-7f8a9b0c1d2e",
-      },
-      language: "en-US",
-      questionnaire: `${survey}/heartRisk|0.2.5`,
-      status: "completed",
-      subject: {
-        identifier: {
-          system:
-            "https://myheartcounts.stanford.edu/fhir/identifiers/participant",
-          value: "test-user",
-        },
-        type: "Patient",
-      },
-      authored: "2026-08-28T08:32:00-07:00",
-      item: [
-        {
-          linkId: ldlLinkId,
-          answer: [
-            {
-              valueQuantity: {
-                value: 132,
-                unit: "milligram per deciliter",
-                system: CodingSystem.ucum,
-                code: "mg/dL",
-              },
-            },
-          ],
-        },
-      ],
-    });
-
-    const handled = await service.handle(
-      "test-user",
-      {
-        id: "2f9d7c1a-4b3e-4a5c-8d6e-7f8a9b0c1d2e",
-        path: "users/test-user/questionnaireResponses/2f9d7c1a-4b3e-4a5c-8d6e-7f8a9b0c1d2e",
-        lastUpdate: new Date(),
-        content,
-      },
-      { isNew: true },
-    );
-
-    expect(handled).to.be.true;
-    expectLdlObservation(written, 132);
+    ]);
+    expectLdlObservation(await storeLdlObservation(id, content), 132);
   });
 
-  it("should store the LDL value of a pre-Grove heart risk response", async () => {
-    const written: WrittenObservation[] = [];
-    const service = new HeartRiskLdlParsingQuestionnaireResponseService({
-      databaseService: capturingDatabaseService(written),
-    });
-    const content = fhirQuestionnaireResponseConverter.value.schema.parse({
-      resourceType: "QuestionnaireResponse",
-      id: "9a8b7c6d-5e4f-4a3b-8c2d-1e0f9a8b7c6d",
-      questionnaire: `${survey}/heartRisk`,
-      status: "completed",
-      authored: Timestamp.fromDate(new Date("2026-08-28T15:32:00.000Z")),
-      item: [
-        {
-          linkId: ldlLinkId,
-          answer: [{ valueQuantity: { value: 118, unit: "mg/dL" } }],
-        },
-      ],
-    });
-
-    const handled = await service.handle(
-      "test-user",
+  it("should store a pre-Grove LDL answer as an observation both app generations read", async () => {
+    const id = "9a8b7c6d-5e4f-4a3b-8c2d-1e0f9a8b7c6d";
+    const content = preGroveQuestionnaireResponse("heartRisk", id, [
       {
-        id: "9a8b7c6d-5e4f-4a3b-8c2d-1e0f9a8b7c6d",
-        path: "users/test-user/questionnaireResponses/9a8b7c6d-5e4f-4a3b-8c2d-1e0f9a8b7c6d",
-        lastUpdate: new Date(),
-        content,
+        linkId: ldlLinkId,
+        answer: [{ valueQuantity: { value: 118, unit: "mg/dL" } }],
       },
-      { isNew: true },
-    );
-
-    expect(handled).to.be.true;
-    expectLdlObservation(written, 118);
+    ]);
+    expectLdlObservation(await storeLdlObservation(id, content), 118);
   });
 });
