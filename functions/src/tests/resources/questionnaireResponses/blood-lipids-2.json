@@ -1,0 +1,48 @@
+{
+  "authored": "2026-09-01T13:25:22.466763973+02:00",
+  "extension": [
+    {
+      "extension": [
+        {
+          "url": "https://myheartcounts.stanford.edu/fhir/core/mhcAppRevision/version",
+          "valueString": "4.0.0"
+        },
+        {
+          "url": "https://myheartcounts.stanford.edu/fhir/core/mhcAppRevision/build",
+          "valueInteger": 1
+        },
+        {
+          "url": "https://myheartcounts.stanford.edu/fhir/core/mhcAppRevision/bundleIdentifier",
+          "valueString": "edu.stanford.MyHeartCounts"
+        },
+        {
+          "url": "https://myheartcounts.stanford.edu/fhir/core/mhcAppRevision/osVersion",
+          "valueString": "26.6.1"
+        }
+      ],
+      "url": "https://myheartcounts.stanford.edu/fhir/core/mhcAppRevision"
+    }
+  ],
+  "id": "04E36106-80BF-4698-B2B3-1D3FFD903459",
+  "identifier": {
+    "value": "04E36106-80BF-4698-B2B3-1D3FFD903459"
+  },
+  "item": [
+    {
+      "answer": [
+        {
+          "valueQuantity": {
+            "code": "mL/dL",
+            "system": "http://unitsofmeasure.org",
+            "unit": "mL/dL",
+            "value": 123
+          }
+        }
+      ],
+      "linkId": "blood-lipids"
+    }
+  ],
+  "questionnaire": "https://myheartcounts.stanford.edu/fhir/survey/blood-lipids",
+  "resourceType": "QuestionnaireResponse",
+  "status": "completed"
+}

@@ -1,0 +1,66 @@
+{
+  "authored": "2026-09-01T13:21:10.000684022+02:00",
+  "extension": [
+    {
+      "extension": [
+        {
+          "url": "https://myheartcounts.stanford.edu/fhir/core/mhcAppRevision/version",
+          "valueString": "4.0.0"
+        },
+        {
+          "url": "https://myheartcounts.stanford.edu/fhir/core/mhcAppRevision/build",
+          "valueInteger": 1
+        },
+        {
+          "url": "https://myheartcounts.stanford.edu/fhir/core/mhcAppRevision/bundleIdentifier",
+          "valueString": "edu.stanford.MyHeartCounts"
+        },
+        {
+          "url": "https://myheartcounts.stanford.edu/fhir/core/mhcAppRevision/osVersion",
+          "valueString": "26.6.1"
+        }
+      ],
+      "url": "https://myheartcounts.stanford.edu/fhir/core/mhcAppRevision"
+    }
+  ],
+  "id": "B8C989D4-78FC-4CD8-985E-912E479FB631",
+  "identifier": {
+    "value": "B8C989D4-78FC-4CD8-985E-912E479FB631"
+  },
+  "item": [
+    {
+      "item": [
+        {
+          "answer": [
+            {
+              "valueQuantity": {
+                "code": "mm[Hg]",
+                "system": "http://unitsofmeasure.org",
+                "unit": "mmHg",
+                "value": 69
+              }
+            }
+          ],
+          "linkId": "blood-pressure-systolic"
+        },
+        {
+          "answer": [
+            {
+              "valueQuantity": {
+                "code": "mm[Hg]",
+                "system": "http://unitsofmeasure.org",
+                "unit": "mmHg",
+                "value": 69
+              }
+            }
+          ],
+          "linkId": "blood-pressure-diastolic"
+        }
+      ],
+      "linkId": "blood-pressure"
+    }
+  ],
+  "questionnaire": "https://myheartcounts.stanford.edu/fhir/survey/blood-pressure",
+  "resourceType": "QuestionnaireResponse",
+  "status": "completed"
+}

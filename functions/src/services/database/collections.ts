@@ -103,6 +103,16 @@ export class CollectionsService {
       .withConverter(new DatabaseConverter(fhirObservationConverter.value));
   }
 
+  userHealthStatsMonth(userId: string, metric: string, monthId: string) {
+    return this.firestore
+      .collection("users")
+      .doc(userId)
+      .collection("stats")
+      .doc(metric)
+      .collection("months")
+      .doc(monthId);
+  }
+
   pendingHealthSampleDeletions(userId: string) {
     return this.firestore
       .collection("users")

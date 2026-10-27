@@ -3,14 +3,10 @@
 // SPDX-FileCopyrightText: 2026 Stanford University and the project authors (see CONTRIBUTORS.md)
 // SPDX-License-Identifier: MIT
 
-import { randomUUID } from "crypto";
 import { logger } from "firebase-functions";
+import { storeLdlObservation } from "./ldlObservation.js";
 import { QuestionnaireResponseService } from "./questionnaireResponseService.js";
-import {
-  FHIRObservation,
-  FHIRObservationStatus,
-  type FHIRQuestionnaireResponse,
-} from "../../models/index.js";
+import { type FHIRQuestionnaireResponse } from "../../models/index.js";
 import {
   type Document,
   type DatabaseService,
@@ -46,12 +42,12 @@ export class HeartRiskLdlParsingQuestionnaireResponseService extends Questionnai
         return false;
       }
 
-      await this.storeLdlObservation(
+      await storeLdlObservation(this.databaseService, {
         userId,
-        response.id,
-        ldlValue,
-        new Date(response.content.authored),
-      );
+        questionnaireResponseId: response.id,
+        value: ldlValue,
+        effectiveDateTime: new Date(response.content.authored),
+      });
 
       logger.info(
         `HeartRiskLdlParsingService: Processed heart risk questionnaire for user ${userId}, LDL: ${ldlValue} mg/dL`,
@@ -102,64 +98,5 @@ export class HeartRiskLdlParsingQuestionnaireResponseService extends Questionnai
       logger.error(`Failed to extract LDL value: ${String(error)}`);
       return null;
     }
-  }
-
-  private async storeLdlObservation(
-    userId: string,
-    questionnaireResponseId: string,
-    ldlValue: number,
-    authoredDateTime: Date,
-  ): Promise<void> {
-    const observationId = randomUUID();
-
-    const observation = new FHIRObservation({
-      id: observationId,
-      status: FHIRObservationStatus.final,
-      subject: {
-        reference: `user/${userId}`,
-      },
-      code: {
-        coding: [
-          {
-            code: "18262-6",
-            system: "http://loinc.org",
-          },
-          {
-            code: "MHCCustomSampleTypeBloodLipidMeasurement",
-            display: "LDL Cholesterol",
-            system: "https://spezi.stanford.edu",
-          },
-        ],
-      },
-      valueQuantity: {
-        value: ldlValue,
-        unit: "mg/dL",
-        code: "18262-6",
-        system: "http://loinc.org",
-      },
-      effectiveDateTime: authoredDateTime,
-      issued: new Date(),
-      derivedFrom: [
-        {
-          reference: `QuestionnaireResponse/${questionnaireResponseId}`,
-        },
-      ],
-      extension: [
-        {
-          url: "https://bdh.stanford.edu/fhir/defs/sampleUploadTimeZone",
-          valueString: Intl.DateTimeFormat().resolvedOptions().timeZone,
-        },
-      ],
-    });
-
-    const collectionName =
-      "HealthObservations_MHCCustomSampleTypeBloodLipidMeasurement";
-
-    return this.databaseService.runTransaction((collections, transaction) => {
-      const ref = collections
-        .userHealthObservations(userId, collectionName)
-        .doc(observationId);
-      transaction.set(ref, observation);
-    });
   }
 }
