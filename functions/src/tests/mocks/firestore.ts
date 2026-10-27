@@ -132,7 +132,7 @@ class MockFirestoreCollectionRef extends MockFirestoreRef {
       docs.push({
         id: key,
         exists: true,
-        ref: this.doc(key) as unknown as MockFirestoreDocRef,
+        ref: this.doc(key),
         updateTime: Timestamp.now(),
         data: () => value,
       });
@@ -159,10 +159,7 @@ class MockFirestoreCollectionRef extends MockFirestoreRef {
   withConverter<T>(
     converter: FirestoreDataConverter<T>,
   ): MockFirestoreCollectionRef {
-    return new MockFirestoreConvertedCollectionRef(
-      this,
-      converter,
-    ) as unknown as MockFirestoreCollectionRef;
+    return new MockFirestoreConvertedCollectionRef(this, converter);
   }
 }
 
@@ -410,7 +407,7 @@ class MockFirestoreCollectionGroupRef extends MockFirestoreCollectionRef {
             ref: new MockFirestoreDocRef(
               this.firestore,
               `${collectionPath}/${docId}`,
-            ) as unknown as MockFirestoreDocRef,
+            ),
             updateTime: Timestamp.now(),
             data: () => docData,
           });
@@ -428,10 +425,7 @@ class MockFirestoreCollectionGroupRef extends MockFirestoreCollectionRef {
   withConverter<T>(
     converter: FirestoreDataConverter<T>,
   ): MockFirestoreCollectionRef {
-    return new MockFirestoreConvertedCollectionRef(
-      this,
-      converter,
-    ) as unknown as MockFirestoreCollectionRef;
+    return new MockFirestoreConvertedCollectionRef(this, converter);
   }
 }
 

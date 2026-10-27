@@ -65,6 +65,9 @@ enum EducationLevel {
   DOCTORAL_DEGREE = "doctoralDegree",
 }
 
+const toEducationLevel = (value: string): EducationLevel | undefined =>
+  Object.values(EducationLevel).find((level) => (level as string) === value);
+
 const mhcGenderIdentityMap: Partial<Record<number, string>> = {
   0: "prefer not to state",
   1: "male",
@@ -108,6 +111,7 @@ interface PosttrialNudgeMessage extends BaseNudgeMessage {
   llmPromptVersion?: string;
   llmTokenUsage?: LlmTokenUsage;
   llmModel?: string;
+  llmModelRequested?: string;
 }
 
 export class PosttrialNudgeService {
@@ -529,7 +533,7 @@ export class PosttrialNudgeService {
         // Build education level context
         let educationContext = "";
         if (educationLevel) {
-          switch (educationLevel as EducationLevel) {
+          switch (toEducationLevel(educationLevel)) {
             case EducationLevel.DID_NOT_ATTEND_SCHOOL:
             case EducationLevel.GRADE_SCHOOL:
             case EducationLevel.HIGH_SCHOOL:
@@ -693,7 +697,8 @@ export class PosttrialNudgeService {
           generatedAt,
           llmPrompt: prompt,
           llmPromptVersion: PROMPT_VERSION,
-          llmModel: LLM_MODEL,
+          ...(response.model && { llmModel: response.model }),
+          llmModelRequested: LLM_MODEL,
           ...(tokenUsage && { llmTokenUsage: tokenUsage }),
         };
 
@@ -744,6 +749,9 @@ export class PosttrialNudgeService {
         }),
         ...(nudge.llmTokenUsage && { llmTokenUsage: nudge.llmTokenUsage }),
         ...(nudge.llmModel && { llmModel: nudge.llmModel }),
+        ...(nudge.llmModelRequested && {
+          llmModelRequested: nudge.llmModelRequested,
+        }),
       });
   }
 

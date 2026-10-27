@@ -34,7 +34,7 @@ export const dateConverter = new SchemaConverter({
         value &&
         typeof value === "object" &&
         "toDate" in value &&
-        typeof (value as { toDate: unknown }).toDate === "function"
+        typeof value.toDate === "function"
       ) {
         try {
           const date = (value as { toDate: () => Date }).toDate();

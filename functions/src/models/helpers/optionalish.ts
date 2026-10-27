@@ -15,5 +15,4 @@ export const optionalishDefault = <T extends z.ZodTypeAny>(
   type
     .or(z.null().transform(() => undefined))
     .optional()
-    /* eslint-disable-next-line @typescript-eslint/no-unsafe-return */
     .transform((value) => value ?? defaultValue);

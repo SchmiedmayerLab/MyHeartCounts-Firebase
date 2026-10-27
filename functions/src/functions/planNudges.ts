@@ -66,6 +66,9 @@ enum EducationLevel {
   DOCTORAL_DEGREE = "doctoralDegree",
 }
 
+const toEducationLevel = (value: string): EducationLevel | undefined =>
+  Object.values(EducationLevel).find((level) => (level as string) === value);
+
 const mhcGenderIdentityMap: Partial<Record<number, string>> = {
   0: "prefer not to state",
   1: "male",
@@ -98,6 +101,7 @@ interface NudgeMessage extends BaseNudgeMessage {
   llmPromptVersion?: string;
   llmTokenUsage?: LlmTokenUsage;
   llmModel?: string;
+  llmModelRequested?: string;
 }
 
 export class NudgeService {
@@ -398,7 +402,7 @@ export class NudgeService {
         // Background: The idea of tailoring content to education level comes from research in health communication and literacy, which shows that people understand and act on information more effectively when it’s written at a level that matches their background. Someone with a high school education or less may benefit from clear, simple language and shorter sentences, while someone with college-level education is typically more comfortable with complex ideas and vocabulary. Matching the reading level helps reduce barriers to understanding and ensures that messages are accessible rather than overwhelming or condescending. Each level reflects different communication needs: for those with less formal education, the focus is on clarity and plain language, while for those with higher education, the focus can shift to nuance and more detailed explanation. This approach recognizes that effective communication isn’t “one-size-fits-all” but should adapt to the audience to maximize understanding and impact.
         let educationContext = "";
         if (educationLevel) {
-          switch (educationLevel as EducationLevel) {
+          switch (toEducationLevel(educationLevel)) {
             case EducationLevel.DID_NOT_ATTEND_SCHOOL:
             case EducationLevel.GRADE_SCHOOL:
             case EducationLevel.HIGH_SCHOOL:
@@ -526,7 +530,8 @@ export class NudgeService {
               body: n.body,
               isLLMGenerated: true,
               generatedAt,
-              llmModel: LLM_MODEL,
+              ...(response.model && { llmModel: response.model }),
+              llmModelRequested: LLM_MODEL,
               llmPromptVersion: PROMPT_VERSION,
               ...(isFirst && { llmPrompt: prompt }),
               ...(isFirst && tokenUsage && { llmTokenUsage: tokenUsage }),
@@ -614,6 +619,9 @@ export class NudgeService {
             llmTokenUsage: nudgeMessage.llmTokenUsage,
           }),
           ...(nudgeMessage.llmModel && { llmModel: nudgeMessage.llmModel }),
+          ...(nudgeMessage.llmModelRequested && {
+            llmModelRequested: nudgeMessage.llmModelRequested,
+          }),
         });
 
       nudgesCreated++;
