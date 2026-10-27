@@ -105,9 +105,7 @@ export class SeedingService {
   ): Array<z.output<Schema>> {
     return schema
       .array()
-      .parse(
-        JSON.parse(fs.readFileSync(this.path + filename, "utf8")),
-      ) as Array<z.output<Schema>>;
+      .parse(JSON.parse(fs.readFileSync(this.path + filename, "utf8")));
   }
 
   protected readJSONRecord<Schema extends z.ZodTypeAny>(
@@ -116,9 +114,7 @@ export class SeedingService {
   ): Record<string, z.output<Schema>> {
     return z
       .record(schema)
-      .parse(
-        JSON.parse(fs.readFileSync(this.path + filename, "utf8")),
-      ) as Record<string, z.output<Schema>>;
+      .parse(JSON.parse(fs.readFileSync(this.path + filename, "utf8")));
   }
 
   protected writeJSON(filename: string, data: unknown) {
