@@ -6,13 +6,23 @@
 import { CodingSystem } from "./codes.js";
 import { type FHIRCoding } from "../fhir/baseTypes/fhirCoding.js";
 
+export enum MhcSampleTypeCode {
+  bloodLipidMeasurement = "MHCCustomSampleTypeBloodLipidMeasurement",
+  dietMEPAScore = "MHCCustomSampleTypeDietMEPAScore",
+  nicotineExposure = "MHCCustomSampleTypeNicotineExposure",
+  who5Score = "MHCCustomSampleTypeWHO5Score",
+}
+
 const mhcSampleTypeSystems = [
   CodingSystem.mhcSampleType,
   CodingSystem.mhcSampleTypeSuperseded,
 ];
 
+export const mhcSampleTypeCollection = (code: MhcSampleTypeCode): string =>
+  `HealthObservations_${code}`;
+
 export const mhcSampleTypeCodings = (
-  code: string,
+  code: MhcSampleTypeCode,
   display: string,
 ): FHIRCoding[] =>
   mhcSampleTypeSystems.map((system) => ({ code, display, system }));

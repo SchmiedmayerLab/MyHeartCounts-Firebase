@@ -14,6 +14,8 @@ import { QuestionnaireResponseService } from "./questionnaireResponseService.js"
 import {
   type Score,
   type FHIRQuestionnaireResponse,
+  mhcSampleTypeCollection,
+  MhcSampleTypeCode,
 } from "../../models/index.js";
 import {
   type Document,
@@ -121,8 +123,9 @@ export class HeartRiskNicotineScoringQuestionnaireResponseService extends Questi
       userId,
     );
 
-    const collectionName =
-      "HealthObservations_MHCCustomSampleTypeNicotineExposure";
+    const collectionName = mhcSampleTypeCollection(
+      MhcSampleTypeCode.nicotineExposure,
+    );
 
     return this.databaseService.runTransaction((collections, transaction) => {
       const ref = collections
