@@ -8,6 +8,7 @@ import { describe, it } from "mocha";
 import {
   FHIRQuestionnaireResponse,
   fhirQuestionnaireResponseConverter,
+  questionnaireCanonicalUrl,
 } from "../../../models/index.js";
 import type { DatabaseService } from "../../../services/database/databaseService.js";
 import {
@@ -20,10 +21,7 @@ import {
   DefaultNicotineScoreCalculator,
   NicotineScoringQuestionnaireResponseService,
 } from "../../../services/questionnaireResponse/nicotineScoringService.js";
-import {
-  type QuestionnaireResponseService,
-  questionnaireCanonicalUrl,
-} from "../../../services/questionnaireResponse/questionnaireResponseService.js";
+import { type QuestionnaireResponseService } from "../../../services/questionnaireResponse/questionnaireResponseService.js";
 import {
   DefaultWho5ScoreCalculator,
   Who5ScoringQuestionnaireResponseService,
