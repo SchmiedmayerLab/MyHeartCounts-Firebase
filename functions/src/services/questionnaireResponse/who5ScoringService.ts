@@ -10,7 +10,12 @@ import {
   getWho5ObservationConfig,
 } from "./fhirObservationConverter.js";
 import { QuestionnaireResponseService } from "./questionnaireResponseService.js";
-import { Score, type FHIRQuestionnaireResponse } from "../../models/index.js";
+import {
+  mhcSampleTypeCollection,
+  MhcSampleTypeCode,
+  Score,
+  type FHIRQuestionnaireResponse,
+} from "../../models/index.js";
 import {
   type Document,
   type DatabaseService,
@@ -192,7 +197,7 @@ export class Who5ScoringQuestionnaireResponseService extends QuestionnaireRespon
       userId,
     );
 
-    const collectionName = "HealthObservations_MHCCustomSampleTypeWHO5Score";
+    const collectionName = mhcSampleTypeCollection(MhcSampleTypeCode.who5Score);
 
     return this.databaseService.runTransaction((collections, transaction) => {
       const ref = collections
