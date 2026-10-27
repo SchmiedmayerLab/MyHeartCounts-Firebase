@@ -5,13 +5,15 @@
 
 import { randomUUID } from "crypto";
 import { logger } from "firebase-functions";
+import {
+  getLdlObservationConfig,
+  questionnaireObservation,
+} from "./fhirObservationConverter.js";
 import { QuestionnaireResponseService } from "./questionnaireResponseService.js";
 import {
   CodingSystem,
-  FHIRObservation,
-  FHIRObservationStatus,
-  mhcSampleTypeCodings,
-  QuantityUnit,
+  mhcSampleTypeCollection,
+  MhcSampleTypeCode,
   type FHIRQuestionnaireResponse,
 } from "../../models/index.js";
 import {
@@ -114,43 +116,19 @@ export class HeartRiskLdlParsingQuestionnaireResponseService extends Questionnai
     authoredDateTime: Date,
   ): Promise<void> {
     const observationId = randomUUID();
-
-    const observation = new FHIRObservation({
-      id: observationId,
-      status: FHIRObservationStatus.final,
-      subject: {
-        reference: `user/${userId}`,
-      },
-      code: {
-        coding: [
-          {
-            code: "18262-6",
-            system: CodingSystem.loinc,
-          },
-          ...mhcSampleTypeCodings(
-            "MHCCustomSampleTypeBloodLipidMeasurement",
-            "LDL Cholesterol",
-          ),
-        ],
-      },
-      valueQuantity: QuantityUnit.mg_dL.fhirQuantity(ldlValue),
-      effectiveDateTime: authoredDateTime,
-      issued: new Date(),
-      derivedFrom: [
-        {
-          reference: `QuestionnaireResponse/${questionnaireResponseId}`,
-        },
-      ],
-      extension: [
-        {
-          url: "https://bdh.stanford.edu/fhir/defs/sampleUploadTimeZone",
-          valueString: Intl.DateTimeFormat().resolvedOptions().timeZone,
-        },
-      ],
+    const observation = questionnaireObservation({
+      config: getLdlObservationConfig(),
+      value: ldlValue,
+      date: authoredDateTime,
+      questionnaireResponseId,
+      observationId,
+      userId,
+      extraCodings: [{ code: "18262-6", system: CodingSystem.loinc }],
     });
 
-    const collectionName =
-      "HealthObservations_MHCCustomSampleTypeBloodLipidMeasurement";
+    const collectionName = mhcSampleTypeCollection(
+      MhcSampleTypeCode.bloodLipidMeasurement,
+    );
 
     return this.databaseService.runTransaction((collections, transaction) => {
       const ref = collections
