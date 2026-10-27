@@ -4,6 +4,7 @@
 // SPDX-License-Identifier: MIT
 
 import { expect } from "chai";
+import { Timestamp } from "firebase-admin/firestore";
 import { describe, it } from "mocha";
 import {
   FHIRQuestionnaireResponse,
@@ -127,6 +128,51 @@ describe("QuestionnaireResponseService canonical matching", () => {
       }
     });
   }
+
+  it("should score a pre-Grove questionnaire response as the shipped app stores it", async () => {
+    const content = fhirQuestionnaireResponseConverter.value.schema.parse({
+      resourceType: "QuestionnaireResponse",
+      id: "6c1d2e3f-4a5b-4c6d-8e7f-9a0b1c2d3e4f",
+      questionnaire: `${survey}/nicotineExposure`,
+      status: "completed",
+      authored: Timestamp.fromDate(new Date("2026-08-28T15:32:00.000Z")),
+      item: [
+        {
+          linkId: "dcb2277e-fe96-4f45-844a-ef58a9516380",
+          answer: [
+            {
+              valueCoding: {
+                system: "urn:uuid:049cbbd0-02fa-4fcd-83a7-65a112c1f607",
+                code: "never-smoked/vaped",
+                display: "Never smoked/vaped",
+              },
+            },
+          ],
+        },
+      ],
+    });
+    expect(content.authored.toISOString()).to.equal("2026-08-28T15:32:00.000Z");
+
+    const service = new NicotineScoringQuestionnaireResponseService({
+      databaseService: {
+        getQuery: () => Promise.resolve([]),
+        runTransaction: () => Promise.resolve(),
+      } as Partial<DatabaseService> as DatabaseService,
+      scoreCalculator: new DefaultNicotineScoreCalculator(),
+    });
+    const handled = await service.handle(
+      "test-user",
+      {
+        id: "6c1d2e3f-4a5b-4c6d-8e7f-9a0b1c2d3e4f",
+        path: "users/test-user/questionnaireResponses/6c1d2e3f-4a5b-4c6d-8e7f-9a0b1c2d3e4f",
+        lastUpdate: new Date(),
+        content,
+      },
+      { isNew: true },
+    );
+    // eslint-disable-next-line @typescript-eslint/no-unused-expressions
+    expect(handled).to.be.true;
+  });
 
   it("should score a Grove questionnaire response as the app stores it", async () => {
     const content = fhirQuestionnaireResponseConverter.value.schema.parse({
