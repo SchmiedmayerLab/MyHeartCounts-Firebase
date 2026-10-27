@@ -12,6 +12,7 @@
     "resolveJsonModule": true,
     "isolatedModules": true,
     "incremental": true,
+    "sourceMap": true,
     "outDir": "lib",
     "rootDir": "src"
   },
