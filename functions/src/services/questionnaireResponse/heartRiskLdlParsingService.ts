@@ -5,12 +5,13 @@
 
 import { randomUUID } from "crypto";
 import { logger } from "firebase-functions";
-import { mhcSampleTypeCodings } from "./fhirObservationConverter.js";
 import { QuestionnaireResponseService } from "./questionnaireResponseService.js";
 import {
   CodingSystem,
   FHIRObservation,
   FHIRObservationStatus,
+  mhcSampleTypeCodings,
+  QuantityUnit,
   type FHIRQuestionnaireResponse,
 } from "../../models/index.js";
 import {
@@ -132,12 +133,7 @@ export class HeartRiskLdlParsingQuestionnaireResponseService extends Questionnai
           ),
         ],
       },
-      valueQuantity: {
-        value: ldlValue,
-        unit: "mg/dL",
-        code: "mg/dL",
-        system: CodingSystem.ucum,
-      },
+      valueQuantity: QuantityUnit.mg_dL.fhirQuantity(ldlValue),
       effectiveDateTime: authoredDateTime,
       issued: new Date(),
       derivedFrom: [

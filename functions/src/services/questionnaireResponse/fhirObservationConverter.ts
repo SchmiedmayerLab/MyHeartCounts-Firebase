@@ -5,10 +5,10 @@
 
 import { getPackageVersion } from "../../helpers/packageVersion.js";
 import {
-  CodingSystem,
   FHIRObservation,
   FHIRObservationStatus,
-  type FHIRCoding,
+  mhcSampleTypeCodings,
+  QuantityUnit,
   type Score,
   type FHIRCodeableConcept,
 } from "../../models/index.js";
@@ -16,18 +16,8 @@ import {
 export interface QuestionnaireObservationConfig {
   customCode: string;
   display: string;
-  unit: string;
-  unitSystem: string;
-  ucumCode?: string;
+  unit: QuantityUnit;
 }
-
-export const mhcSampleTypeCodings = (
-  code: string,
-  display: string,
-): FHIRCoding[] =>
-  [CodingSystem.mhcSampleType, CodingSystem.mhcSampleTypeSuperseded].map(
-    (system) => ({ code, display, system }),
-  );
 
 export const scoreToObservation = (
   score: Score,
@@ -48,12 +38,7 @@ export const scoreToObservation = (
       reference: `user/${userId}`,
     },
     code: codeableConcept,
-    valueQuantity: {
-      value: score.overallScore,
-      unit: config.unit,
-      system: config.unitSystem,
-      code: config.ucumCode ?? config.unit,
-    },
+    valueQuantity: config.unit.fhirQuantity(score.overallScore),
     effectiveDateTime: score.date,
     issued: new Date(),
     derivedFrom: [
@@ -89,24 +74,18 @@ export const scoreToObservation = (
 export const getDietObservationConfig = (): QuestionnaireObservationConfig => ({
   customCode: "MHCCustomSampleTypeDietMEPAScore",
   display: "Diet MEPA Score",
-  unit: "count",
-  unitSystem: CodingSystem.ucum,
-  ucumCode: "{count}",
+  unit: QuantityUnit.score,
 });
 
 export const getNicotineObservationConfig =
   (): QuestionnaireObservationConfig => ({
     customCode: "MHCCustomSampleTypeNicotineExposure",
     display: "Nicotine Exposure Score",
-    unit: "count",
-    unitSystem: CodingSystem.ucum,
-    ucumCode: "{count}",
+    unit: QuantityUnit.score,
   });
 
 export const getWho5ObservationConfig = (): QuestionnaireObservationConfig => ({
   customCode: "MHCCustomSampleTypeWHO5Score",
   display: "WHO-5 Well-Being Score",
-  unit: "count",
-  unitSystem: CodingSystem.ucum,
-  ucumCode: "{count}",
+  unit: QuantityUnit.score,
 });

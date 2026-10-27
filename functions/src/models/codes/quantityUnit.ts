@@ -3,6 +3,7 @@
 // SPDX-FileCopyrightText: 2026 Stanford University and the project authors (see CONTRIBUTORS.md)
 // SPDX-License-Identifier: MIT
 
+import { CodingSystem } from "./codes.js";
 import { type FHIRQuantity } from "../fhir/baseTypes/fhirQuantity.js";
 import { type Observation } from "../types/observation.js";
 
@@ -21,6 +22,7 @@ export class QuantityUnit {
     "mL/min/1.73m2",
   );
   static readonly tablet = new QuantityUnit("{tbl}", "tbl.");
+  static readonly score = new QuantityUnit("{count}", "count");
 
   // HealthKit mobility metrics
   static readonly flights = new QuantityUnit("flights", "flights");
@@ -101,11 +103,7 @@ export class QuantityUnit {
 
   // Constructor
 
-  constructor(
-    code: string,
-    unit: string,
-    system = "http://unitsofmeasure.org",
-  ) {
+  constructor(code: string, unit: string, system: string = CodingSystem.ucum) {
     this.unit = unit;
     this.code = code;
     this.system = system;
