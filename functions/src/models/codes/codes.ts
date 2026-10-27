@@ -7,6 +7,10 @@ export enum CodingSystem {
   loinc = "http://loinc.org",
   rxNorm = "http://www.nlm.nih.gov/research/umls/rxnorm",
   snomedCt = "http://snomed.info/sct",
+  ucum = "http://unitsofmeasure.org",
+  mhcSampleType = "https://myheartcounts.stanford.edu/fhir/CodeSystem/sampleType",
+  // iOS 4.0.x only recognises this superseded spelling; Grove builds accept both.
+  mhcSampleTypeSuperseded = "https://spezi.stanford.edu",
 }
 
 export enum LoincCode {
