@@ -12,4 +12,12 @@ export abstract class QuestionnaireResponseService {
     response: Document<FHIRQuestionnaireResponse>,
     options: { isNew: boolean },
   ): Promise<boolean>;
+
+  protected targetsQuestionnaire(
+    response: FHIRQuestionnaireResponse,
+    targetUrls: string[],
+  ): boolean {
+    const url = response.questionnaireUrl;
+    return url !== null && targetUrls.includes(url);
+  }
 }

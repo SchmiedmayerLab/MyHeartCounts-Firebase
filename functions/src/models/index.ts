@@ -4,6 +4,7 @@
 // SPDX-License-Identifier: MIT
 
 export * from "./codes/codes.js";
+export * from "./codes/mhcSampleType.js";
 export * from "./codes/quantityUnit.js";
 export * from "./codes/references.js";
 export * from "./fhir/baseTypes/fhirCodeableConcept.js";

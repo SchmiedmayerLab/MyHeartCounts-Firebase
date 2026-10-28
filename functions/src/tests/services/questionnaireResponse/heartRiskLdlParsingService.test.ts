@@ -8,9 +8,24 @@
 /* eslint-disable @typescript-eslint/no-unused-expressions */
 
 import { expect } from "chai";
+import { type Firestore } from "firebase-admin/firestore";
 import { describe, it } from "mocha";
-import { FHIRQuestionnaireResponse } from "../../../models/index.js";
+import {
+  CodingSystem,
+  type FHIRObservation,
+  FHIRQuestionnaireResponse,
+  QuantityUnit,
+} from "../../../models/index.js";
+import { FirestoreService } from "../../../services/database/firestoreService.js";
 import { HeartRiskLdlParsingQuestionnaireResponseService } from "../../../services/questionnaireResponse/heartRiskLdlParsingService.js";
+import {
+  authoredAt,
+  groveQuestionnaireResponse,
+  preGroveQuestionnaireResponse,
+  questionnaireResponseDocument,
+  testUserId,
+} from "../../helpers/questionnaireResponses.js";
+import { MockFirestore } from "../../mocks/firestore.js";
 
 describe("HeartRiskLdlParsingQuestionnaireResponseService", () => {
   describe("handle method", () => {
@@ -333,5 +348,100 @@ describe("HeartRiskLdlParsingQuestionnaireResponseService", () => {
 
       expect(result).to.be.false;
     });
+  });
+});
+
+const ldlLinkId = "1574e238-8804-4a17-fa5e-a764f094bd2b";
+const ldlCollection =
+  "HealthObservations_MHCCustomSampleTypeBloodLipidMeasurement";
+
+const storeLdlObservation = async (
+  id: string,
+  content: FHIRQuestionnaireResponse,
+): Promise<FHIRObservation> => {
+  const databaseService = new FirestoreService(
+    new MockFirestore() as unknown as Firestore,
+  );
+  const service = new HeartRiskLdlParsingQuestionnaireResponseService({
+    databaseService,
+  });
+  const handled = await service.handle(
+    testUserId,
+    questionnaireResponseDocument(id, content),
+    { isNew: true },
+  );
+  expect(handled).to.equal(true);
+
+  const stored = await databaseService.getQuery((collections) =>
+    collections.userHealthObservations(testUserId, ldlCollection),
+  );
+  expect(stored).to.have.length(1);
+  expect(stored[0].path).to.equal(
+    `users/${testUserId}/${ldlCollection}/${stored[0].content.id}`,
+  );
+  expect(stored[0].content.derivedFrom?.[0].reference).to.equal(
+    `QuestionnaireResponse/${id}`,
+  );
+  return stored[0].content;
+};
+
+const expectLdlObservation = (observation: FHIRObservation, value: number) => {
+  expect(
+    observation.code.coding?.map(({ system, code, display }) => ({
+      system,
+      code,
+      display,
+    })),
+  ).to.deep.equal([
+    { system: CodingSystem.loinc, code: "18262-6", display: undefined },
+    {
+      system: CodingSystem.mhcSampleType,
+      code: "MHCCustomSampleTypeBloodLipidMeasurement",
+      display: "LDL Cholesterol",
+    },
+    {
+      system: CodingSystem.mhcSampleTypeSuperseded,
+      code: "MHCCustomSampleTypeBloodLipidMeasurement",
+      display: "LDL Cholesterol",
+    },
+  ]);
+  expect(observation.valueQuantity).to.deep.include(
+    QuantityUnit.mg_dL.fhirQuantity(value),
+  );
+  expect(observation.effectiveDateTime?.toISOString()).to.equal(
+    authoredAt.toISOString(),
+  );
+};
+
+describe("HeartRiskLdlParsingQuestionnaireResponseService observation shape", () => {
+  it("should store a Grove LDL answer as an observation both app generations read", async () => {
+    const id = "2f9d7c1a-4b3e-4a5c-8d6e-7f8a9b0c1d2e";
+    const content = groveQuestionnaireResponse("heartRisk", id, [
+      {
+        linkId: ldlLinkId,
+        answer: [
+          {
+            valueQuantity: {
+              value: 132,
+              unit: "milligram per deciliter",
+              system: CodingSystem.ucum,
+              code: "mg/dL",
+            },
+          },
+        ],
+      },
+    ]);
+    expectLdlObservation(await storeLdlObservation(id, content), 132);
+  });
+
+  it("should store a pre-Grove LDL answer as an observation both app generations read", async () => {
+    const id = "9a8b7c6d-5e4f-4a3b-8c2d-1e0f9a8b7c6d";
+    const content = preGroveQuestionnaireResponse("heartRisk", id, [
+      {
+        linkId: ldlLinkId,
+        answer: [{ valueQuantity: { value: 118, unit: "mg/dL" } }],
+      },
+    ]);
+    expectLdlObservation(await storeLdlObservation(id, content), 118);
   });
 });

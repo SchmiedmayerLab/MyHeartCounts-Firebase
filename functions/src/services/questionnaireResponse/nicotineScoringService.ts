@@ -14,6 +14,8 @@ import {
   Score,
   type FHIRQuestionnaireResponse,
   type FHIRObservation,
+  mhcSampleTypeCollection,
+  MhcSampleTypeCode,
 } from "../../models/index.js";
 import {
   type Document,
@@ -86,7 +88,7 @@ export class NicotineScoringQuestionnaireResponseService extends QuestionnaireRe
       "https://myheartcounts.stanford.edu/fhir/survey/nicotineExposure",
     ];
 
-    if (!targetQuestionnaireUrls.includes(response.content.questionnaire)) {
+    if (!this.targetsQuestionnaire(response.content, targetQuestionnaireUrls)) {
       return false;
     }
 
@@ -158,8 +160,9 @@ export class NicotineScoringQuestionnaireResponseService extends QuestionnaireRe
   private async getLatestScore(
     userId: string,
   ): Promise<Document<Score> | undefined> {
-    const collectionName =
-      "HealthObservations_MHCCustomSampleTypeNicotineExposure";
+    const collectionName = mhcSampleTypeCollection(
+      MhcSampleTypeCode.nicotineExposure,
+    );
     const result = await this.databaseService.getQuery<FHIRObservation>(
       (collections) =>
         collections
@@ -204,8 +207,9 @@ export class NicotineScoringQuestionnaireResponseService extends QuestionnaireRe
       userId,
     );
 
-    const collectionName =
-      "HealthObservations_MHCCustomSampleTypeNicotineExposure";
+    const collectionName = mhcSampleTypeCollection(
+      MhcSampleTypeCode.nicotineExposure,
+    );
 
     return this.databaseService.runTransaction((collections, transaction) => {
       const ref = collections

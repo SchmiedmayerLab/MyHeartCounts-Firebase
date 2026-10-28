@@ -10,7 +10,12 @@ import {
   getDietObservationConfig,
 } from "./fhirObservationConverter.js";
 import { QuestionnaireResponseService } from "./questionnaireResponseService.js";
-import { Score, type FHIRQuestionnaireResponse } from "../../models/index.js";
+import {
+  mhcSampleTypeCollection,
+  MhcSampleTypeCode,
+  Score,
+  type FHIRQuestionnaireResponse,
+} from "../../models/index.js";
 import {
   type Document,
   type DatabaseService,
@@ -153,7 +158,7 @@ export class DietScoringQuestionnaireResponseService extends QuestionnaireRespon
       "https://myheartcounts.stanford.edu/fhir/survey/dietScore",
     ];
 
-    if (!targetQuestionnaireUrls.includes(response.content.questionnaire)) {
+    if (!this.targetsQuestionnaire(response.content, targetQuestionnaireUrls)) {
       return false;
     }
 
@@ -269,8 +274,9 @@ export class DietScoringQuestionnaireResponseService extends QuestionnaireRespon
       userId,
     );
 
-    const collectionName =
-      "HealthObservations_MHCCustomSampleTypeDietMEPAScore";
+    const collectionName = mhcSampleTypeCollection(
+      MhcSampleTypeCode.dietMEPAScore,
+    );
 
     return this.databaseService.runTransaction((collections, transaction) => {
       const ref = collections
