@@ -13,7 +13,7 @@
     "url": "https://github.com/SchmiedmayerLab/MyHeartCounts-Firebase"
   },
   "dependencies": {
-    "firebase-admin": "^13.7.0",
+    "firebase-admin": "^14.5.0",
     "luxon": "^3.7.2"
   },
   "scripts": {
@@ -29,9 +29,9 @@
     "serve:seeded": "npm --prefix functions run serve:seeded"
   },
   "devDependencies": {
-    "@stanfordspezi/spezi-web-configurations": "^0.6.0",
+    "@stanfordspezi/spezi-web-configurations": "^0.7.0",
     "@types/luxon": "^3.7.1",
-    "eslint": "^9.39.2",
+    "eslint": "^10.13.0",
     "prettier": "^3.8.1"
   },
   "overrides": {
