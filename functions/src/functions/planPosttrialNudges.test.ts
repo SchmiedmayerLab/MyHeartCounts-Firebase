@@ -187,8 +187,10 @@ describeWithEmulators("function: planPosttrialNudges", (env) => {
         .collection("notificationBacklog")
         .get();
 
-      // No API key in the emulator → generateLLMNudge returns null after
-      // retries → user is skipped for the day with no predefined fallback.
+      // No API key in the emulator → generateLLMNudge returns no nudge after
+      // retries → user is skipped for the day with no predefined fallback and
+      // the failure is reported to the coordinator mailbox (skipped here
+      // because SMTP is not configured).
       expect(backlog.size).to.equal(0);
     });
   });

@@ -402,6 +402,8 @@ flowchart TD
     style W fill:#d3d3d3
 ```
 
+If every retry against the LLM backend fails (e.g. the gateway is offline), the trial function falls back to predefined nudges and the post-trial function skips the user for the day. In both cases the run sends one summary mail listing the affected users and the final error to the coordinator mailbox that also receives participant feedback (`FEEDBACK_COORDINATOR_EMAIL`, via the `SMTP_*` and `FEEDBACK_SENDER_EMAIL` secrets). When those secrets are not configured, the failure is only logged.
+
 #### Archived Sample Functions
 
 ```mermaid
