@@ -9,7 +9,17 @@ import { logger } from "firebase-functions";
 import { onSchedule } from "firebase-functions/v2/scheduler";
 import { DateTime } from "luxon";
 import OpenAI from "openai";
-import { getLlmApiBaseUrl, getLlmApiKey, llmSecretParams } from "../env.js";
+import {
+  feedbackEmailSecretParams,
+  getLlmApiBaseUrl,
+  getLlmApiKey,
+  llmSecretParams,
+} from "../env.js";
+import {
+  formatNudgeGenerationFailureMail,
+  type NudgeGenerationFailure,
+  sendCoordinatorMail,
+} from "./coordinatorMail.js";
 import { privilegedServiceAccount } from "./helpers.js";
 import { type BaseNudgeMessage } from "./nudgeMessages.js";
 
@@ -357,7 +367,7 @@ export class PosttrialNudgeService {
     language: string,
     userData: PosttrialUserData,
     targetUtc: Date,
-  ): Promise<PosttrialNudgeMessage | null> {
+  ): Promise<{ nudge: PosttrialNudgeMessage | null; error?: string }> {
     let resolvedGenderIdentity = userData.genderIdentity;
 
     if (resolvedGenderIdentity === undefined) {
@@ -368,13 +378,13 @@ export class PosttrialNudgeService {
           logger.error(
             `User ${userId} has unmapped mhcGenderIdentity value: ${userData.mhcGenderIdentity}. Cannot generate post-trial LLM nudge.`,
           );
-          return null;
+          return { nudge: null };
         }
       } else {
         logger.error(
           `User ${userId} has no gender identity. Cannot generate post-trial LLM nudge.`,
         );
-        return null;
+        return { nudge: null };
       }
     }
 
@@ -382,7 +392,7 @@ export class PosttrialNudgeService {
       logger.error(
         `User ${userId} has no comorbidities data. Cannot generate post-trial LLM nudge.`,
       );
-      return null;
+      return { nudge: null };
     }
 
     const educationLevel = userData.educationUS ?? userData.educationUK;
@@ -705,7 +715,7 @@ export class PosttrialNudgeService {
         logger.info(
           `Generated post-trial LLM nudge for user ${userId} in ${language} (attempt ${attempt})`,
         );
-        return nudge;
+        return { nudge };
       } catch (error) {
         lastError = error instanceof Error ? error : new Error(String(error));
         logger.warn(
@@ -721,7 +731,7 @@ export class PosttrialNudgeService {
     logger.error(
       `All ${maxRetries} attempts failed for post-trial LLM nudge generation for user ${userId}. Final error: ${String(lastError)}`,
     );
-    return null;
+    return { nudge: null, error: String(lastError) };
   }
 
   async createPosttrialNudgeForUser(
@@ -822,6 +832,7 @@ export class PosttrialNudgeService {
     let welcomesScheduled = 0;
     let usersSkippedDedup = 0;
     let usersSkippedFailure = 0;
+    const generationFailures: NudgeGenerationFailure[] = [];
 
     for (const userDoc of usersSnapshot.docs) {
       try {
@@ -909,7 +920,7 @@ export class PosttrialNudgeService {
         }
 
         const userLanguage = this.getUserLanguage(userData);
-        const nudge = await this.generateLLMNudge(
+        const { nudge, error: generationError } = await this.generateLLMNudge(
           userId,
           userLanguage,
           userData,
@@ -921,6 +932,9 @@ export class PosttrialNudgeService {
             `Skipping post-trial nudge for user ${userId}: LLM nudge generation returned no nudge.`,
           );
           usersSkippedFailure++;
+          if (generationError !== undefined) {
+            generationFailures.push({ userId, error: generationError });
+          }
           continue;
         }
 
@@ -955,6 +969,16 @@ export class PosttrialNudgeService {
     logger.info(
       `Post-trial nudge creation complete: ${nudgesCreated} nudges created, ${welcomesScheduled} welcome nudges scheduled, ${usersProcessed} users processed, ${usersSkippedDedup} skipped (dedup), ${usersSkippedFailure} skipped (LLM failure)`,
     );
+
+    if (generationFailures.length > 0) {
+      await sendCoordinatorMail(
+        formatNudgeGenerationFailureMail(
+          "onScheduleDailyPosttrialNudgeCreation",
+          generationFailures,
+          "No post-trial nudge was scheduled for these users today; the next daily run will try again.",
+        ),
+      );
+    }
   }
 }
 
@@ -973,7 +997,7 @@ export const onScheduleDailyPosttrialNudgeCreation = onSchedule(
     schedule: "30 8 * * *",
     timeZone: "UTC",
     timeoutSeconds: 1800,
-    secrets: llmSecretParams,
+    secrets: [...llmSecretParams, ...feedbackEmailSecretParams],
     serviceAccount: privilegedServiceAccount,
   },
   async () => {
