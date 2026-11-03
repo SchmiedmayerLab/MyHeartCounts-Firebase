@@ -3,6 +3,7 @@
 // SPDX-FileCopyrightText: 2026 Stanford University and the project authors (see CONTRIBUTORS.md)
 // SPDX-License-Identifier: MIT
 
+import { type QuestionnaireResponse } from "fhir/r4b";
 import { z } from "zod";
 import { fhirCodingConverter } from "./baseTypes/fhirCoding.js";
 import {
@@ -100,31 +101,36 @@ export interface FHIRQuestionnaireResponseItem extends z.output<
   item?: FHIRQuestionnaireResponseItem[];
 }
 
-export const fhirQuestionnaireResponseConverter = new Lazy(
-  () =>
-    new SchemaConverter({
-      schema: fhirResourceConverter.value.schema
-        .extend({
-          authored: dateConverter.schema,
-          item: optionalish(
-            z
-              .lazy(() => fhirQuestionnaireResponseItemConverter.value.schema)
-              .array(),
-          ),
-          questionnaire: z.string(),
-        })
-        .transform((values) => new FHIRQuestionnaireResponse(values)),
-      encode: (object) => ({
-        ...fhirResourceConverter.value.encode(object),
-        authored: dateConverter.encode(object.authored),
-        item:
-          object.item?.map(
-            fhirQuestionnaireResponseItemConverter.value.encode,
-          ) ?? null,
-        questionnaire: object.questionnaire,
-      }),
+export const fhirQuestionnaireResponseConverter = new Lazy(() => {
+  const schema = fhirResourceConverter.value.schema.extend({
+    authored: dateConverter.schema,
+    item: optionalish(
+      z.lazy(() => fhirQuestionnaireResponseItemConverter.value.schema).array(),
+    ),
+    questionnaire: z.string(),
+  });
+  return new SchemaConverter({
+    schema: z.unknown().transform((raw, context) => {
+      const result = schema.safeParse(raw);
+      if (!result.success) {
+        for (const issue of result.error.issues) context.addIssue(issue);
+        return z.NEVER;
+      }
+      return new FHIRQuestionnaireResponse({
+        ...result.data,
+        value: raw as QuestionnaireResponse,
+      });
     }),
-);
+    encode: (object) => ({
+      ...fhirResourceConverter.value.encode(object),
+      authored: dateConverter.encode(object.authored),
+      item:
+        object.item?.map(fhirQuestionnaireResponseItemConverter.value.encode) ??
+        null,
+      questionnaire: object.questionnaire,
+    }),
+  });
+});
 
 export class FHIRQuestionnaireResponse extends FHIRResource {
   // Stored Properties
@@ -133,6 +139,8 @@ export class FHIRQuestionnaireResponse extends FHIRResource {
   readonly authored: Date;
   readonly item?: FHIRQuestionnaireResponseItem[];
   readonly questionnaire: string;
+  // Source FHIR JSON as written by the client; absent when constructed in code.
+  readonly value?: QuestionnaireResponse;
 
   // Constructor
 
@@ -141,12 +149,14 @@ export class FHIRQuestionnaireResponse extends FHIRResource {
       authored: Date;
       item?: FHIRQuestionnaireResponseItem[];
       questionnaire: string;
+      value?: QuestionnaireResponse;
     },
   ) {
     super(input);
     this.authored = input.authored;
     this.item = input.item;
     this.questionnaire = input.questionnaire;
+    this.value = input.value;
   }
 
   // Methods
