@@ -6,16 +6,8 @@
 import { Timestamp } from "firebase-admin/firestore";
 import { logger } from "firebase-functions";
 import { onDocumentCreated } from "firebase-functions/v2/firestore";
-import { createTransport } from "nodemailer";
-import {
-  feedbackEmailSecretParams,
-  getFeedbackCoordinatorEmail,
-  getFeedbackSenderEmail,
-  getSmtpHost,
-  getSmtpPassword,
-  getSmtpPort,
-  getSmtpUsername,
-} from "../env.js";
+import { feedbackEmailSecretParams } from "../env.js";
+import { sendCoordinatorMail } from "./coordinatorMail.js";
 import { privilegedServiceAccount } from "./helpers.js";
 
 // Renders in the submitter's timezone when the feedback carries one, e.g.
@@ -81,39 +73,6 @@ export const onFeedbackCreated = onDocumentCreated(
 
     const feedbackId = event.params.feedbackId;
     const data = snapshot.data();
-    const { subject, text } = formatFeedbackEmail(feedbackId, data);
-
-    try {
-      // requireTLS/forceAuth make the transport fail loudly if the server does
-      // not offer STARTTLS or AUTH, instead of silently sending unauthenticated.
-      const port = Number(getSmtpPort());
-      const transporter = createTransport({
-        host: getSmtpHost(),
-        port,
-        secure: port === 465,
-        requireTLS: true,
-        forceAuth: true,
-        logger: true,
-        auth: {
-          user: getSmtpUsername(),
-          pass: getSmtpPassword(),
-        },
-      });
-
-      await transporter.sendMail({
-        from: `"MyHeart Counts" <${getFeedbackSenderEmail()}>`,
-        to: getFeedbackCoordinatorEmail(),
-        subject,
-        text,
-      });
-
-      logger.info(
-        `Feedback notification sent for ${feedbackId} to ${getFeedbackCoordinatorEmail()}`,
-      );
-    } catch (error) {
-      logger.error(
-        `Failed to send feedback notification for ${feedbackId}: ${String(error)}`,
-      );
-    }
+    await sendCoordinatorMail(formatFeedbackEmail(feedbackId, data));
   },
 );
