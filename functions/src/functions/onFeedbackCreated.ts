@@ -7,7 +7,10 @@ import { Timestamp } from "firebase-admin/firestore";
 import { logger } from "firebase-functions";
 import { onDocumentCreated } from "firebase-functions/v2/firestore";
 import { feedbackEmailSecretParams } from "../env.js";
-import { sendCoordinatorMail } from "./coordinatorMail.js";
+import {
+  type CoordinatorMail,
+  sendCoordinatorMail,
+} from "./coordinatorMail.js";
 import { privilegedServiceAccount } from "./helpers.js";
 
 // Renders in the submitter's timezone when the feedback carries one, e.g.
@@ -32,7 +35,7 @@ const formatTimestamp = (
 const formatFeedbackEmail = (
   feedbackId: string,
   data: Record<string, unknown>,
-): { subject: string; text: string } => {
+): CoordinatorMail => {
   const subject = `[MyHeartCounts] New Feedback Received (ID: ${feedbackId})`;
 
   const { accountId, ...rest } = data;

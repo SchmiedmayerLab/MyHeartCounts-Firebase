@@ -15,12 +15,11 @@ import {
   getLlmApiKey,
   llmSecretParams,
 } from "../env.js";
-import {
-  formatNudgeGenerationFailureMail,
-  type NudgeGenerationFailure,
-  sendCoordinatorMail,
-} from "./coordinatorMail.js";
 import { privilegedServiceAccount } from "./helpers.js";
+import {
+  type NudgeGenerationFailure,
+  reportNudgeGenerationFailures,
+} from "./nudgeFailureMail.js";
 import {
   getPredefinedNudgeMessages,
   type BaseNudgeMessage,
@@ -223,11 +222,7 @@ export class NudgeService {
     userId: string,
     language: string,
     userData: UserData,
-  ): Promise<{
-    nudges: NudgeMessage[];
-    usedFallback: boolean;
-    error?: string;
-  }> {
+  ): Promise<{ nudges: NudgeMessage[]; fallbackError?: string }> {
     let resolvedGenderIdentity = userData.genderIdentity;
 
     if (resolvedGenderIdentity === undefined) {
@@ -556,7 +551,7 @@ export class NudgeService {
         logger.info(
           `Generated ${nudges.length} LLM nudges for user ${userId} in ${language} (attempt ${attempt})`,
         );
-        return { nudges, usedFallback: false };
+        return { nudges };
       } catch (error) {
         lastError = error instanceof Error ? error : new Error(String(error));
         logger.warn(
@@ -574,8 +569,7 @@ export class NudgeService {
     );
     return {
       nudges: this.getPredefinedNudges(language),
-      usedFallback: true,
-      error: String(lastError),
+      fallbackError: String(lastError),
     };
   }
 
@@ -783,16 +777,11 @@ export class NudgeService {
           logger.info(
             `Creating LLM-generated nudges for user ${userId} (${triggerReason}), language: ${userLanguage}`,
           );
-          const {
-            nudges: llmNudges,
-            usedFallback,
-            error: generationError,
-          } = await this.generateLLMNudges(userId, userLanguage, userData);
+          const { nudges: llmNudges, fallbackError } =
+            await this.generateLLMNudges(userId, userLanguage, userData);
+          const usedFallback = fallbackError !== undefined;
           if (usedFallback) {
-            generationFailures.push({
-              userId,
-              error: generationError ?? "unknown error",
-            });
+            generationFailures.push({ userId, error: fallbackError });
           }
           const category = usedFallback ? "nudge-predefined" : "nudge-llm";
           const created = await this.createNudgesForUser(
@@ -817,6 +806,10 @@ export class NudgeService {
         logger.error(
           `Error creating nudges for user ${userDoc.id}: ${String(error)}`,
         );
+        const failure = generationFailures.find((f) => f.userId === userDoc.id);
+        if (failure) {
+          failure.error += ` (predefined fallback NOT scheduled: ${String(error)})`;
+        }
       }
     }
 
@@ -824,15 +817,11 @@ export class NudgeService {
       `Nudge creation complete: ${nudgesCreated} nudges created for ${usersProcessed} users processed, ${generationFailures.length} LLM generation failures`,
     );
 
-    if (generationFailures.length > 0) {
-      await sendCoordinatorMail(
-        formatNudgeGenerationFailureMail(
-          "onScheduleDailyNudgeCreation",
-          generationFailures,
-          "Predefined nudges were scheduled for these users instead.",
-        ),
-      );
-    }
+    await reportNudgeGenerationFailures(
+      "onScheduleDailyNudgeCreation",
+      generationFailures,
+      "Predefined nudges were scheduled for these users instead, unless noted otherwise below.",
+    );
   }
 }
 
