@@ -21,6 +21,9 @@ import {
   type DatabaseService,
 } from "../database/databaseService.js";
 
+// LDL cholesterol: 1 mmol/L corresponds to 38.67 mg/dL (cholesterol's molar mass is 386.65 g/mol).
+const ldlMgPerDlPerMmolPerL = 38.67;
+
 export class HeartRiskLdlParsingQuestionnaireResponseService extends QuestionnaireResponseService {
   private readonly databaseService: DatabaseService;
 
@@ -83,7 +86,11 @@ export class HeartRiskLdlParsingQuestionnaireResponseService extends Questionnai
       const answer = responseItem.answer[0];
 
       if (answer.valueQuantity?.value !== undefined) {
-        return answer.valueQuantity.value;
+        const { value, code, unit } = answer.valueQuantity;
+        // The Imperial study asks for LDL in mmol/L; the stored observation is always in mg/dL.
+        return code === "mmol/L" || unit === "mmol/L" ?
+            value * ldlMgPerDlPerMmolPerL
+          : value;
       }
 
       if (answer.valueInteger !== undefined) {

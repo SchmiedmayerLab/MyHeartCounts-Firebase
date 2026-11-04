@@ -10,6 +10,7 @@ import {
   fhirResourceConverter,
   type FHIRResourceInput,
 } from "./baseTypes/fhirElement.js";
+import { fhirQuantityConverter } from "./baseTypes/fhirQuantity.js";
 import { dateConverter } from "../helpers/dateConverter.js";
 import { Lazy } from "../helpers/lazy.js";
 import { optionalish } from "../helpers/optionalish.js";
@@ -29,10 +30,7 @@ const fhirQuestionnaireResponseItemBaseConverter = new SchemaConverter({
           valueInteger: optionalish(z.number()),
           valueDecimal: optionalish(z.number()),
           valueQuantity: optionalish(
-            z.object({
-              value: optionalish(z.number()),
-              unit: optionalish(z.string()),
-            }),
+            z.lazy(() => fhirQuantityConverter.value.schema),
           ),
         })
         .array(),
@@ -52,7 +50,10 @@ const fhirQuestionnaireResponseItemBaseConverter = new SchemaConverter({
         valueBoolean: value.valueBoolean ?? null,
         valueInteger: value.valueInteger ?? null,
         valueDecimal: value.valueDecimal ?? null,
-        valueQuantity: value.valueQuantity ?? null,
+        valueQuantity:
+          value.valueQuantity ?
+            fhirQuantityConverter.value.encode(value.valueQuantity)
+          : null,
       })) ?? null,
     linkId: object.linkId ?? null,
   }),

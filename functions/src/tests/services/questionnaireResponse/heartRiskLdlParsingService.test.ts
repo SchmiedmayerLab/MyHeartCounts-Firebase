@@ -444,4 +444,24 @@ describe("HeartRiskLdlParsingQuestionnaireResponseService observation shape", ()
     ]);
     expectLdlObservation(await storeLdlObservation(id, content), 118);
   });
+
+  it("should convert an LDL answer given in mmol/L to mg/dL", async () => {
+    const id = "6c1e2b9a-3d4f-4e5a-9b8c-0d1e2f3a4b5c";
+    const content = groveQuestionnaireResponse("heartRisk", id, [
+      {
+        linkId: ldlLinkId,
+        answer: [
+          {
+            valueQuantity: {
+              value: 3,
+              unit: "millimole per litre",
+              system: CodingSystem.ucum,
+              code: "mmol/L",
+            },
+          },
+        ],
+      },
+    ]);
+    expectLdlObservation(await storeLdlObservation(id, content), 3 * 38.67);
+  });
 });
