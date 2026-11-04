@@ -9,8 +9,17 @@ import { logger } from "firebase-functions";
 import { onSchedule } from "firebase-functions/v2/scheduler";
 import { DateTime } from "luxon";
 import OpenAI from "openai";
-import { getLlmApiBaseUrl, getLlmApiKey, llmSecretParams } from "../env.js";
+import {
+  feedbackEmailSecretParams,
+  getLlmApiBaseUrl,
+  getLlmApiKey,
+  llmSecretParams,
+} from "../env.js";
 import { privilegedServiceAccount } from "./helpers.js";
+import {
+  type NudgeGenerationFailure,
+  reportNudgeGenerationFailures,
+} from "./nudgeFailureMail.js";
 import {
   getPredefinedNudgeMessages,
   type BaseNudgeMessage,
@@ -213,7 +222,7 @@ export class NudgeService {
     userId: string,
     language: string,
     userData: UserData,
-  ): Promise<{ nudges: NudgeMessage[]; usedFallback: boolean }> {
+  ): Promise<{ nudges: NudgeMessage[]; fallbackError?: string }> {
     let resolvedGenderIdentity = userData.genderIdentity;
 
     if (resolvedGenderIdentity === undefined) {
@@ -542,7 +551,7 @@ export class NudgeService {
         logger.info(
           `Generated ${nudges.length} LLM nudges for user ${userId} in ${language} (attempt ${attempt})`,
         );
-        return { nudges, usedFallback: false };
+        return { nudges };
       } catch (error) {
         lastError = error instanceof Error ? error : new Error(String(error));
         logger.warn(
@@ -558,7 +567,10 @@ export class NudgeService {
     logger.error(
       `All ${maxRetries} attempts failed for LLM nudge generation for user ${userId}. Final error: ${String(lastError)}`,
     );
-    return { nudges: this.getPredefinedNudges(language), usedFallback: true };
+    return {
+      nudges: this.getPredefinedNudges(language),
+      fallbackError: String(lastError),
+    };
   }
 
   async createNudgesForUser(
@@ -659,6 +671,7 @@ export class NudgeService {
 
     let usersProcessed = 0;
     let nudgesCreated = 0;
+    const generationFailures: NudgeGenerationFailure[] = [];
 
     for (const userDoc of usersSnapshot.docs) {
       try {
@@ -764,8 +777,12 @@ export class NudgeService {
           logger.info(
             `Creating LLM-generated nudges for user ${userId} (${triggerReason}), language: ${userLanguage}`,
           );
-          const { nudges: llmNudges, usedFallback } =
+          const { nudges: llmNudges, fallbackError } =
             await this.generateLLMNudges(userId, userLanguage, userData);
+          const usedFallback = fallbackError !== undefined;
+          if (usedFallback) {
+            generationFailures.push({ userId, error: fallbackError });
+          }
           const category = usedFallback ? "nudge-predefined" : "nudge-llm";
           const created = await this.createNudgesForUser(
             userId,
@@ -789,11 +806,21 @@ export class NudgeService {
         logger.error(
           `Error creating nudges for user ${userDoc.id}: ${String(error)}`,
         );
+        const failure = generationFailures.find((f) => f.userId === userDoc.id);
+        if (failure) {
+          failure.error += ` (predefined fallback NOT scheduled: ${String(error)})`;
+        }
       }
     }
 
     logger.info(
-      `Nudge creation complete: ${nudgesCreated} nudges created for ${usersProcessed} users processed`,
+      `Nudge creation complete: ${nudgesCreated} nudges created for ${usersProcessed} users processed, ${generationFailures.length} LLM generation failures`,
+    );
+
+    await reportNudgeGenerationFailures(
+      "onScheduleDailyNudgeCreation",
+      generationFailures,
+      "Predefined nudges were scheduled for these users instead, unless noted otherwise below.",
     );
   }
 }
@@ -813,7 +840,7 @@ export const onScheduleDailyNudgeCreation = onSchedule(
     schedule: "0 8 * * *",
     timeZone: "UTC",
     timeoutSeconds: 1800,
-    secrets: llmSecretParams,
+    secrets: [...llmSecretParams, ...feedbackEmailSecretParams],
     serviceAccount: privilegedServiceAccount,
   },
   async () => {
