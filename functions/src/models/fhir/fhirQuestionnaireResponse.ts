@@ -126,6 +126,14 @@ export const fhirQuestionnaireResponseConverter = new Lazy(
     }),
 );
 
+// A canonical is `url` or `url|version`; scoring keys on the url since linkIds are stable across versions.
+export const questionnaireCanonicalUrl = (canonical: string): string | null => {
+  if (canonical.includes("#")) return null;
+  const [url, version, ...rest] = canonical.split("|");
+  if (url === "" || version === "" || rest.length > 0) return null;
+  return url;
+};
+
 export class FHIRQuestionnaireResponse extends FHIRResource {
   // Stored Properties
 
@@ -147,6 +155,12 @@ export class FHIRQuestionnaireResponse extends FHIRResource {
     this.authored = input.authored;
     this.item = input.item;
     this.questionnaire = input.questionnaire;
+  }
+
+  // Computed Properties
+
+  get questionnaireUrl(): string | null {
+    return questionnaireCanonicalUrl(this.questionnaire);
   }
 
   // Methods
