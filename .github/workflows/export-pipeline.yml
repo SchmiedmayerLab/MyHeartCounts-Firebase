@@ -1,0 +1,68 @@
+#
+# This source file is part of the MyHeart Counts project
+#
+# SPDX-FileCopyrightText: 2026 Stanford University and the project authors (see CONTRIBUTORS.md)
+#
+# SPDX-License-Identifier: MIT
+#
+
+name: Export Pipeline
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "export/**"
+      - ".github/workflows/export-pipeline.yml"
+  pull_request:
+    paths:
+      - "export/**"
+      - ".github/workflows/export-pipeline.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: export-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    name: Lint, test and install smoke test
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: export
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+          cache-dependency-glob: export/uv.lock
+      - name: Install
+        run: uv sync --locked --extra dev
+      - name: Lint
+        run: uv run ruff check . && uv run ruff format --check .
+      - name: Test
+        run: uv run pytest -q
+      - name: Build wheel
+        run: uv build --wheel --out-dir dist
+      - name: Install the wheel in a clean environment and load the registry
+        run: |
+          uv venv /tmp/smoke
+          uv pip install --python /tmp/smoke/bin/python dist/*.whl
+          cd /tmp
+          /tmp/smoke/bin/python -c "from mhc_export.transform.specs import default_registry; r = default_registry(); assert len(r.exportable_types()) > 150, r.exportable_types()"
+          /tmp/smoke/bin/mhc-export new-key > /dev/null
+          /tmp/smoke/bin/mhc-export --help > /dev/null
+      - name: Registry matches the pinned Grove catalogs
+        run: |
+          git clone --quiet --depth 1 https://github.com/SchmiedmayerLab/grove-fhir.git /tmp/grove-fhir
+          cd /tmp/grove-fhir && git fetch --quiet --depth 1 origin e04ab868401faa8984105e09b3077336519a0ef9 && git checkout --quiet FETCH_HEAD
+          cd $GITHUB_WORKSPACE/export
+          uv run python scripts/gen_registry.py /tmp/grove-fhir --ref HEAD --out /tmp/registry.json
+          python3 - <<'PY'
+          import json
+          a = json.load(open("mhc_export/schemas/healthkit-types.json"))
+          b = json.load(open("/tmp/registry.json"))
+          assert a["types"] == b["types"] and a["grove_version"] == b["grove_version"], "regenerate the registry"
+          PY

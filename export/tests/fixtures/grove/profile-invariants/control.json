@@ -1,0 +1,105 @@
+{
+  "resourceType": "Observation",
+  "id": "control",
+  "meta": {
+    "profile": [
+      "https://grovealliance.org/fhir/mobile/StructureDefinition/grove-mobile-heart-rate"
+    ]
+  },
+  "extension": [
+    {
+      "url": "https://grovealliance.org/fhir/mobile/StructureDefinition/grove-recording-method",
+      "valueCoding": {
+        "system": "https://grovealliance.org/fhir/mobile/CodeSystem/grove-recording-method",
+        "code": "automatically-recorded",
+        "display": "Automatically recorded"
+      }
+    },
+    {
+      "url": "http://hl7.org/fhir/StructureDefinition/observation-gatewayDevice",
+      "valueReference": {
+        "reference": "Device/GroveApplicationDeviceExample"
+      }
+    },
+    {
+      "url": "http://hl7.org/fhir/StructureDefinition/workflow-researchStudy",
+      "valueReference": {
+        "reference": "ResearchStudy/GroveMobileResearchStudyExample"
+      }
+    }
+  ],
+  "identifier": [
+    {
+      "type": {
+        "coding": [
+          {
+            "system": "https://grovealliance.org/fhir/mobile/CodeSystem/grove-identifier-role",
+            "code": "source-record"
+          }
+        ]
+      },
+      "system": "https://study.example.org/fhir/NamingSystem/grove-source-record-v0/test-key/1",
+      "value": "v0:test-key:1:ptHr751zWyYfaR2WIvrP1TfnVEK4bInC__ibP_AYfVY"
+    },
+    {
+      "type": {
+        "coding": [
+          {
+            "system": "https://grovealliance.org/fhir/mobile/CodeSystem/grove-identifier-role",
+            "code": "source-output"
+          }
+        ]
+      },
+      "system": "https://study.example.org/fhir/NamingSystem/grove-source-output-v0/test-key/1",
+      "value": "v0:test-key:1:PPULnf0LKpASjIj8mU5TKafPKig_oqWND3_dHFShGd8"
+    }
+  ],
+  "status": "final",
+  "category": [
+    {
+      "coding": [
+        {
+          "system": "http://terminology.hl7.org/CodeSystem/observation-category",
+          "code": "vital-signs",
+          "display": "Vital Signs"
+        }
+      ]
+    }
+  ],
+  "code": {
+    "coding": [
+      {
+        "system": "http://loinc.org",
+        "code": "8867-4",
+        "display": "Heart rate"
+      }
+    ]
+  },
+  "subject": {
+    "reference": "Patient/GroveMobilePatientExample"
+  },
+  "effectiveDateTime": "2026-08-19T10:30:00.251-07:00",
+  "_effectiveDateTime": {
+    "extension": [
+      {
+        "url": "http://hl7.org/fhir/StructureDefinition/timezone",
+        "valueCode": "America/Los_Angeles"
+      }
+    ]
+  },
+  "issued": "2026-08-19T17:30:02.000Z",
+  "performer": [
+    {
+      "reference": "Patient/GroveMobilePatientExample"
+    }
+  ],
+  "valueQuantity": {
+    "value": 72,
+    "unit": "beats/minute",
+    "system": "http://unitsofmeasure.org",
+    "code": "/min"
+  },
+  "device": {
+    "reference": "Device/GroveRecordingDeviceExample"
+  }
+}
