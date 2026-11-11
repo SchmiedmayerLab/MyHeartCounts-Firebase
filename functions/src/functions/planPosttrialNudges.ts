@@ -3,7 +3,7 @@
 // SPDX-FileCopyrightText: 2026 Stanford University and the project authors (see CONTRIBUTORS.md)
 // SPDX-License-Identifier: MIT
 
-import { randomUUID } from "crypto";
+import { createHash, randomUUID } from "crypto";
 import admin from "firebase-admin";
 import { logger } from "firebase-functions";
 import { onSchedule } from "firebase-functions/v2/scheduler";
@@ -21,6 +21,7 @@ import {
   reportNudgeGenerationFailures,
 } from "./nudgeFailureMail.js";
 import { type BaseNudgeMessage } from "./nudgeMessages.js";
+import { forEachWithConcurrency } from "../helpers/forEachWithConcurrency.js";
 
 interface PosttrialUserData {
   genderIdentity?: string;
@@ -103,6 +104,23 @@ const LLM_MODEL = "gpt-5-mini";
 
 const LLM_REQUEST_TIMEOUT_MS = 60_000;
 
+// Number of users whose nudges are generated at the same time. The gateway
+// takes roughly 15 to 20 seconds per request, so generating one user at a
+// time no longer fits into the function timeout.
+const LLM_CONCURRENCY = 5;
+
+// Waits before the second and third LLM attempt. The gateway's 502 page asks
+// clients to retry after about 30 seconds, so short waits only burn through
+// all attempts while the gateway is still recovering.
+const LLM_RETRY_DELAYS_MS: readonly number[] = [10_000, 30_000];
+
+// How long a run may keep starting new LLM generations. The rest of the
+// function timeout is reserved for generations still in flight (worst case
+// three 60 s request timeouts plus 40 s of retry waits) and the failure mail,
+// so a slow gateway ends the run cleanly instead of getting it killed.
+const FUNCTION_TIMEOUT_SECONDS = 1800;
+const RUN_BUDGET_MS = (FUNCTION_TIMEOUT_SECONDS - 5 * 60) * 1000;
+
 // Version of the LLM prompt template built in generateLLMNudge. Bump this
 // whenever the prompt wording changes so generated nudges can be traced back
 // to the exact prompt version that produced them.
@@ -123,6 +141,27 @@ interface PosttrialNudgeMessage extends BaseNudgeMessage {
   llmModelRequested?: string;
 }
 
+export interface PosttrialNudgeServiceOptions {
+  llmConcurrency?: number;
+  llmRetryDelaysMs?: readonly number[];
+  runBudgetMs?: number;
+}
+
+export interface PosttrialNudgeRunSummary {
+  usersProcessed: number;
+  nudgesCreated: number;
+  welcomesScheduled: number;
+  usersSkippedDedup: number;
+  usersSkippedFailure: number;
+  usersSkippedBudget: number;
+  generationFailures: NudgeGenerationFailure[];
+}
+
+const isAlreadyExistsError = (error: unknown): boolean => {
+  const code = (error as { code?: unknown } | null)?.code;
+  return code === 6 || code === "already-exists";
+};
+
 export class PosttrialNudgeService {
   // Properties
 
@@ -140,14 +179,46 @@ export class PosttrialNudgeService {
     "¡Los empujoncitos diarios para tus actividades preferidas continúan después del período de prueba! Puedes administrarlos en cualquier momento en Perfil/Configuración bajo el interruptor de empujoncitos a largo plazo.";
   private static readonly WELCOME_LEAD_MS = 60 * 60 * 1000;
   private readonly firestore: admin.firestore.Firestore;
+  private readonly llmConcurrency: number;
+  private readonly llmRetryDelaysMs: readonly number[];
+  private readonly runBudgetMs: number;
 
   // Constructor
 
-  constructor(firestore?: admin.firestore.Firestore) {
+  constructor(
+    firestore?: admin.firestore.Firestore,
+    options: PosttrialNudgeServiceOptions = {},
+  ) {
     this.firestore = firestore ?? admin.firestore();
+    this.llmConcurrency = options.llmConcurrency ?? LLM_CONCURRENCY;
+    this.llmRetryDelaysMs = options.llmRetryDelaysMs ?? LLM_RETRY_DELAYS_MS;
+    this.runBudgetMs = options.runBudgetMs ?? RUN_BUDGET_MS;
   }
 
   // Methods
+
+  // Derives the backlog document ID from the user and the delivery slot, so
+  // overlapping runs (Cloud Scheduler delivers at least once) write to the
+  // same document instead of queueing a second nudge. The result keeps the
+  // uppercase UUID format of the randomly generated IDs (RFC 9562 version 8).
+  private static posttrialNudgeId(userId: string, targetUtc: Date): string {
+    const bytes = createHash("sha256")
+      .update(
+        `${PosttrialNudgeService.CATEGORY}:${userId}:${targetUtc.toISOString()}`,
+      )
+      .digest()
+      .subarray(0, 16);
+    bytes[6] = (bytes[6] & 0x0f) | 0x80;
+    bytes[8] = (bytes[8] & 0x3f) | 0x80;
+    const hex = bytes.toString("hex").toUpperCase();
+    return [
+      hex.slice(0, 8),
+      hex.slice(8, 12),
+      hex.slice(12, 16),
+      hex.slice(16, 20),
+      hex.slice(20, 32),
+    ].join("-");
+  }
 
   private mapComorbidityKeyToDisease(key: string): Disease | null {
     // These are defined for iOS in https://github.com/SchmiedmayerLab/MyHeartCounts-iOS/blob/main/MyHeartCounts/Account/Demographics/Comorbidities.swift.
@@ -722,7 +793,8 @@ export class PosttrialNudgeService {
         );
 
         if (attempt < maxRetries) {
-          await new Promise((resolve) => setTimeout(resolve, 1000 * attempt));
+          const delayMs = this.llmRetryDelaysMs[attempt - 1] ?? 0;
+          await new Promise((resolve) => setTimeout(resolve, delayMs));
         }
       }
     }
@@ -733,35 +805,46 @@ export class PosttrialNudgeService {
     throw lastError ?? new Error("LLM nudge generation failed");
   }
 
+  /**
+   * Queues the nudge for the given delivery slot. Returns false without
+   * writing when a nudge for the same user and slot is already queued, which
+   * happens when two runs overlap.
+   */
   async createPosttrialNudgeForUser(
     userId: string,
     nudge: PosttrialNudgeMessage,
     targetUtc: Date,
-  ): Promise<void> {
-    const nudgeId = randomUUID().toUpperCase();
-    await this.firestore
-      .collection("users")
-      .doc(userId)
-      .collection("notificationBacklog")
-      .doc(nudgeId)
-      .set({
-        id: nudgeId,
-        title: nudge.title,
-        body: nudge.body,
-        timestamp: admin.firestore.Timestamp.fromDate(targetUtc),
-        category: PosttrialNudgeService.CATEGORY,
-        isLLMGenerated: nudge.isLLMGenerated,
-        generatedAt: nudge.generatedAt,
-        ...(nudge.llmPrompt && { llmPrompt: nudge.llmPrompt }),
-        ...(nudge.llmPromptVersion !== undefined && {
-          llmPromptVersion: nudge.llmPromptVersion,
-        }),
-        ...(nudge.llmTokenUsage && { llmTokenUsage: nudge.llmTokenUsage }),
-        ...(nudge.llmModel && { llmModel: nudge.llmModel }),
-        ...(nudge.llmModelRequested && {
-          llmModelRequested: nudge.llmModelRequested,
-        }),
-      });
+  ): Promise<boolean> {
+    const nudgeId = PosttrialNudgeService.posttrialNudgeId(userId, targetUtc);
+    try {
+      await this.firestore
+        .collection("users")
+        .doc(userId)
+        .collection("notificationBacklog")
+        .doc(nudgeId)
+        .create({
+          id: nudgeId,
+          title: nudge.title,
+          body: nudge.body,
+          timestamp: admin.firestore.Timestamp.fromDate(targetUtc),
+          category: PosttrialNudgeService.CATEGORY,
+          isLLMGenerated: nudge.isLLMGenerated,
+          generatedAt: nudge.generatedAt,
+          ...(nudge.llmPrompt && { llmPrompt: nudge.llmPrompt }),
+          ...(nudge.llmPromptVersion !== undefined && {
+            llmPromptVersion: nudge.llmPromptVersion,
+          }),
+          ...(nudge.llmTokenUsage && { llmTokenUsage: nudge.llmTokenUsage }),
+          ...(nudge.llmModel && { llmModel: nudge.llmModel }),
+          ...(nudge.llmModelRequested && {
+            llmModelRequested: nudge.llmModelRequested,
+          }),
+        });
+      return true;
+    } catch (error) {
+      if (isAlreadyExistsError(error)) return false;
+      throw error;
+    }
   }
 
   async scheduleWelcomeIfNeeded(
@@ -820,163 +903,207 @@ export class PosttrialNudgeService {
     return userData.userLanguage === "es" ? "es" : "en";
   }
 
-  async createPosttrialNudgeNotifications(): Promise<void> {
+  async createPosttrialNudgeNotifications(): Promise<PosttrialNudgeRunSummary> {
+    const runDeadline = Date.now() + this.runBudgetMs;
     const usersSnapshot = await this.firestore
       .collection("users")
       .where("extendedActivityNudgesOptIn", "==", true)
       .get();
 
-    let usersProcessed = 0;
-    let nudgesCreated = 0;
-    let welcomesScheduled = 0;
-    let usersSkippedDedup = 0;
-    let usersSkippedFailure = 0;
-    const generationFailures: NudgeGenerationFailure[] = [];
+    const summary: PosttrialNudgeRunSummary = {
+      usersProcessed: 0,
+      nudgesCreated: 0,
+      welcomesScheduled: 0,
+      usersSkippedDedup: 0,
+      usersSkippedFailure: 0,
+      usersSkippedBudget: 0,
+      generationFailures: [],
+    };
 
-    for (const userDoc of usersSnapshot.docs) {
-      try {
-        const userData = userDoc.data() as PosttrialUserData;
-        const userId = userDoc.id;
-        usersProcessed++;
-
-        if (userData.mostRecentOnboardingStep !== "finalStep") {
-          logger.info(
-            `Skipping post-trial nudge for user ${userId}: onboarding not completed (mostRecentOnboardingStep: ${userData.mostRecentOnboardingStep ?? "undefined"}).`,
-          );
-          continue;
-        }
-
-        if (userData.disabled === true) {
-          logger.info(
-            `Skipping post-trial nudge for user ${userId} - account disabled`,
-          );
-          continue;
-        }
-
-        if (userData.hasWithdrawnFromStudy === true) {
-          continue;
-        }
-
-        if (userData.didOptInToTrial !== true) {
-          logger.info(
-            `Skipping post-trial nudge for user ${userId}: did not opt into trial`,
-          );
-          continue;
-        }
-
-        if (!userData.timeZone || !userData.dateOfEnrollment) {
-          logger.info(
-            `Skipping post-trial nudge for user ${userId}: missing timeZone or dateOfEnrollment`,
-          );
-          continue;
-        }
-
-        const daysSinceEnrollment = this.getDaysSinceEnrollment(
-          userData.dateOfEnrollment,
-        );
-        if (daysSinceEnrollment < PosttrialNudgeService.TRIAL_COMPLETION_DAYS) {
-          logger.info(
-            `Skipping post-trial nudge for user ${userId}: trial nudges not yet complete (${daysSinceEnrollment} days since enrollment, need ${PosttrialNudgeService.TRIAL_COMPLETION_DAYS})`,
-          );
-          continue;
-        }
-
-        if (!this.isWithinActiveWindow(userData.lastActiveDate)) {
-          logger.info(
-            `Skipping post-trial nudge for user ${userId}: not active within the last ${PosttrialNudgeService.ACTIVE_WINDOW_DAYS} days`,
-          );
-          continue;
-        }
-
-        const rawNotificationTime = userData.preferredNotificationTime?.trim();
-        const preferredTime =
-          rawNotificationTime !== undefined && rawNotificationTime !== "" ?
-            rawNotificationTime
-          : PosttrialNudgeService.DEFAULT_NOTIFICATION_TIME;
-        if (preferredTime !== rawNotificationTime) {
-          logger.warn(
-            `User ${userId} has no preferred notification time for post-trial nudge. Assuming ${PosttrialNudgeService.DEFAULT_NOTIFICATION_TIME} as default.`,
-          );
-          userData.preferredNotificationTime = preferredTime;
-        }
-
-        const targetUtc = this.computeTargetUtc(
-          userData.timeZone,
-          preferredTime,
-        );
-
-        const duplicate = await this.hasNudgeForLocalDay(
-          userId,
-          targetUtc,
-          userData.timeZone,
-        );
-        if (duplicate) {
-          logger.info(
-            `Skipping post-trial nudge for user ${userId}: already queued for ${targetUtc.toISOString()}`,
-          );
-          usersSkippedDedup++;
-          continue;
-        }
-
-        const userLanguage = this.getUserLanguage(userData);
-        let nudge: PosttrialNudgeMessage | null;
-        try {
-          nudge = await this.generateLLMNudge(
-            userId,
-            userLanguage,
-            userData,
-            targetUtc,
-          );
-        } catch (error) {
-          generationFailures.push({ userId, error: String(error) });
-          nudge = null;
-        }
-
-        if (!nudge) {
-          logger.warn(
-            `Skipping post-trial nudge for user ${userId}: LLM nudge generation returned no nudge.`,
-          );
-          usersSkippedFailure++;
-          continue;
-        }
-
-        await this.createPosttrialNudgeForUser(userId, nudge, targetUtc);
-        nudgesCreated++;
-        logger.info(
-          `Created post-trial nudge for user ${userId} at ${targetUtc.toISOString()} (${userLanguage})`,
-        );
-
-        try {
-          const welcomed = await this.scheduleWelcomeIfNeeded(
-            userId,
-            userData,
-            targetUtc,
-            userLanguage,
-          );
-          if (welcomed) welcomesScheduled++;
-        } catch (welcomeError) {
-          // Non-fatal: the post-trial nudge itself was already queued, and
-          // the unset flag means the next daily run will retry the welcome.
-          logger.error(
-            `Failed to schedule post-trial welcome nudge for user ${userId}: ${String(welcomeError)}`,
-          );
-        }
-      } catch (error) {
-        logger.error(
-          `Error creating post-trial nudge for user ${userDoc.id}: ${String(error)}`,
-        );
-      }
-    }
+    // Users are processed concurrently so the slow LLM requests overlap.
+    // Sharing `summary` is safe: each callback runs uninterrupted until its
+    // next await, so the counter updates never interleave.
+    await forEachWithConcurrency(
+      usersSnapshot.docs,
+      this.llmConcurrency,
+      async (userDoc) =>
+        this.processUserForPosttrialNudge(userDoc, runDeadline, summary),
+    );
 
     logger.info(
-      `Post-trial nudge creation complete: ${nudgesCreated} nudges created, ${welcomesScheduled} welcome nudges scheduled, ${usersProcessed} users processed, ${usersSkippedDedup} skipped (dedup), ${usersSkippedFailure} skipped (LLM failure)`,
+      `Post-trial nudge creation complete: ${summary.nudgesCreated} nudges created, ${summary.welcomesScheduled} welcome nudges scheduled, ${summary.usersProcessed} users processed, ${summary.usersSkippedDedup} skipped (dedup), ${summary.usersSkippedFailure} skipped (LLM failure), ${summary.usersSkippedBudget} skipped (time budget)`,
     );
 
+    const budgetNote =
+      summary.usersSkippedBudget > 0 ?
+        ` ${summary.usersSkippedBudget} of them were not attempted because the run reached its time budget.`
+      : "";
     await reportNudgeGenerationFailures(
       "onScheduleDailyPosttrialNudgeCreation",
-      generationFailures,
-      "No post-trial nudge was scheduled for these users today. Users who remain eligible are retried in the next daily run.",
+      summary.generationFailures,
+      `No post-trial nudge was scheduled for these users today. Users who remain eligible are retried in the next daily run.${budgetNote}`,
     );
+
+    return summary;
+  }
+
+  private async processUserForPosttrialNudge(
+    userDoc: admin.firestore.QueryDocumentSnapshot,
+    runDeadline: number,
+    summary: PosttrialNudgeRunSummary,
+  ): Promise<void> {
+    try {
+      const userData = userDoc.data() as PosttrialUserData;
+      const userId = userDoc.id;
+      summary.usersProcessed++;
+
+      if (userData.mostRecentOnboardingStep !== "finalStep") {
+        logger.info(
+          `Skipping post-trial nudge for user ${userId}: onboarding not completed (mostRecentOnboardingStep: ${userData.mostRecentOnboardingStep ?? "undefined"}).`,
+        );
+        return;
+      }
+
+      if (userData.disabled === true) {
+        logger.info(
+          `Skipping post-trial nudge for user ${userId} - account disabled`,
+        );
+        return;
+      }
+
+      if (userData.hasWithdrawnFromStudy === true) {
+        return;
+      }
+
+      if (userData.didOptInToTrial !== true) {
+        logger.info(
+          `Skipping post-trial nudge for user ${userId}: did not opt into trial`,
+        );
+        return;
+      }
+
+      if (!userData.timeZone || !userData.dateOfEnrollment) {
+        logger.info(
+          `Skipping post-trial nudge for user ${userId}: missing timeZone or dateOfEnrollment`,
+        );
+        return;
+      }
+
+      const daysSinceEnrollment = this.getDaysSinceEnrollment(
+        userData.dateOfEnrollment,
+      );
+      if (daysSinceEnrollment < PosttrialNudgeService.TRIAL_COMPLETION_DAYS) {
+        logger.info(
+          `Skipping post-trial nudge for user ${userId}: trial nudges not yet complete (${daysSinceEnrollment} days since enrollment, need ${PosttrialNudgeService.TRIAL_COMPLETION_DAYS})`,
+        );
+        return;
+      }
+
+      if (!this.isWithinActiveWindow(userData.lastActiveDate)) {
+        logger.info(
+          `Skipping post-trial nudge for user ${userId}: not active within the last ${PosttrialNudgeService.ACTIVE_WINDOW_DAYS} days`,
+        );
+        return;
+      }
+
+      const rawNotificationTime = userData.preferredNotificationTime?.trim();
+      const preferredTime =
+        rawNotificationTime !== undefined && rawNotificationTime !== "" ?
+          rawNotificationTime
+        : PosttrialNudgeService.DEFAULT_NOTIFICATION_TIME;
+      if (preferredTime !== rawNotificationTime) {
+        logger.warn(
+          `User ${userId} has no preferred notification time for post-trial nudge. Assuming ${PosttrialNudgeService.DEFAULT_NOTIFICATION_TIME} as default.`,
+        );
+        userData.preferredNotificationTime = preferredTime;
+      }
+
+      const targetUtc = this.computeTargetUtc(userData.timeZone, preferredTime);
+
+      const duplicate = await this.hasNudgeForLocalDay(
+        userId,
+        targetUtc,
+        userData.timeZone,
+      );
+      if (duplicate) {
+        logger.info(
+          `Skipping post-trial nudge for user ${userId}: already queued for ${targetUtc.toISOString()}`,
+        );
+        summary.usersSkippedDedup++;
+        return;
+      }
+
+      if (Date.now() >= runDeadline) {
+        logger.error(
+          `Skipping post-trial nudge for user ${userId}: the run reached its time budget before generation started.`,
+        );
+        summary.usersSkippedBudget++;
+        summary.generationFailures.push({
+          userId,
+          error: "Not attempted: the run reached its time budget",
+        });
+        return;
+      }
+
+      const userLanguage = this.getUserLanguage(userData);
+      let nudge: PosttrialNudgeMessage | null;
+      try {
+        nudge = await this.generateLLMNudge(
+          userId,
+          userLanguage,
+          userData,
+          targetUtc,
+        );
+      } catch (error) {
+        summary.generationFailures.push({ userId, error: String(error) });
+        nudge = null;
+      }
+
+      if (!nudge) {
+        logger.warn(
+          `Skipping post-trial nudge for user ${userId}: LLM nudge generation returned no nudge.`,
+        );
+        summary.usersSkippedFailure++;
+        return;
+      }
+
+      const created = await this.createPosttrialNudgeForUser(
+        userId,
+        nudge,
+        targetUtc,
+      );
+      if (!created) {
+        logger.info(
+          `Skipping post-trial nudge for user ${userId}: an overlapping run already queued it for ${targetUtc.toISOString()}`,
+        );
+        summary.usersSkippedDedup++;
+        return;
+      }
+      summary.nudgesCreated++;
+      logger.info(
+        `Created post-trial nudge for user ${userId} at ${targetUtc.toISOString()} (${userLanguage})`,
+      );
+
+      try {
+        const welcomed = await this.scheduleWelcomeIfNeeded(
+          userId,
+          userData,
+          targetUtc,
+          userLanguage,
+        );
+        if (welcomed) summary.welcomesScheduled++;
+      } catch (welcomeError) {
+        // Non-fatal: the post-trial nudge itself was already queued, and
+        // the unset flag means the next daily run will retry the welcome.
+        logger.error(
+          `Failed to schedule post-trial welcome nudge for user ${userId}: ${String(welcomeError)}`,
+        );
+      }
+    } catch (error) {
+      logger.error(
+        `Error creating post-trial nudge for user ${userDoc.id}: ${String(error)}`,
+      );
+    }
   }
 }
 
@@ -994,7 +1121,7 @@ export const onScheduleDailyPosttrialNudgeCreation = onSchedule(
   {
     schedule: "30 8 * * *",
     timeZone: "UTC",
-    timeoutSeconds: 1800,
+    timeoutSeconds: FUNCTION_TIMEOUT_SECONDS,
     secrets: [...llmSecretParams, ...feedbackEmailSecretParams],
     serviceAccount: privilegedServiceAccount,
   },

@@ -8,6 +8,7 @@ import { expect } from "chai";
 import admin from "firebase-admin";
 import { DateTime } from "luxon";
 import { it, describe } from "mocha";
+import { stub } from "sinon";
 import { createNudgeNotifications } from "./planNudges.js";
 import {
   PosttrialNudgeService,
@@ -179,7 +180,10 @@ describeWithEmulators("function: planPosttrialNudges", (env) => {
           }),
         );
 
-      await createPosttrialNudgeNotifications();
+      const service = new PosttrialNudgeService(env.firestore, {
+        llmRetryDelaysMs: [0, 0],
+      });
+      const summary = await service.createPosttrialNudgeNotifications();
 
       const backlog = await env.firestore
         .collection("users")
@@ -190,6 +194,119 @@ describeWithEmulators("function: planPosttrialNudges", (env) => {
       // No API key in the emulator → generateLLMNudge throws after retries →
       // user is skipped for the day with no predefined fallback.
       expect(backlog.size).to.equal(0);
+      expect(summary.usersSkippedFailure).to.equal(1);
+      expect(summary.generationFailures.map((f) => f.userId)).to.deep.equal([
+        userId,
+      ]);
+    });
+  });
+
+  describe("Parallel generation and overlapping runs", () => {
+    const seedEligibleUsers = async (count: number): Promise<string[]> => {
+      const userIds = Array.from(
+        { length: count },
+        (_, index) => `posttrial-parallel-${index}`,
+      );
+      await Promise.all(
+        userIds.map((userId) =>
+          env.firestore
+            .collection("users")
+            .doc(userId)
+            .set(baseEligibleUser({ timeZone: "UTC" })),
+        ),
+      );
+      return userIds;
+    };
+
+    const backlogByCategory = async (userId: string, category: string) =>
+      env.firestore
+        .collection("users")
+        .doc(userId)
+        .collection("notificationBacklog")
+        .where("category", "==", category)
+        .get();
+
+    const stubLlm = (service: PosttrialNudgeService, delayMs: number) => {
+      const state = { inFlight: 0, maxInFlight: 0 };
+      const llmStub = stub(service, "generateLLMNudge").callsFake(async () => {
+        state.inFlight++;
+        state.maxInFlight = Math.max(state.maxInFlight, state.inFlight);
+        await new Promise((resolve) => setTimeout(resolve, delayMs));
+        state.inFlight--;
+        return {
+          title: "Stubbed title",
+          body: "Stubbed body",
+          isLLMGenerated: true,
+          generatedAt: admin.firestore.Timestamp.now(),
+        };
+      });
+      return { llmStub, state };
+    };
+
+    it("generates nudges for several users concurrently up to the configured limit", async () => {
+      const userIds = await seedEligibleUsers(7);
+      const service = new PosttrialNudgeService(env.firestore, {
+        llmConcurrency: 3,
+      });
+      const { llmStub, state } = stubLlm(service, 50);
+
+      const summary = await service.createPosttrialNudgeNotifications();
+
+      expect(llmStub.callCount).to.equal(7);
+      expect(state.maxInFlight).to.equal(3);
+      expect(summary.nudgesCreated).to.equal(7);
+      for (const userId of userIds) {
+        const nudges = await backlogByCategory(userId, "nudge-posttrial");
+        expect(nudges.size).to.equal(1);
+        expect(nudges.docs[0].id).to.match(
+          /^[0-9A-F]{8}-[0-9A-F]{4}-8[0-9A-F]{3}-[89AB][0-9A-F]{3}-[0-9A-F]{12}$/,
+        );
+        expect(nudges.docs[0].get("id")).to.equal(nudges.docs[0].id);
+      }
+    });
+
+    it("queues only one nudge and one welcome per user when two runs overlap", async () => {
+      const userIds = await seedEligibleUsers(4);
+      const service = new PosttrialNudgeService(env.firestore);
+      // The delay keeps both runs past the dedup query before either writes,
+      // which is the race seen when Cloud Scheduler delivered a job twice.
+      const { llmStub } = stubLlm(service, 500);
+
+      const [first, second] = await Promise.all([
+        service.createPosttrialNudgeNotifications(),
+        service.createPosttrialNudgeNotifications(),
+      ]);
+
+      expect(llmStub.callCount).to.equal(8);
+      expect(first.nudgesCreated + second.nudgesCreated).to.equal(4);
+      expect(first.usersSkippedDedup + second.usersSkippedDedup).to.equal(4);
+      for (const userId of userIds) {
+        const nudges = await backlogByCategory(userId, "nudge-posttrial");
+        const welcomes = await backlogByCategory(
+          userId,
+          "nudge-posttrial-welcome",
+        );
+        expect(nudges.size).to.equal(1);
+        expect(welcomes.size).to.equal(1);
+      }
+    });
+
+    it("stops starting LLM generations once the run time budget is used up", async () => {
+      const [userId] = await seedEligibleUsers(1);
+      const service = new PosttrialNudgeService(env.firestore, {
+        runBudgetMs: 0,
+      });
+      const { llmStub } = stubLlm(service, 0);
+
+      const summary = await service.createPosttrialNudgeNotifications();
+
+      expect(llmStub.callCount).to.equal(0);
+      expect(summary.usersSkippedBudget).to.equal(1);
+      expect(summary.generationFailures.map((f) => f.userId)).to.deep.equal([
+        userId,
+      ]);
+      const nudges = await backlogByCategory(userId, "nudge-posttrial");
+      expect(nudges.size).to.equal(0);
     });
   });
 
