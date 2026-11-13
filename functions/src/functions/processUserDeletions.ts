@@ -14,24 +14,25 @@ import { getServiceFactory } from "../services/factory/getServiceFactory.js";
 const storage = new Storage();
 
 export const deleteUserStorageFiles = async (userId: string): Promise<void> => {
-  const bucketName = process.env.GCLOUD_PROJECT;
-  if (!bucketName) {
+  const projectId = process.env.GCLOUD_PROJECT;
+  if (!projectId) {
     logger.error("GCLOUD_PROJECT environment variable not set");
     return;
   }
 
-  const bucket = storage.bucket(`${bucketName}.appspot.com`);
+  const bucketNames = [
+    `${projectId}.appspot.com`,
+    process.env.DATA_COLLECTION_BUCKET,
+  ].filter((name): name is string => !!name);
   const prefix = `users/${userId}/`;
 
   try {
-    const [files] = await bucket.getFiles({ prefix });
-
-    if (files.length === 0) {
-      return;
-    }
-
-    const deletePromises = files.map((file) => file.delete());
-    await Promise.all(deletePromises);
+    await Promise.all(
+      bucketNames.map(async (bucketName) => {
+        const [files] = await storage.bucket(bucketName).getFiles({ prefix });
+        await Promise.all(files.map((file) => file.delete()));
+      }),
+    );
   } catch (error) {
     logger.error(`Failed to delete storage files for user ${userId}:`, error);
     throw error;
