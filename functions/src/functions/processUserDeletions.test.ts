@@ -30,6 +30,7 @@ describe("function: processUserDeletions", () => {
   afterEach(() => {
     restore();
     delete process.env.GCLOUD_PROJECT;
+    delete process.env.DATA_COLLECTION_BUCKET;
   });
 
   describeWithEmulators("processUserDeletions integration", (_env) => {
@@ -66,6 +67,29 @@ describe("function: processUserDeletions", () => {
       expect(mockFiles[1].delete.calledOnce).to.be.true;
       // eslint-disable-next-line @typescript-eslint/no-unused-expressions
       expect(mockFiles[2].delete.calledOnce).to.be.true;
+    });
+
+    it("also deletes files in the data collection bucket", async () => {
+      process.env.DATA_COLLECTION_BUCKET = "test-datacollection";
+      const mockFile = {
+        name: "users/testuser/file.json.zstd",
+        delete: stub().resolves(),
+      };
+      getFilesStub.resolves([[mockFile]]);
+
+      const { deleteUserStorageFiles } =
+        await import("./processUserDeletions.js");
+
+      await deleteUserStorageFiles("testuser");
+
+      // eslint-disable-next-line @typescript-eslint/no-unused-expressions
+      expect(storageStub.calledWith("test-project.appspot.com")).to.be.true;
+      // eslint-disable-next-line @typescript-eslint/no-unused-expressions
+      expect(storageStub.calledWith("test-datacollection")).to.be.true;
+      // eslint-disable-next-line @typescript-eslint/no-unused-expressions
+      expect(getFilesStub.calledTwice).to.be.true;
+      // eslint-disable-next-line @typescript-eslint/no-unused-expressions
+      expect(mockFile.delete.calledTwice).to.be.true;
     });
 
     it("handles empty file list", async () => {
