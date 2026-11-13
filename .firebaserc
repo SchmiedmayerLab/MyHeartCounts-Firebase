@@ -1,5 +1,14 @@
 {
   "projects": {
     "default": "myheart-counts-development"
+  },
+  "targets": {
+    "som-rit-phi-mhc-dev": {
+      "storage": {
+        "datacollection": [
+          "mhc-datacollection-dev.starr-data.us"
+        ]
+      }
+    }
   }
 }
