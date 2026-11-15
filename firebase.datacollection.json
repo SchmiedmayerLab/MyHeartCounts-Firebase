@@ -1,0 +1,8 @@
+{
+  "storage": [
+    {
+      "target": "datacollection",
+      "rules": "firebasestorage.datacollection.rules"
+    }
+  ]
+}
