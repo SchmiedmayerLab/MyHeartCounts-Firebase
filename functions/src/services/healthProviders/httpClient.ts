@@ -25,9 +25,15 @@ export class ProviderHttpError extends Error {
     Object.setPrototypeOf(this, ProviderHttpError.prototype);
   }
 
-  /** Whether the status indicates the credentials are no longer usable. */
+  /**
+   * Whether the status indicates the credentials are no longer usable. Only
+   * 401/403: a 400 on a data endpoint is a request problem (e.g. a malformed
+   * filter), not a revoked token. Token-endpoint failures (where 400
+   * `invalid_grant` does mean revoked) are wrapped in {@link ProviderAuthError}
+   * by the token refresh path instead.
+   */
   get isAuthFailure(): boolean {
-    return this.status === 400 || this.status === 401 || this.status === 403;
+    return this.status === 401 || this.status === 403;
   }
 }
 
@@ -109,24 +115,36 @@ export const postJson = async <T>(
   return parseJson<T>(response, context);
 };
 
+/** Whether an error means the stored credentials are unusable. */
+export const isProviderAuthFailure = (error: unknown): boolean =>
+  error instanceof ProviderAuthError ||
+  (error instanceof ProviderHttpError && error.isAuthFailure);
+
 /**
- * Await one per-metric request, isolating transient failures: a 429/5xx (or any
- * non-auth error) for a single endpoint is logged and resolves to `undefined` so
- * the surrounding `Promise.all` still yields the metrics that did succeed,
- * instead of dropping the whole window. Auth failures are rethrown so the caller
- * can mark the connection as broken.
+ * Await one per-endpoint request, isolating transient failures: a 429/5xx (or
+ * any non-auth error) is logged and resolves to `undefined` so the surrounding
+ * `Promise.all` still yields the endpoints that did succeed. Auth failures are
+ * rethrown so the caller can mark the connection as broken.
+ *
+ * Pass a `failures` array to record which endpoints failed: the orchestrator
+ * treats any recorded failure as a partial sync and does not advance
+ * `lastSyncAt`, so the next sync re-fetches the window.
  */
 export const settleEndpoint = async <T>(
   context: string,
   promise: Promise<T>,
+  failures?: string[],
 ): Promise<T | undefined> => {
   try {
     return await promise;
   } catch (error) {
-    if (error instanceof ProviderHttpError && error.isAuthFailure) {
+    if (isProviderAuthFailure(error)) {
       throw error;
     }
-    logger.warn(`${context}: dropped this window's data: ${String(error)}`);
+    logger.warn(
+      `${context}: fetch failed, window will be retried: ${String(error)}`,
+    );
+    failures?.push(context);
     return undefined;
   }
 };

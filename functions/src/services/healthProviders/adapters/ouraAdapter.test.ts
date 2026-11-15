@@ -3,298 +3,358 @@
 // SPDX-FileCopyrightText: 2026 Stanford University and the project authors (see CONTRIBUTORS.md)
 // SPDX-License-Identifier: MIT
 
+import { createHmac } from "crypto";
 import { expect } from "chai";
-import { normalizeOura, OuraAdapter, parseOuraEvent } from "./ouraAdapter.js";
-import { type ProviderTokens } from "../../../models/index.js";
-import { type ProviderObservation } from "../healthProviderAdapter.js";
-
-const subject = { reference: "user/u1" };
-
-const fakeTokens: ProviderTokens = {
-  accessToken: "access",
-  refreshToken: "refresh",
-  expiresAt: new Date(Date.now() + 3600_000),
-  scopes: [],
-  providerUserId: "u",
-};
-
-const stubFetch = (route: (url: string) => unknown): (() => void) => {
-  const original = globalThis.fetch;
-  globalThis.fetch = ((input: unknown) => {
-    const url =
-      typeof input === "string" ? input : (input as { url: string }).url;
-    const payload = route(url);
-    return Promise.resolve({
-      ok: true,
-      status: 200,
-      text: () =>
-        Promise.resolve(payload === undefined ? "" : JSON.stringify(payload)),
-    } as Response);
-  }) as typeof fetch;
-  return () => {
-    globalThis.fetch = original;
-  };
-};
-
-const observationFor = (
-  observations: ProviderObservation[],
-  metric: string,
-) => {
-  const match = observations.find((o) => o.metric === metric);
-  if (match === undefined)
-    throw new Error(`no observation for metric ${metric}`);
-  return match.observation;
-};
+import {
+  fakeTokens,
+  outputFor,
+  outputsFor,
+  quantityOf,
+  stubFetch,
+} from "./adapterTestSupport.js";
+import {
+  normalizeOura,
+  OuraAdapter,
+  parseOuraEvent,
+  verifyOuraSignature,
+} from "./ouraAdapter.js";
 
 describe("OuraAdapter: normalizeOura", () => {
-  it("maps daily activity to steps, energy and distance", () => {
-    const result = normalizeOura(
-      {
-        activity: [
-          {
-            id: "a1",
-            day: "2026-01-01",
-            steps: 1000,
-            active_calories: 200,
-            equivalent_walking_distance: 800,
-          },
-        ],
-      },
-      subject,
+  it("maps daily activity to a civil-day Period with the source offset", () => {
+    const records = normalizeOura({
+      activity: [
+        {
+          id: "a1",
+          day: "2026-08-20",
+          timestamp: "2026-08-20T04:00:00-07:00",
+          steps: 8241,
+          active_calories: 420,
+          equivalent_walking_distance: 6100,
+          total_calories: 2400,
+          score: 82,
+          high_activity_time: 600,
+        },
+      ],
+    });
+    expect(records).to.have.lengthOf(1);
+    expect(records[0].sourceType).to.equal("daily_activity");
+    expect(records[0].nativeRecordId).to.equal("a1");
+    const steps = outputFor(records, "step-count").output;
+    expect(steps.effective).to.deep.equal({
+      kind: "period",
+      start: "2026-08-20T00:00:00-07:00",
+      end: "2026-08-21T00:00:00-07:00",
+      timezone: undefined,
+    });
+    expect(quantityOf(steps)).to.equal(8241);
+    expect(quantityOf(outputFor(records, "active-energy").output)).to.equal(
+      420,
     );
+    expect(quantityOf(outputFor(records, "distance").output)).to.equal(6100);
+    expect(
+      quantityOf(outputFor(records, "total-energy-burned").output),
+    ).to.equal(2400);
+    expect(quantityOf(outputFor(records, "activity-score").output)).to.equal(
+      82,
+    );
+    expect(
+      quantityOf(outputFor(records, "high-activity-duration").output),
+    ).to.equal(10);
+  });
 
-    expect(result.map((o) => o.metric)).to.have.members([
-      "steps",
-      "activeEnergyBurned",
-      "distanceWalkingRunning",
+  it("maps a sleep session to Grove sleep profiles over the bedtime Period", () => {
+    const records = normalizeOura({
+      sleep: [
+        {
+          id: "s1",
+          day: "2026-08-20",
+          type: "long_sleep",
+          bedtime_start: "2026-08-19T23:00:00+02:00",
+          bedtime_end: "2026-08-20T07:00:00+02:00",
+          total_sleep_duration: 25200,
+          deep_sleep_duration: 3600,
+          rem_sleep_duration: 5400,
+          light_sleep_duration: 16200,
+          awake_time: 1800,
+          lowest_heart_rate: 48,
+          average_heart_rate: 55,
+          average_hrv: 41,
+          average_breath: 14.5,
+          efficiency: 90,
+          latency: 600,
+        },
+      ],
+    });
+    expect(records).to.have.lengthOf(1);
+    const duration = outputFor(records, "sleep-duration").output;
+    expect(quantityOf(duration)).to.equal(7);
+    expect(duration.effective).to.deep.include({
+      start: "2026-08-19T23:00:00+02:00",
+      end: "2026-08-20T07:00:00+02:00",
+    });
+    expect(
+      quantityOf(outputFor(records, "deep-sleep-duration").output),
+    ).to.equal(60);
+    const heartRates = outputsFor(records, "sleep-heart-rate");
+    expect(heartRates.map(({ output }) => output.method)).to.deep.equal([
+      "session-minimum",
+      "session-mean",
     ]);
-
-    const steps = observationFor(result, "steps");
-    expect(steps.valueQuantity?.value).to.equal(1000);
-    expect(steps.id).to.equal("oura-a1");
-    expect(steps.subject.reference).to.equal("user/u1");
-    // Provenance extension identifies the provider and native sample id.
-    const providerExt = steps.extension?.find((ext) =>
-      ext.url.endsWith("/healthProvider"),
-    );
-    expect(providerExt?.valueString).to.equal("oura");
-  });
-
-  it("converts sleep durations from seconds to minutes and uses the sleep period", () => {
-    const result = normalizeOura(
-      {
-        sleep: [
-          {
-            id: "s1",
-            day: "2026-01-01",
-            bedtime_start: "2026-01-01T23:00:00Z",
-            bedtime_end: "2026-01-02T07:00:00Z",
-            total_sleep_duration: 28800,
-            deep_sleep_duration: 3600,
-            lowest_heart_rate: 50,
-            average_hrv: 65,
-            average_breath: 14,
-          },
-        ],
-      },
-      subject,
-    );
-
+    expect(heartRates[1].output.outsideCatalog).to.equal(true);
+    expect(heartRates[1].output.discriminator).to.equal("session-mean");
     expect(
-      observationFor(result, "sleepDuration").valueQuantity?.value,
-    ).to.equal(480);
-    expect(observationFor(result, "sleepDeep").valueQuantity?.value).to.equal(
-      60,
-    );
+      outputFor(records, "respiratory-rate-average").output.method,
+    ).to.equal("session-mean");
     expect(
-      observationFor(result, "restingHeartRate").valueQuantity?.value,
-    ).to.equal(50);
-    expect(
-      observationFor(result, "heartRateVariability").valueQuantity?.value,
-    ).to.equal(65);
-    // Duration observations carry an effectivePeriod, not a single instant.
-    const duration = observationFor(result, "sleepDuration");
-    expect(duration.effectivePeriod?.start?.toISOString()).to.equal(
-      "2026-01-01T23:00:00.000Z",
-    );
-  });
-
-  it("skips sleep stages that are absent instead of emitting zeros", () => {
-    const result = normalizeOura(
-      {
-        sleep: [
-          {
-            id: "s2",
-            day: "2026-01-02",
-            total_sleep_duration: 28800,
-            // deep/rem/light/awake all absent
-          },
-        ],
-      },
-      subject,
-    );
-    const metrics = result.map((o) => o.metric);
-    expect(metrics).to.include("sleepDuration");
-    expect(metrics).to.not.include("sleepDeep");
-    expect(metrics).to.not.include("sleepRem");
-    expect(metrics).to.not.include("sleepLight");
-    expect(metrics).to.not.include("sleepAwake");
-  });
-
-  it("computes workout duration in minutes from the interval", () => {
-    const result = normalizeOura(
-      {
-        workouts: [
-          {
-            id: "w1",
-            start_datetime: "2026-01-01T10:00:00Z",
-            end_datetime: "2026-01-01T10:30:00Z",
-          },
-        ],
-      },
-      subject,
-    );
-    expect(
-      observationFor(result, "workoutDuration").valueQuantity?.value,
-    ).to.equal(30);
-  });
-
-  it("maps VO2 max estimates", () => {
-    const result = normalizeOura(
-      { vo2Max: [{ id: "v1", day: "2026-01-01", vo2_max: 42.1 }] },
-      subject,
-    );
-    expect(observationFor(result, "vo2Max").valueQuantity?.value).to.equal(
-      42.1,
-    );
-  });
-
-  it("maps cardiovascular age and readiness score, treating null as absent", () => {
-    const result = normalizeOura(
-      {
-        cardiovascularAge: [
-          { id: "c1", day: "2026-01-01", vascular_age: 41 },
-          { id: "c2", day: "2026-01-02", vascular_age: null },
-        ],
-        readiness: [{ id: "r1", day: "2026-01-01", score: 82 }],
-      },
-      subject,
-    );
-    expect(
-      observationFor(result, "cardiovascularAge").valueQuantity?.value,
+      quantityOf(
+        outputFor(records, "sleep-heart-rate-variability-rmssd").output,
+      ),
     ).to.equal(41);
+    expect(quantityOf(outputFor(records, "sleep-latency").output)).to.equal(10);
     expect(
-      observationFor(result, "readinessScore").valueQuantity?.value,
-    ).to.equal(82);
-    expect(
-      result.filter((o) => o.metric === "cardiovascularAge"),
-    ).to.have.lengthOf(1);
+      outputFor(records, "sleep-period-type").output.value,
+    ).to.deep.include({
+      text: "long_sleep",
+    });
   });
 
-  it("skips missing/undefined values", () => {
-    const result = normalizeOura(
-      { activity: [{ id: "a1", day: "2026-01-01" }] },
-      subject,
+  it("defers sleep output when a bedtime bound is missing", () => {
+    expect(
+      normalizeOura({
+        sleep: [{ id: "s1", day: "2026-08-20", total_sleep_duration: 100 }],
+      }),
+    ).to.have.lengthOf(0);
+  });
+
+  it("borrows the day's offset for documents without a timestamp", () => {
+    const records = normalizeOura({
+      activity: [
+        { id: "a1", day: "2026-08-20", timestamp: "2026-08-20T04:00:00+09:00" },
+      ],
+      spo2: [
+        {
+          id: "o1",
+          day: "2026-08-20",
+          spo2_percentage: { average: 97.2 },
+          breathing_disturbance_index: 3,
+        },
+      ],
+    });
+    const spo2 = outputFor(records, "oxygen-saturation-daily-average").output;
+    expect(spo2.effective).to.deep.include({
+      start: "2026-08-20T00:00:00+09:00",
+    });
+    expect(
+      quantityOf(outputFor(records, "breathing-disturbance-index").output),
+    ).to.equal(3);
+  });
+
+  it("maps workouts to the Grove workout profile with activity and statistics", () => {
+    const records = normalizeOura({
+      workouts: [
+        {
+          id: "w1",
+          activity: "running",
+          calories: 300,
+          distance: 5000,
+          intensity: "hard",
+          source: "manual",
+          start_datetime: "2026-08-20T07:00:00-04:00",
+          end_datetime: "2026-08-20T07:30:00-04:00",
+        },
+      ],
+    });
+    const workout = outputFor(records, "workout").output;
+    expect(workout.value).to.deep.equal({
+      concept: [
+        {
+          system:
+            "https://grovealliance.org/fhir/mobile/CodeSystem/grove-workout-activity",
+          code: "running",
+        },
+      ],
+      text: "running",
+    });
+    expect(workout.recordingMethod).to.equal("manual-entry");
+    expect(workout.components?.map((c) => c.code.code)).to.deep.equal([
+      "active-energy-sum",
+      "distance-sum",
+    ]);
+    expect(
+      outputFor(records, "workout-intensity").output.value,
+    ).to.deep.include({ text: "hard" });
+  });
+
+  it("maps VO2 max at its timestamp and skips it without one", () => {
+    const records = normalizeOura({
+      vo2Max: [
+        {
+          id: "v1",
+          day: "2026-08-20",
+          timestamp: "2026-08-20T08:00:00+01:00",
+          vo2_max: 44,
+        },
+        { id: "v2", day: "2026-08-21", vo2_max: 45 },
+      ],
+    });
+    expect(records).to.have.lengthOf(1);
+    expect(outputFor(records, "vo2-max").output.effective).to.deep.include({
+      kind: "instant",
+      value: "2026-08-20T08:00:00+01:00",
+    });
+  });
+
+  it("maps readiness, temperature deviation and cardiovascular age, skipping nulls", () => {
+    const records = normalizeOura({
+      readiness: [
+        {
+          id: "r1",
+          day: "2026-08-20",
+          score: 78,
+          temperature_deviation: -0.2,
+          temperature_trend_deviation: null,
+        },
+        { id: "r2", day: "2026-08-21", score: null },
+      ],
+      cardiovascularAge: [
+        { day: "2026-08-20", vascular_age: 35, pulse_wave_velocity: 6.1 },
+      ],
+    });
+    expect(
+      quantityOf(outputFor(records, "oura-readiness-score").output),
+    ).to.equal(78);
+    expect(
+      quantityOf(outputFor(records, "temperature-deviation").output),
+    ).to.equal(-0.2);
+    expect(outputsFor(records, "temperature-trend-deviation")).to.have.lengthOf(
+      0,
     );
-    expect(result).to.have.lengthOf(0);
+    const age = outputFor(records, "oura-cardiovascular-age");
+    expect(age.record.nativeRecordId).to.equal("2026-08-20");
+    expect(quantityOf(age.output)).to.equal(35);
+    expect(
+      quantityOf(outputFor(records, "pulse-wave-velocity").output),
+    ).to.equal(6.1);
   });
 });
 
-describe("OuraAdapter: fetchObservations", () => {
-  it("follows next_token pagination and normalizes", async () => {
+describe("OuraAdapter: fetchData", () => {
+  it("follows next_token pagination, archives heart rate, and reports failures", async () => {
     let activityCalls = 0;
     const restore = stubFetch((url) => {
       if (url.includes("/daily_activity")) {
         activityCalls += 1;
-        if (!url.includes("next_token")) {
-          return {
-            data: [{ id: "a1", day: "2026-01-01", steps: 1000 }],
-            next_token: "page2",
-          };
-        }
-        return {
-          data: [{ id: "a2", day: "2026-01-01", steps: 500 }],
-          next_token: null,
-        };
+        return url.includes("next_token") ?
+            {
+              data: [{ id: "a2", day: "2026-01-02", steps: 500 }],
+              next_token: null,
+            }
+          : {
+              data: [{ id: "a1", day: "2026-01-01", steps: 1000 }],
+              next_token: "page2",
+            };
       }
-      return { data: [] };
-    });
-    try {
-      const adapter = new OuraAdapter();
-      const result = await adapter.fetchObservations({
-        tokens: fakeTokens,
-        since: new Date("2026-01-01T00:00:00Z"),
-        until: new Date("2026-01-02T00:00:00Z"),
-        subject,
-      });
-      expect(activityCalls).to.equal(2);
-      expect(result.filter((o) => o.metric === "steps")).to.have.lengthOf(2);
-    } finally {
-      restore();
-    }
-  });
-});
-
-describe("OuraAdapter: fetchRawArchives", () => {
-  it("archives continuous heart rate as a single raw payload", async () => {
-    const restore = stubFetch((url) => {
       if (url.includes("/heartrate")) {
         return {
-          data: [
-            { bpm: 60, timestamp: "2026-01-01T00:00:00Z" },
-            { bpm: 61, timestamp: "2026-01-01T00:05:00Z" },
-          ],
+          data: [{ bpm: 60, timestamp: "2026-01-01T00:00:00Z" }],
           next_token: null,
         };
       }
+      if (url.includes("/daily_readiness")) return { __status: 503 };
       return { data: [] };
     });
     try {
-      const adapter = new OuraAdapter();
-      const archives = await adapter.fetchRawArchives({
+      const result = await new OuraAdapter().fetchData({
         tokens: fakeTokens,
         since: new Date("2026-01-01T00:00:00Z"),
         until: new Date("2026-01-02T00:00:00Z"),
-        subject,
       });
-      expect(archives).to.have.lengthOf(1);
-      expect(archives[0]?.dataType).to.equal("heartRate");
-      expect(archives[0]?.payload).to.deep.equal([
-        { bpm: 60, timestamp: "2026-01-01T00:00:00Z" },
-        { bpm: 61, timestamp: "2026-01-01T00:05:00Z" },
-      ]);
+      expect(activityCalls).to.equal(2);
+      expect(outputsFor(result.records, "step-count")).to.have.lengthOf(2);
+      expect(result.rawArchives).to.have.lengthOf(1);
+      expect(result.rawArchives[0]).to.include({
+        sourceType: "heartrate",
+        dataType: "heartRate",
+      });
+      expect(result.failures).to.deep.equal(["Oura daily_readiness"]);
     } finally {
       restore();
     }
   });
 
-  it("returns no archive when there is nothing to report", async () => {
-    const restore = stubFetch(() => ({ data: [], next_token: null }));
+  it("propagates auth failures", async () => {
+    const restore = stubFetch(() => ({ __status: 401 }));
     try {
-      const adapter = new OuraAdapter();
-      const archives = await adapter.fetchRawArchives({
-        tokens: fakeTokens,
-        since: new Date("2026-01-01T00:00:00Z"),
-        until: new Date("2026-01-02T00:00:00Z"),
-        subject,
-      });
-      expect(archives).to.have.lengthOf(0);
+      let thrown: unknown;
+      try {
+        await new OuraAdapter().fetchData({
+          tokens: fakeTokens,
+          since: new Date("2026-01-01T00:00:00Z"),
+          until: new Date("2026-01-02T00:00:00Z"),
+        });
+      } catch (error) {
+        thrown = error;
+      }
+      expect(thrown).to.be.instanceOf(Error);
     } finally {
       restore();
     }
   });
 });
 
-describe("OuraAdapter: parseOuraEvent", () => {
+describe("OuraAdapter: webhooks", () => {
   it("extracts the provider user id", () => {
     expect(parseOuraEvent({ user_id: "abc" })).to.deep.equal({
       providerUserId: "abc",
     });
+    expect(parseOuraEvent({})).to.equal(undefined);
+    expect(parseOuraEvent({ user_id: 5 })).to.equal(undefined);
   });
 
-  it("returns undefined for malformed events", () => {
-    expect(parseOuraEvent({})).to.equal(undefined);
-    expect(parseOuraEvent(null)).to.equal(undefined);
-    expect(parseOuraEvent({ user_id: 5 })).to.equal(undefined);
+  it("verifies the HMAC signature over timestamp + raw body", () => {
+    const rawBody = Buffer.from('{"user_id":"abc"}');
+    const now = Date.parse("2026-08-20T00:00:00Z");
+    const timestamp = String(Math.floor(now / 1000));
+    const signature = createHmac("sha256", "secret")
+      .update(timestamp)
+      .update(rawBody)
+      .digest("hex")
+      .toUpperCase();
+    expect(
+      verifyOuraSignature({
+        signature,
+        timestamp,
+        rawBody,
+        secret: "secret",
+        now,
+      }),
+    ).to.equal(true);
+    expect(
+      verifyOuraSignature({
+        signature,
+        timestamp,
+        rawBody,
+        secret: "other",
+        now,
+      }),
+    ).to.equal(false);
+    expect(
+      verifyOuraSignature({
+        signature,
+        timestamp,
+        rawBody,
+        secret: "secret",
+        now: now + 3600_000,
+      }),
+    ).to.equal(false);
+    expect(
+      verifyOuraSignature({
+        signature: undefined,
+        timestamp,
+        rawBody,
+        secret: "secret",
+        now,
+      }),
+    ).to.equal(undefined);
   });
 });

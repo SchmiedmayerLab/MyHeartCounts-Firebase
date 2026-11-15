@@ -12,26 +12,52 @@ import {
   getGoogleHealthClientSecret,
 } from "../../../env.js";
 import {
-  type FHIRReference,
   HealthProviderId,
   type ProviderTokens,
 } from "../../../models/index.js";
 import {
-  type FetchObservationsParams,
+  GroveUrl,
+  groveWorkoutActivity,
+  MhcMeasurements,
+  MhcUrl,
+} from "../grove/constants.js";
+import {
+  isoDate,
+  num,
+  type ObservationDraft,
+  type ObservationRecordDraft,
+  outputKey,
+  quantityValue as quantity,
+  type RecordingMethod,
+  workoutComponent,
+} from "../grove/drafts.js";
+import {
+  civilDay,
+  formatInstant,
+  type GroveEffective,
+  instant,
+  offsetOfDuration,
+  offsetOfIso,
+  period,
+} from "../grove/time.js";
+import {
+  type FetchDataParams,
   type HealthProviderAdapter,
-  type ProviderObservation,
-  type ProviderRawArchive,
+  type ProviderFetchResult,
   type WebhookHandling,
 } from "../healthProviderAdapter.js";
-import { getJson, postJson, settleEndpoint } from "../httpClient.js";
-import { buildProviderObservation } from "../observationBuilder.js";
-import { MetricSpecs } from "../providerCodes.js";
+import {
+  getJson,
+  postJson,
+  ProviderHttpError,
+  settleEndpoint,
+} from "../httpClient.js";
 
-// This adapter replaces the legacy Fitbit Web API (sunsetting September 2026)
-// with its Google-managed successor, the Google Health API
-// (health.googleapis.com/v4). Endpoint shapes here were confirmed against the
-// live Google API discovery document (health.googleapis.com/$discovery/rest),
-// the same source Google's own client libraries are generated from.
+// This adapter targets the Google Health API (health.googleapis.com/v4), the
+// successor of the legacy Fitbit Web API (sunsetting September 2026). Endpoint
+// shapes follow the API discovery document. Optional fields read below that are
+// not covered by the test fixtures (data point `name`, `dataSource`, UTC offsets,
+// sleep `stages`, exercise summaries) are read defensively.
 
 const AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth";
 const TOKEN_URL = "https://oauth2.googleapis.com/token";
@@ -47,8 +73,6 @@ const GOOGLE_HEALTH_SCOPES = [
 /** Safety cap on token-paginated fetches. */
 const MAX_PAGES = 1000;
 
-const isoDate = (date: Date): string => date.toISOString().slice(0, 10);
-
 const physicalTimeFilter = (field: string, since: Date, until: Date): string =>
   `${field} >= "${since.toISOString()}" AND ${field} < "${until.toISOString()}"`;
 
@@ -61,15 +85,12 @@ interface GoogleHealthDate {
   day: number;
 }
 
-const dailyDate = (date: GoogleHealthDate): Date =>
-  new Date(Date.UTC(date.year, date.month - 1, date.day, 12));
-
 const dateKey = (date: GoogleHealthDate): string =>
   `${date.year}-${String(date.month).padStart(2, "0")}-${String(date.day).padStart(2, "0")}`;
 
-// --- Raw response shapes (only the fields we consume) ----------------------
+// --- Raw response shapes ------------------------------------------------------
 // Int64 fields (count, millimeters, beatsPerMinute, minutes, ...) are encoded
-// as JSON strings by the Google Health API and must be parsed with `Number`.
+// as JSON strings by the Google Health API and are parsed with `num`.
 
 interface GoogleHealthTokenResponse {
   access_token: string;
@@ -81,98 +102,36 @@ interface GoogleHealthTokenResponse {
 interface GHInterval {
   startTime: string;
   endTime: string;
+  startUtcOffset?: string;
+  endUtcOffset?: string;
 }
 interface GHSampleTime {
   physicalTime: string;
+  utcOffset?: string;
 }
-interface GHSteps {
-  count: string;
-  interval: GHInterval;
-}
-interface GHDistance {
-  millimeters: string;
-  interval: GHInterval;
-}
-interface GHActiveEnergyBurned {
-  kcal: number;
-  interval: GHInterval;
-}
-interface GHWeight {
-  weightGrams: number;
-  sampleTime: GHSampleTime;
-}
-interface GHBodyFat {
-  percentage: number;
-  sampleTime: GHSampleTime;
-}
-interface GHHeight {
-  heightMillimeters: string;
-  sampleTime: GHSampleTime;
-}
-interface GHVo2Max {
-  vo2Max: number;
-  sampleTime: GHSampleTime;
-}
-interface GHBloodGlucose {
-  bloodGlucoseMilligramsPerDeciliter: number;
-  sampleTime: GHSampleTime;
-}
-interface GHCoreBodyTemperature {
-  temperatureCelsius: number;
-  sampleTime: GHSampleTime;
-}
-interface GHFloors {
-  count: string;
-  interval: GHInterval;
-}
-interface GHBasalEnergyBurned {
-  kcal: number;
-  interval: GHInterval;
-}
-interface GHDailyOxygenSaturation {
-  averagePercentage: number;
-  date: GoogleHealthDate;
-}
-interface GHHeartRateVariability {
-  rootMeanSquareOfSuccessiveDifferencesMilliseconds?: number;
-  standardDeviationMilliseconds?: number;
-  sampleTime: GHSampleTime;
-}
-interface GHDailyRestingHeartRate {
-  beatsPerMinute: string;
-  date: GoogleHealthDate;
-}
-interface GHDailyRespiratoryRate {
-  breathsPerMinute: number;
-  date: GoogleHealthDate;
-}
-interface GHSleepStageSummary {
+interface GHSleepStage {
+  startTime?: string;
+  endTime?: string;
   type?: string;
-  minutes?: string;
 }
 interface GHSleep {
   interval: GHInterval;
+  type?: string;
   summary?: {
     minutesAsleep?: string;
-    stagesSummary?: GHSleepStageSummary[];
+    minutesAwake?: string;
+    minutesInSleepPeriod?: string;
+    minutesToFallAsleep?: string;
+    stagesSummary?: Array<{ type?: string; minutes?: string; count?: string }>;
   };
+  stages?: GHSleepStage[];
 }
 interface GHExercise {
   interval: GHInterval;
+  exerciseType?: string;
+  activeDuration?: string;
+  metricsSummary?: Record<string, unknown>;
 }
-
-const stageMinutes = (
-  stagesSummary: GHSleepStageSummary[] | undefined,
-  type: string,
-): number | undefined => {
-  const match = stagesSummary?.find((s) => s.type === type);
-  return match?.minutes !== undefined ? Number(match.minutes) : undefined;
-};
-
-// --- Response validation (zod) ---------------------------------------------
-// Provider payloads are untrusted; validate only the envelope shape we depend
-// on for pagination and stay permissive about the per-item field shapes,
-// which the extraction below already treats defensively.
 
 const googleHealthTokenResponseSchema = z
   .object({
@@ -214,278 +173,583 @@ const tokensFrom = (
   };
 };
 
+// --- Normalization helpers -------------------------------------------------------
+
+type DataPoint = Record<string, unknown> & {
+  name?: unknown;
+  dataSource?: { recordingMethod?: unknown } & Record<string, unknown>;
+};
+
+/** The data point's own id (last segment of its resource `name`). */
+const nativeIdOf = (point: DataPoint, fallback: string): string => {
+  if (typeof point.name === "string" && point.name.length > 0) {
+    const segments = point.name.split("/");
+    return segments[segments.length - 1] || point.name;
+  }
+  // No native id: fall back to the (type, time) key the API reconciles on.
+  return fallback;
+};
+
+const recordingMethodOf = (point: DataPoint): RecordingMethod | undefined => {
+  const method = point.dataSource?.recordingMethod;
+  if (typeof method !== "string") return undefined;
+  const upper = method.toUpperCase();
+  if (upper.includes("MANUAL")) return "manual-entry";
+  if (upper.includes("PASSIVE") || upper.includes("AUTOMATIC")) {
+    return "automatically-recorded";
+  }
+  if (upper.includes("ACTIVE")) return "actively-recorded";
+  return undefined;
+};
+
+const intervalEffective = (
+  interval: GHInterval | undefined,
+): GroveEffective | undefined => {
+  if (!interval?.startTime || !interval.endTime) return undefined;
+  const start = Date.parse(interval.startTime);
+  const end = Date.parse(interval.endTime);
+  if (Number.isNaN(start) || Number.isNaN(end) || end <= start)
+    return undefined;
+  const offsetMinutes =
+    offsetOfDuration(interval.startUtcOffset) ??
+    offsetOfIso(interval.startTime);
+  return period(start, end, { offsetMinutes });
+};
+
+const sampleEffective = (
+  sampleTime: GHSampleTime | undefined,
+): GroveEffective | undefined => {
+  if (!sampleTime?.physicalTime) return undefined;
+  const millis = Date.parse(sampleTime.physicalTime);
+  if (Number.isNaN(millis)) return undefined;
+  const offsetMinutes =
+    offsetOfDuration(sampleTime.utcOffset) ??
+    offsetOfIso(sampleTime.physicalTime);
+  return instant(millis, { offsetMinutes });
+};
+
+const record = (
+  sourceType: string,
+  nativeRecordId: string,
+  occurred: GroveEffective,
+  outputs: ObservationDraft[],
+): ObservationRecordDraft[] =>
+  outputs.length === 0 ?
+    []
+  : [{ kind: "observations", sourceType, nativeRecordId, occurred, outputs }];
+
+const SLEEP_STAGE_CODES: Record<string, string> = {
+  AWAKE: "awake",
+  LIGHT: "light",
+  DEEP: "deep",
+  REM: "rem",
+  ASLEEP: "asleep-unspecified",
+  OUT_OF_BED: "out-of-bed",
+  IN_BED: "in-bed",
+};
+
+export interface GoogleHealthRawData {
+  steps?: unknown[];
+  distance?: unknown[];
+  activeEnergyBurned?: unknown[];
+  weight?: unknown[];
+  bodyFat?: unknown[];
+  height?: unknown[];
+  vo2Max?: unknown[];
+  dailyOxygenSaturation?: unknown[];
+  heartRateVariability?: unknown[];
+  dailyRestingHeartRate?: unknown[];
+  dailyRespiratoryRate?: unknown[];
+  bloodGlucose?: unknown[];
+  coreBodyTemperature?: unknown[];
+  floors?: unknown[];
+  basalEnergyBurned?: unknown[];
+  sleep?: unknown[];
+  exercise?: unknown[];
+}
+
 // --- Pure normalization (exported for unit tests) --------------------------
 
 export const normalizeGoogleHealth = (
-  raw: {
-    steps?: unknown[];
-    distance?: unknown[];
-    activeEnergyBurned?: unknown[];
-    weight?: unknown[];
-    bodyFat?: unknown[];
-    height?: unknown[];
-    vo2Max?: unknown[];
-    dailyOxygenSaturation?: unknown[];
-    heartRateVariability?: unknown[];
-    dailyRestingHeartRate?: unknown[];
-    dailyRespiratoryRate?: unknown[];
-    bloodGlucose?: unknown[];
-    coreBodyTemperature?: unknown[];
-    floors?: unknown[];
-    basalEnergyBurned?: unknown[];
-    sleep?: unknown[];
-    exercise?: unknown[];
-  },
-  subject: FHIRReference,
-): ProviderObservation[] => {
-  const out: ProviderObservation[] = [];
-  const add = (
-    spec: (typeof MetricSpecs)[keyof typeof MetricSpecs],
-    value: number | undefined,
-    effective: Date | { start: Date; end: Date },
-    sampleId: string,
+  raw: GoogleHealthRawData,
+): ObservationRecordDraft[] => {
+  const records: ObservationRecordDraft[] = [];
+  const points = (list: unknown[] | undefined) => (list ?? []) as DataPoint[];
+
+  /** Interval-valued totals (`steps`, `distance`, …). */
+  const intervalTotals = (
+    list: unknown[] | undefined,
+    unionKey: string,
+    sourceType: string,
+    measurement: string,
+    valueKey: string,
+    scale = 1,
   ) => {
-    if (value === undefined || Number.isNaN(value)) return;
-    out.push(
-      buildProviderObservation({
-        provider: HealthProviderId.googleHealth,
-        sourceName: "Google Health",
-        subject,
-        spec,
-        value,
-        effective,
-        sampleId,
-      }),
-    );
+    for (const point of points(list)) {
+      const value = point[unionKey] as
+        | (Record<string, unknown> & { interval?: GHInterval })
+        | undefined;
+      if (!value) continue;
+      const effective = intervalEffective(value.interval);
+      const q = quantity(value[valueKey], scale);
+      if (!effective || !q) continue;
+      records.push(
+        ...record(
+          sourceType,
+          nativeIdOf(point, `${sourceType}-${value.interval?.startTime}`),
+          effective,
+          [
+            {
+              measurement,
+              effective,
+              value: q,
+              recordingMethod: recordingMethodOf(point),
+            },
+          ],
+        ),
+      );
+    }
   };
 
-  for (const item of raw.steps ?? []) {
-    const v = (item as { steps?: GHSteps }).steps;
-    if (!v) continue;
-    add(
-      MetricSpecs.steps,
-      Number(v.count),
-      {
-        start: new Date(v.interval.startTime),
-        end: new Date(v.interval.endTime),
-      },
-      `steps-${v.interval.startTime}`,
+  /** Sample-valued measurements (`weight`, `height`, …). */
+  const samples = (
+    list: unknown[] | undefined,
+    unionKey: string,
+    sourceType: string,
+    measurement: string,
+    valueKey: string,
+    scale = 1,
+  ) => {
+    for (const point of points(list)) {
+      const value = point[unionKey] as
+        | (Record<string, unknown> & { sampleTime?: GHSampleTime })
+        | undefined;
+      if (!value) continue;
+      const effective = sampleEffective(value.sampleTime);
+      const q = quantity(value[valueKey], scale);
+      if (!effective || !q) continue;
+      records.push(
+        ...record(
+          sourceType,
+          nativeIdOf(point, `${sourceType}-${value.sampleTime?.physicalTime}`),
+          effective,
+          [
+            {
+              measurement,
+              effective,
+              value: q,
+              recordingMethod: recordingMethodOf(point),
+            },
+          ],
+        ),
+      );
+    }
+  };
+
+  /**
+   * Daily summaries carry only a civil date; the API gives no offset for
+   * them, so the day is taken in UTC (the Grove `mobile-omission.source-offset`
+   * case).
+   */
+  const daily = (
+    list: unknown[] | undefined,
+    unionKey: string,
+    sourceType: string,
+    build: (
+      value: Record<string, unknown>,
+      effective: GroveEffective,
+    ) => ObservationDraft[],
+  ) => {
+    for (const point of points(list)) {
+      const value = point[unionKey] as
+        | (Record<string, unknown> & { date?: GoogleHealthDate })
+        | undefined;
+      if (!value?.date) continue;
+      const effective = civilDay(value.date);
+      if (!effective) continue;
+      records.push(
+        ...record(
+          sourceType,
+          nativeIdOf(point, `${sourceType}-${dateKey(value.date)}`),
+          effective,
+          build(value, effective),
+        ),
+      );
+    }
+  };
+
+  intervalTotals(raw.steps, "steps", "steps", "step-count", "count");
+  intervalTotals(
+    raw.distance,
+    "distance",
+    "distance",
+    "distance",
+    "millimeters",
+    1 / 1000,
+  );
+  intervalTotals(
+    raw.activeEnergyBurned,
+    "activeEnergyBurned",
+    "active-energy-burned",
+    "active-energy",
+    "kcal",
+  );
+  intervalTotals(raw.floors, "floors", "floors", "flights-climbed", "count");
+  intervalTotals(
+    raw.basalEnergyBurned,
+    "basalEnergyBurned",
+    "basal-energy-burned",
+    "basal-energy",
+    "kcal",
+  );
+
+  samples(
+    raw.weight,
+    "weight",
+    "weight",
+    "body-weight",
+    "weightGrams",
+    1 / 1000,
+  );
+  samples(
+    raw.bodyFat,
+    "bodyFat",
+    "body-fat",
+    "body-fat-percentage",
+    "percentage",
+  );
+  samples(
+    raw.height,
+    "height",
+    "height",
+    "body-height",
+    "heightMillimeters",
+    1 / 10,
+  );
+  samples(raw.vo2Max, "vo2Max", "vo2-max", "vo2-max", "vo2Max");
+  samples(
+    raw.bloodGlucose,
+    "bloodGlucose",
+    "blood-glucose",
+    "blood-glucose-unspecified-specimen",
+    "bloodGlucoseMilligramsPerDeciliter",
+  );
+  samples(
+    raw.coreBodyTemperature,
+    "coreBodyTemperature",
+    "core-body-temperature",
+    "body-temperature",
+    "temperatureCelsius",
+  );
+
+  // HRV: both statistics of one sample are outputs of one record.
+  for (const point of points(raw.heartRateVariability)) {
+    const value = point.heartRateVariability as
+      | {
+          rootMeanSquareOfSuccessiveDifferencesMilliseconds?: unknown;
+          standardDeviationMilliseconds?: unknown;
+          sampleTime?: GHSampleTime;
+        }
+      | undefined;
+    if (!value) continue;
+    const effective = sampleEffective(value.sampleTime);
+    if (!effective) continue;
+    const recordingMethod = recordingMethodOf(point);
+    const outputs: ObservationDraft[] = [];
+    const rmssd = quantity(
+      value.rootMeanSquareOfSuccessiveDifferencesMilliseconds,
+    );
+    const sdnn = quantity(value.standardDeviationMilliseconds);
+    if (rmssd)
+      outputs.push({
+        measurement: "heart-rate-variability-rmssd",
+        effective,
+        value: rmssd,
+        recordingMethod,
+      });
+    if (sdnn)
+      outputs.push({
+        measurement: "heart-rate-variability-sdnn",
+        effective,
+        value: sdnn,
+        recordingMethod,
+      });
+    records.push(
+      ...record(
+        "heart-rate-variability",
+        nativeIdOf(
+          point,
+          `heart-rate-variability-${value.sampleTime?.physicalTime}`,
+        ),
+        effective,
+        outputs,
+      ),
     );
   }
 
-  for (const item of raw.distance ?? []) {
-    const v = (item as { distance?: GHDistance }).distance;
-    if (!v) continue;
-    add(
-      MetricSpecs.distanceWalkingRunning,
-      Number(v.millimeters) / 1000,
-      {
-        start: new Date(v.interval.startTime),
-        end: new Date(v.interval.endTime),
-      },
-      `distance-${v.interval.startTime}`,
+  daily(
+    raw.dailyOxygenSaturation,
+    "dailyOxygenSaturation",
+    "daily-oxygen-saturation",
+    (value, effective) => {
+      const outputs: ObservationDraft[] = [];
+      const average = quantity(value.averagePercentage);
+      const lower = quantity(value.lowerBoundPercentage);
+      const upper = quantity(value.upperBoundPercentage);
+      if (average)
+        outputs.push({
+          measurement: "oxygen-saturation-daily-average",
+          effective,
+          value: average,
+        });
+      if (lower)
+        outputs.push({
+          measurement: MhcMeasurements.oxygenSaturationDailyLowerBound,
+          effective,
+          value: lower,
+        });
+      if (upper)
+        outputs.push({
+          measurement: MhcMeasurements.oxygenSaturationDailyUpperBound,
+          effective,
+          value: upper,
+        });
+      return outputs;
+    },
+  );
+  daily(
+    raw.dailyRestingHeartRate,
+    "dailyRestingHeartRate",
+    "daily-resting-heart-rate",
+    (value, effective) => {
+      const q = quantity(value.beatsPerMinute);
+      return q ?
+          [
+            {
+              measurement: "resting-heart-rate-daily-average",
+              effective,
+              value: q,
+            },
+          ]
+        : [];
+    },
+  );
+  daily(
+    raw.dailyRespiratoryRate,
+    "dailyRespiratoryRate",
+    "daily-respiratory-rate",
+    (value, effective) => {
+      const q = quantity(value.breathsPerMinute);
+      return q ?
+          [
+            {
+              measurement: "respiratory-rate-average",
+              effective,
+              value: q,
+              method: "daily-mean",
+            },
+          ]
+        : [];
+    },
+  );
+
+  for (const point of points(raw.sleep)) {
+    const value = point.sleep as GHSleep | undefined;
+    if (!value) continue;
+    const effective = intervalEffective(value.interval);
+    if (!effective) continue;
+    const offsetMinutes =
+      offsetOfDuration(value.interval.startUtcOffset) ??
+      offsetOfIso(value.interval.startTime);
+    const summary = value.summary;
+    const stageMinutes = (type: string) =>
+      quantity(
+        summary?.stagesSummary?.find((stage) => stage.type === type)?.minutes,
+      );
+    const outputs: ObservationDraft[] = [];
+
+    // Stage timeline: Grove sleep-stage intervals (catalog: deferred for
+    // providers, so tagged out-of-catalog), linked from the sleep duration.
+    const stageKeys: string[] = [];
+    (value.stages ?? []).forEach((stage, index) => {
+      if (!stage.startTime || !stage.endTime || !stage.type) return;
+      const start = Date.parse(stage.startTime);
+      const end = Date.parse(stage.endTime);
+      if (Number.isNaN(start) || Number.isNaN(end) || end <= start) return;
+      const code = SLEEP_STAGE_CODES[stage.type.toUpperCase()] ?? "unknown";
+      const discriminator = `${formatInstant(start)}|${formatInstant(end)}|${stage.type}|${index}`;
+      stageKeys.push(outputKey("sleep-stage", discriminator));
+      outputs.push({
+        measurement: "sleep-stage",
+        discriminator,
+        outsideCatalog: true,
+        effective: period(start, end, { offsetMinutes }),
+        value: {
+          concept: [
+            { system: GroveUrl.sleepStage, code },
+            {
+              system: MhcUrl.providerToken("google-health", "sleep-stage"),
+              code: stage.type,
+            },
+          ],
+        },
+      });
+    });
+
+    const asleep = quantity(summary?.minutesAsleep, 1 / 60);
+    if (asleep) {
+      outputs.push({
+        measurement: "sleep-duration",
+        effective,
+        value: asleep,
+        hasMember: stageKeys,
+      });
+    }
+    const deep = stageMinutes("DEEP");
+    const rem = stageMinutes("REM");
+    const light = stageMinutes("LIGHT");
+    const awake = stageMinutes("AWAKE");
+    if (deep)
+      outputs.push({
+        measurement: "deep-sleep-duration",
+        effective,
+        value: deep,
+      });
+    if (rem)
+      outputs.push({
+        measurement: "rem-sleep-duration",
+        effective,
+        value: rem,
+      });
+    if (light)
+      outputs.push({
+        measurement: "light-sleep-duration",
+        effective,
+        value: light,
+      });
+    if (awake)
+      outputs.push({
+        measurement: "sleep-awake-duration",
+        effective,
+        value: awake,
+      });
+    const latency = quantity(summary?.minutesToFallAsleep);
+    if (latency)
+      outputs.push({
+        measurement: MhcMeasurements.sleepLatency,
+        effective,
+        value: latency,
+      });
+    const inBed = quantity(summary?.minutesInSleepPeriod);
+    if (inBed) {
+      outputs.push({
+        measurement: MhcMeasurements.timeInBed,
+        effective,
+        value: inBed,
+        method: "session-total",
+      });
+    }
+    if (value.type) {
+      outputs.push({
+        measurement: MhcMeasurements.sleepPeriodType,
+        effective,
+        value: {
+          concept: [
+            {
+              system: MhcUrl.providerToken("google-health", "sleep-type"),
+              code: value.type,
+            },
+          ],
+          text: value.type,
+        },
+      });
+    }
+    records.push(
+      ...record(
+        "sleep",
+        nativeIdOf(point, `sleep-${value.interval.startTime}`),
+        effective,
+        outputs,
+      ),
     );
   }
 
-  for (const item of raw.activeEnergyBurned ?? []) {
-    const v = (item as { activeEnergyBurned?: GHActiveEnergyBurned })
-      .activeEnergyBurned;
-    if (!v) continue;
-    add(
-      MetricSpecs.activeEnergyBurned,
-      v.kcal,
-      {
-        start: new Date(v.interval.startTime),
-        end: new Date(v.interval.endTime),
-      },
-      `active-energy-burned-${v.interval.startTime}`,
+  for (const point of points(raw.exercise)) {
+    const value = point.exercise as GHExercise | undefined;
+    if (!value) continue;
+    const effective = intervalEffective(value.interval);
+    if (!effective) continue;
+    const summary = value.metricsSummary ?? {};
+    const activeSeconds =
+      typeof value.activeDuration === "string" ?
+        num(value.activeDuration.replace(/s$/, ""))
+      : undefined;
+    const distanceMm = num(summary.distanceMillimeters);
+    const elevationMm = num(summary.elevationGainMillimeters);
+    records.push(
+      ...record(
+        "exercise",
+        nativeIdOf(point, `exercise-${value.interval.startTime}`),
+        effective,
+        [
+          {
+            measurement: "workout",
+            effective,
+            recordingMethod: recordingMethodOf(point),
+            value: {
+              concept: [
+                {
+                  system: GroveUrl.workoutActivity,
+                  code: groveWorkoutActivity(value.exerciseType),
+                },
+                ...(value.exerciseType ?
+                  [
+                    {
+                      system: MhcUrl.providerToken(
+                        "google-health",
+                        "exercise-type",
+                      ),
+                      code: value.exerciseType,
+                    },
+                  ]
+                : []),
+              ],
+            },
+            components: [
+              ...workoutComponent("active-duration", activeSeconds, "s"),
+              ...workoutComponent(
+                "active-energy-sum",
+                num(summary.caloriesKcal),
+                "kcal",
+              ),
+              ...workoutComponent(
+                "distance-sum",
+                distanceMm === undefined ? undefined : distanceMm / 1000,
+                "m",
+              ),
+              ...workoutComponent(
+                "step-count-sum",
+                num(summary.steps),
+                "{steps}",
+              ),
+              ...workoutComponent(
+                "heart-rate-avg",
+                num(summary.averageHeartRateBeatsPerMinute),
+                "/min",
+              ),
+              ...workoutComponent(
+                "elevation-gain",
+                elevationMm === undefined ? undefined : elevationMm / 1000,
+                "m",
+              ),
+            ],
+          },
+        ],
+      ),
     );
   }
 
-  for (const item of raw.weight ?? []) {
-    const v = (item as { weight?: GHWeight }).weight;
-    if (!v) continue;
-    add(
-      MetricSpecs.bodyWeight,
-      v.weightGrams / 1000,
-      new Date(v.sampleTime.physicalTime),
-      `weight-${v.sampleTime.physicalTime}`,
-    );
-  }
-
-  for (const item of raw.bodyFat ?? []) {
-    const v = (item as { bodyFat?: GHBodyFat }).bodyFat;
-    if (!v) continue;
-    add(
-      MetricSpecs.bodyFatPercentage,
-      v.percentage,
-      new Date(v.sampleTime.physicalTime),
-      `body-fat-${v.sampleTime.physicalTime}`,
-    );
-  }
-
-  for (const item of raw.height ?? []) {
-    const v = (item as { height?: GHHeight }).height;
-    if (!v) continue;
-    add(
-      MetricSpecs.height,
-      Number(v.heightMillimeters) / 1000,
-      new Date(v.sampleTime.physicalTime),
-      `height-${v.sampleTime.physicalTime}`,
-    );
-  }
-
-  for (const item of raw.vo2Max ?? []) {
-    const v = (item as { vo2Max?: GHVo2Max }).vo2Max;
-    if (!v) continue;
-    add(
-      MetricSpecs.vo2Max,
-      v.vo2Max,
-      new Date(v.sampleTime.physicalTime),
-      `vo2-max-${v.sampleTime.physicalTime}`,
-    );
-  }
-
-  for (const item of raw.dailyOxygenSaturation ?? []) {
-    const v = (item as { dailyOxygenSaturation?: GHDailyOxygenSaturation })
-      .dailyOxygenSaturation;
-    if (!v) continue;
-    add(
-      MetricSpecs.oxygenSaturation,
-      v.averagePercentage,
-      dailyDate(v.date),
-      `daily-oxygen-saturation-${dateKey(v.date)}`,
-    );
-  }
-
-  for (const item of raw.heartRateVariability ?? []) {
-    const v = (item as { heartRateVariability?: GHHeartRateVariability })
-      .heartRateVariability;
-    if (!v) continue;
-    add(
-      MetricSpecs.heartRateVariability,
-      v.rootMeanSquareOfSuccessiveDifferencesMilliseconds ??
-        v.standardDeviationMilliseconds,
-      new Date(v.sampleTime.physicalTime),
-      `heart-rate-variability-${v.sampleTime.physicalTime}`,
-    );
-  }
-
-  for (const item of raw.dailyRestingHeartRate ?? []) {
-    const v = (item as { dailyRestingHeartRate?: GHDailyRestingHeartRate })
-      .dailyRestingHeartRate;
-    if (!v) continue;
-    add(
-      MetricSpecs.restingHeartRate,
-      Number(v.beatsPerMinute),
-      dailyDate(v.date),
-      `daily-resting-heart-rate-${dateKey(v.date)}`,
-    );
-  }
-
-  for (const item of raw.dailyRespiratoryRate ?? []) {
-    const v = (item as { dailyRespiratoryRate?: GHDailyRespiratoryRate })
-      .dailyRespiratoryRate;
-    if (!v) continue;
-    add(
-      MetricSpecs.respiratoryRate,
-      v.breathsPerMinute,
-      dailyDate(v.date),
-      `daily-respiratory-rate-${dateKey(v.date)}`,
-    );
-  }
-
-  for (const item of raw.bloodGlucose ?? []) {
-    const v = (item as { bloodGlucose?: GHBloodGlucose }).bloodGlucose;
-    if (!v) continue;
-    add(
-      MetricSpecs.bloodGlucose,
-      v.bloodGlucoseMilligramsPerDeciliter,
-      new Date(v.sampleTime.physicalTime),
-      `blood-glucose-${v.sampleTime.physicalTime}`,
-    );
-  }
-
-  for (const item of raw.coreBodyTemperature ?? []) {
-    const v = (item as { coreBodyTemperature?: GHCoreBodyTemperature })
-      .coreBodyTemperature;
-    if (!v) continue;
-    add(
-      MetricSpecs.bodyTemperature,
-      v.temperatureCelsius,
-      new Date(v.sampleTime.physicalTime),
-      `core-body-temperature-${v.sampleTime.physicalTime}`,
-    );
-  }
-
-  for (const item of raw.floors ?? []) {
-    const v = (item as { floors?: GHFloors }).floors;
-    if (!v) continue;
-    add(
-      MetricSpecs.flightsClimbed,
-      Number(v.count),
-      {
-        start: new Date(v.interval.startTime),
-        end: new Date(v.interval.endTime),
-      },
-      `floors-${v.interval.startTime}`,
-    );
-  }
-
-  for (const item of raw.basalEnergyBurned ?? []) {
-    const v = (item as { basalEnergyBurned?: GHBasalEnergyBurned })
-      .basalEnergyBurned;
-    if (!v) continue;
-    add(
-      MetricSpecs.basalEnergyBurned,
-      v.kcal,
-      {
-        start: new Date(v.interval.startTime),
-        end: new Date(v.interval.endTime),
-      },
-      `basal-energy-burned-${v.interval.startTime}`,
-    );
-  }
-
-  for (const item of raw.sleep ?? []) {
-    const v = (item as { sleep?: GHSleep }).sleep;
-    if (!v) continue;
-    const period = {
-      start: new Date(v.interval.startTime),
-      end: new Date(v.interval.endTime),
-    };
-    const id = `sleep-${v.interval.startTime}`;
-    const stages = v.summary?.stagesSummary;
-    add(
-      MetricSpecs.sleepDuration,
-      v.summary?.minutesAsleep !== undefined ?
-        Number(v.summary.minutesAsleep)
-      : undefined,
-      period,
-      id,
-    );
-    add(MetricSpecs.sleepDeep, stageMinutes(stages, "DEEP"), period, id);
-    add(MetricSpecs.sleepRem, stageMinutes(stages, "REM"), period, id);
-    add(MetricSpecs.sleepLight, stageMinutes(stages, "LIGHT"), period, id);
-    add(MetricSpecs.sleepAwake, stageMinutes(stages, "AWAKE"), period, id);
-  }
-
-  for (const item of raw.exercise ?? []) {
-    const v = (item as { exercise?: GHExercise }).exercise;
-    if (!v) continue;
-    const start = new Date(v.interval.startTime);
-    const end = new Date(v.interval.endTime);
-    const minutes =
-      Math.round(((end.getTime() - start.getTime()) / 60000) * 100) / 100;
-    add(
-      MetricSpecs.workoutDuration,
-      minutes,
-      { start, end },
-      `exercise-${v.interval.startTime}`,
-    );
-  }
-
-  return out;
+  return records;
 };
 
 export class GoogleHealthAdapter implements HealthProviderAdapter {
@@ -548,50 +812,59 @@ export class GoogleHealthAdapter implements HealthProviderAdapter {
         "Google Health token refresh",
       ),
     );
-    // Google omits the user id (and often the refresh token) on refresh; the
-    // service preserves the stored providerUserId, and we fall back to the
-    // refresh token that was just used since it remains valid.
+    // Google omits the user id (and often the refresh token) on refresh.
     return tokensFrom(response, "", refreshToken);
   }
 
   async revoke(tokens: ProviderTokens): Promise<void> {
-    await fetch(
-      `${REVOKE_URL}?${new URLSearchParams({ token: tokens.accessToken }).toString()}`,
+    // Revoking the refresh token also invalidates its access tokens.
+    const response = await fetch(
+      `${REVOKE_URL}?${new URLSearchParams({ token: tokens.refreshToken }).toString()}`,
       { method: "POST" },
     );
+    if (!response.ok) {
+      throw new ProviderHttpError(
+        response.status,
+        await response.text(),
+        "Google Health revoke",
+      );
+    }
   }
 
   ensureSubscription(): Promise<{ subscriptionId?: string }> {
     // Google Health push subscriptions require a project-level Subscriber
     // (endpoint verification + a signed-webhook secret) on top of the
-    // per-user Subscription, a materially different model from the legacy
-    // Fitbit Web API's callback-URL webhooks. Not implemented yet — the
-    // scheduled backfill polls instead.
+    // per-user Subscription. Not implemented yet — the scheduled backfill and
+    // the syncHealthProvider callable poll instead.
     logger.warn(
-      "GoogleHealthAdapter: push subscriptions are not implemented; relying on scheduled backfill polling.",
+      "GoogleHealthAdapter: push subscriptions are not implemented; relying on polling.",
     );
     return Promise.resolve({});
   }
 
   async removeSubscription(): Promise<void> {
-    // No subscription is ever created (see ensureSubscription), so there is
-    // nothing to remove.
+    // No subscription is ever created (see ensureSubscription).
   }
 
   handleWebhook(_req: Request, res: Response): WebhookHandling {
     // No subscriber is ever registered with Google, so this route should
     // never receive real traffic.
     res.status(204).send();
-    return { kind: "notifications", notifications: [] };
+    return { kind: "verification" };
   }
 
-  async fetchObservations(
-    params: FetchObservationsParams,
-  ): Promise<ProviderObservation[]> {
-    const { tokens, since, until, subject } = params;
+  async fetchData(params: FetchDataParams): Promise<ProviderFetchResult> {
+    const { tokens, since, until } = params;
     const token = tokens.accessToken;
+    const failures: string[] = [];
     const physical = (field: string) => physicalTimeFilter(field, since, until);
     const daily = (field: string) => civilDateFilter(field, since, until);
+    const fetch = (dataType: string, filter: string) =>
+      settleEndpoint(
+        `GoogleHealth ${dataType}`,
+        this.paginate(dataType, filter, token, "dataPoints:reconcile"),
+        failures,
+      );
 
     const [
       steps,
@@ -611,135 +884,55 @@ export class GoogleHealthAdapter implements HealthProviderAdapter {
       basalEnergyBurned,
       sleep,
       exercise,
+      heartRate,
     ] = await Promise.all([
-      settleEndpoint(
-        "GoogleHealth steps",
-        this.reconcile("steps", physical("steps.interval.start_time"), token),
+      fetch("steps", physical("steps.interval.start_time")),
+      fetch("distance", physical("distance.interval.start_time")),
+      fetch(
+        "active-energy-burned",
+        physical("active_energy_burned.interval.start_time"),
       ),
+      fetch("weight", physical("weight.sample_time.physical_time")),
+      fetch("body-fat", physical("body_fat.sample_time.physical_time")),
+      fetch("height", physical("height.sample_time.physical_time")),
+      fetch("vo2-max", physical("vo2_max.sample_time.physical_time")),
+      fetch("daily-oxygen-saturation", daily("daily_oxygen_saturation.date")),
+      fetch(
+        "heart-rate-variability",
+        physical("heart_rate_variability.sample_time.physical_time"),
+      ),
+      fetch("daily-resting-heart-rate", daily("daily_resting_heart_rate.date")),
+      fetch("daily-respiratory-rate", daily("daily_respiratory_rate.date")),
+      fetch(
+        "blood-glucose",
+        physical("blood_glucose.sample_time.physical_time"),
+      ),
+      fetch(
+        "core-body-temperature",
+        physical("core_body_temperature.sample_time.physical_time"),
+      ),
+      fetch("floors", physical("floors.interval.start_time")),
+      fetch(
+        "basal-energy-burned",
+        physical("basal_energy_burned.interval.start_time"),
+      ),
+      fetch("sleep", physical("sleep.interval.end_time")),
+      fetch("exercise", daily("exercise.interval.civil_start_time")),
+      // Raw (non-reconciled) heart rate is kept as a recording document.
       settleEndpoint(
-        "GoogleHealth distance",
-        this.reconcile(
-          "distance",
-          physical("distance.interval.start_time"),
+        "GoogleHealth heart-rate",
+        this.paginate(
+          "heart-rate",
+          physical("heart_rate.sample_time.physical_time"),
           token,
+          "dataPoints",
         ),
-      ),
-      settleEndpoint(
-        "GoogleHealth active-energy-burned",
-        this.reconcile(
-          "active-energy-burned",
-          physical("active_energy_burned.interval.start_time"),
-          token,
-        ),
-      ),
-      settleEndpoint(
-        "GoogleHealth weight",
-        this.reconcile(
-          "weight",
-          physical("weight.sample_time.physical_time"),
-          token,
-        ),
-      ),
-      settleEndpoint(
-        "GoogleHealth body-fat",
-        this.reconcile(
-          "body-fat",
-          physical("body_fat.sample_time.physical_time"),
-          token,
-        ),
-      ),
-      settleEndpoint(
-        "GoogleHealth height",
-        this.reconcile(
-          "height",
-          physical("height.sample_time.physical_time"),
-          token,
-        ),
-      ),
-      settleEndpoint(
-        "GoogleHealth vo2-max",
-        this.reconcile(
-          "vo2-max",
-          physical("vo2_max.sample_time.physical_time"),
-          token,
-        ),
-      ),
-      settleEndpoint(
-        "GoogleHealth daily-oxygen-saturation",
-        this.reconcile(
-          "daily-oxygen-saturation",
-          daily("daily_oxygen_saturation.date"),
-          token,
-        ),
-      ),
-      settleEndpoint(
-        "GoogleHealth heart-rate-variability",
-        this.reconcile(
-          "heart-rate-variability",
-          physical("heart_rate_variability.sample_time.physical_time"),
-          token,
-        ),
-      ),
-      settleEndpoint(
-        "GoogleHealth daily-resting-heart-rate",
-        this.reconcile(
-          "daily-resting-heart-rate",
-          daily("daily_resting_heart_rate.date"),
-          token,
-        ),
-      ),
-      settleEndpoint(
-        "GoogleHealth daily-respiratory-rate",
-        this.reconcile(
-          "daily-respiratory-rate",
-          daily("daily_respiratory_rate.date"),
-          token,
-        ),
-      ),
-      settleEndpoint(
-        "GoogleHealth blood-glucose",
-        this.reconcile(
-          "blood-glucose",
-          physical("blood_glucose.sample_time.physical_time"),
-          token,
-        ),
-      ),
-      settleEndpoint(
-        "GoogleHealth core-body-temperature",
-        this.reconcile(
-          "core-body-temperature",
-          physical("core_body_temperature.sample_time.physical_time"),
-          token,
-        ),
-      ),
-      settleEndpoint(
-        "GoogleHealth floors",
-        this.reconcile("floors", physical("floors.interval.start_time"), token),
-      ),
-      settleEndpoint(
-        "GoogleHealth basal-energy-burned",
-        this.reconcile(
-          "basal-energy-burned",
-          physical("basal_energy_burned.interval.start_time"),
-          token,
-        ),
-      ),
-      settleEndpoint(
-        "GoogleHealth sleep",
-        this.reconcile("sleep", physical("sleep.interval.end_time"), token),
-      ),
-      settleEndpoint(
-        "GoogleHealth exercise",
-        this.reconcile(
-          "exercise",
-          daily("exercise.interval.civil_start_time"),
-          token,
-        ),
+        failures,
       ),
     ]);
 
-    return normalizeGoogleHealth(
-      {
+    return {
+      records: normalizeGoogleHealth({
         steps,
         distance,
         activeEnergyBurned,
@@ -757,30 +950,20 @@ export class GoogleHealthAdapter implements HealthProviderAdapter {
         basalEnergyBurned,
         sleep,
         exercise,
-      },
-      subject,
-    );
-  }
-
-  /** Continuous heart rate is high-cardinality; archive it raw instead of one Firestore doc per sample. */
-  async fetchRawArchives(
-    params: FetchObservationsParams,
-  ): Promise<ProviderRawArchive[]> {
-    const { tokens, since, until } = params;
-    const heartRate = await settleEndpoint(
-      "GoogleHealth heart-rate",
-      this.list(
-        "heart-rate",
-        physicalTimeFilter(
-          "heart_rate.sample_time.physical_time",
-          since,
-          until,
-        ),
-        tokens.accessToken,
-      ),
-    );
-    if (heartRate === undefined || heartRate.length === 0) return [];
-    return [{ dataType: "heartRate", payload: heartRate }];
+      }),
+      rawArchives:
+        heartRate !== undefined && heartRate.length > 0 ?
+          [
+            {
+              sourceType: "heart-rate",
+              dataType: "heartRate",
+              typeText: "Google Health API heart-rate archive",
+              payload: heartRate,
+            },
+          ]
+        : [],
+      failures,
+    };
   }
 
   // Helpers ------------------------------------------------------------------
@@ -794,24 +977,6 @@ export class GoogleHealthAdapter implements HealthProviderAdapter {
       ),
     );
     return identity.healthUserId;
-  }
-
-  /** Deduplicated data points across sources for a given data type + filter. */
-  private async reconcile(
-    dataType: string,
-    filter: string,
-    token: string,
-  ): Promise<unknown[]> {
-    return this.paginate(dataType, filter, token, "dataPoints:reconcile");
-  }
-
-  /** Raw (non-deduplicated) data points, used for the archive tier. */
-  private async list(
-    dataType: string,
-    filter: string,
-    token: string,
-  ): Promise<unknown[]> {
-    return this.paginate(dataType, filter, token, "dataPoints");
   }
 
   private async paginate(
@@ -840,6 +1005,11 @@ export class GoogleHealthAdapter implements HealthProviderAdapter {
       pageToken = page.nextPageToken ? page.nextPageToken : undefined;
       guard++;
     } while (pageToken !== undefined && guard < MAX_PAGES);
+    if (pageToken !== undefined) {
+      throw new Error(
+        `Google Health ${dataType}: reached ${MAX_PAGES}-page cap`,
+      );
+    }
     return results;
   }
 }

@@ -3,6 +3,7 @@
 // SPDX-FileCopyrightText: 2026 Stanford University and the project authors (see CONTRIBUTORS.md)
 // SPDX-License-Identifier: MIT
 
+import { createHmac, timingSafeEqual } from "crypto";
 import { type Response } from "express";
 import { logger } from "firebase-functions/v2";
 import { type Request } from "firebase-functions/v2/https";
@@ -13,15 +14,37 @@ import {
   getOuraWebhookVerificationToken,
 } from "../../../env.js";
 import {
-  type FHIRReference,
   HealthProviderId,
   type ProviderTokens,
 } from "../../../models/index.js";
 import {
-  type FetchObservationsParams,
+  GroveUrl,
+  groveWorkoutActivity,
+  MhcMeasurements,
+  MhcUrl,
+} from "../grove/constants.js";
+import {
+  isoDate,
+  minutesFromSeconds as minutes,
+  num,
+  type ObservationDraft,
+  type ObservationRecordDraft,
+  quantityValue as quantity,
+  type RecordingMethod,
+  roundTo,
+  workoutComponent,
+} from "../grove/drafts.js";
+import {
+  civilDay,
+  instant,
+  offsetOfIso,
+  period,
+  type SourceZone,
+} from "../grove/time.js";
+import {
+  type FetchDataParams,
   type HealthProviderAdapter,
-  type ProviderObservation,
-  type ProviderRawArchive,
+  type ProviderFetchResult,
   type WebhookHandling,
 } from "../healthProviderAdapter.js";
 import {
@@ -30,11 +53,10 @@ import {
   ProviderHttpError,
   settleEndpoint,
 } from "../httpClient.js";
-import { buildProviderObservation } from "../observationBuilder.js";
-import { MetricSpecs } from "../providerCodes.js";
 
 const AUTH_URL = "https://cloud.ouraring.com/oauth/authorize";
 const TOKEN_URL = "https://api.ouraring.com/oauth/token";
+const REVOKE_URL = "https://api.ouraring.com/oauth/revoke";
 const API_BASE = "https://api.ouraring.com/v2/usercollection";
 const WEBHOOK_URL = "https://api.ouraring.com/v2/webhook/subscription";
 
@@ -47,29 +69,33 @@ const OURA_SCOPES = [
   "spo2Daily",
 ];
 
-/** Data types we subscribe to for near-real-time updates. */
+/**
+ * Data types subscribed to for near-real-time updates: every document type
+ * this adapter fetches. A failed subscription for one type is logged and the
+ * daily backfill still covers it.
+ */
 const SUBSCRIBED_DATA_TYPES = [
   "daily_activity",
   "sleep",
+  "daily_sleep",
   "daily_spo2",
+  "daily_readiness",
+  "daily_cardiovascular_age",
+  "vO2_max",
   "workout",
 ];
 
 const SUBSCRIBED_EVENT_TYPES = ["create", "update"];
 
-/** Safety cap on token-paginated fetches (raised from the original 100). */
+/** Safety cap on token-paginated fetches. */
 const MAX_PAGES = 1000;
 
-const minutesFromSeconds = (
-  seconds: number | null | undefined,
-): number | undefined =>
-  seconds === null || seconds === undefined ?
-    undefined
-  : Math.round((seconds / 60) * 100) / 100;
+/** Reject Oura-signed webhooks older than this (replay protection). */
+const WEBHOOK_MAX_SKEW_MS = 10 * 60 * 1000;
 
-const isoDate = (date: Date): string => date.toISOString().slice(0, 10);
-
-// --- Raw response shapes (only the fields we consume) ----------------------
+// --- Raw response shapes ------------------------------------------------------
+// Fields are those documented for the Oura API v2 usercollection endpoints;
+// everything is optional because Oura omits null-valued fields.
 
 interface OuraTokenResponse {
   access_token: string;
@@ -78,69 +104,90 @@ interface OuraTokenResponse {
   scope?: string;
 }
 
-interface OuraHeartRatePoint {
-  bpm: number;
-  timestamp: string;
-}
-
-interface OuraDailyActivity {
+export interface OuraDailyActivity {
   id: string;
   day: string;
-  steps?: number;
-  active_calories?: number;
-  equivalent_walking_distance?: number;
   timestamp?: string;
+  score?: number | null;
+  steps?: number | null;
+  active_calories?: number | null;
+  total_calories?: number | null;
+  equivalent_walking_distance?: number | null;
+  high_activity_time?: number | null;
+  medium_activity_time?: number | null;
+  low_activity_time?: number | null;
+  sedentary_time?: number | null;
 }
 
-interface OuraSleep {
+export interface OuraSleep {
   id: string;
   day: string;
-  bedtime_start?: string;
-  bedtime_end?: string;
-  total_sleep_duration?: number;
-  deep_sleep_duration?: number;
-  rem_sleep_duration?: number;
-  light_sleep_duration?: number;
-  awake_time?: number;
-  lowest_heart_rate?: number;
-  average_hrv?: number;
-  average_breath?: number;
+  type?: string | null;
+  bedtime_start?: string | null;
+  bedtime_end?: string | null;
+  total_sleep_duration?: number | null;
+  deep_sleep_duration?: number | null;
+  rem_sleep_duration?: number | null;
+  light_sleep_duration?: number | null;
+  awake_time?: number | null;
+  time_in_bed?: number | null;
+  latency?: number | null;
+  efficiency?: number | null;
+  lowest_heart_rate?: number | null;
+  average_heart_rate?: number | null;
+  average_hrv?: number | null;
+  average_breath?: number | null;
 }
 
-interface OuraDailySpo2 {
+export interface OuraDailySleep {
   id: string;
   day: string;
-  spo2_percentage?: { average?: number } | null;
-}
-
-interface OuraWorkout {
-  id: string;
-  start_datetime?: string;
-  end_datetime?: string;
-}
-
-interface OuraVo2Max {
-  id: string;
-  day: string;
-  vo2_max?: number;
-}
-
-interface OuraDailyCardiovascularAge {
-  id: string;
-  day: string;
-  vascular_age?: number | null;
-}
-
-interface OuraDailyReadiness {
-  id: string;
-  day: string;
+  timestamp?: string;
   score?: number | null;
 }
 
+export interface OuraDailySpo2 {
+  id: string;
+  day: string;
+  spo2_percentage?: { average?: number | null } | null;
+  breathing_disturbance_index?: number | null;
+}
+
+export interface OuraWorkout {
+  id: string;
+  activity?: string | null;
+  calories?: number | null;
+  distance?: number | null;
+  intensity?: string | null;
+  source?: string | null;
+  start_datetime?: string | null;
+  end_datetime?: string | null;
+}
+
+export interface OuraVo2Max {
+  id: string;
+  day: string;
+  timestamp?: string | null;
+  vo2_max?: number | null;
+}
+
+export interface OuraDailyCardiovascularAge {
+  id?: string;
+  day: string;
+  vascular_age?: number | null;
+  pulse_wave_velocity?: number | null;
+}
+
+export interface OuraDailyReadiness {
+  id: string;
+  day: string;
+  timestamp?: string;
+  score?: number | null;
+  temperature_deviation?: number | null;
+  temperature_trend_deviation?: number | null;
+}
+
 // --- Response validation (zod) ---------------------------------------------
-// Provider payloads are untrusted input; validate the shapes we depend on and
-// stay permissive (`.passthrough()`) about everything else so new upstream
-// fields don't break ingestion.
 
 const ouraTokenResponseSchema = z
   .object({
@@ -179,151 +226,390 @@ const tokensFrom = (
 
 // --- Pure normalization (exported for unit tests) --------------------------
 
-const midday = (day: string): Date => new Date(`${day}T12:00:00Z`);
+export interface OuraRawData {
+  activity?: OuraDailyActivity[];
+  sleep?: OuraSleep[];
+  dailySleep?: OuraDailySleep[];
+  spo2?: OuraDailySpo2[];
+  workouts?: OuraWorkout[];
+  vo2Max?: OuraVo2Max[];
+  cardiovascularAge?: OuraDailyCardiovascularAge[];
+  readiness?: OuraDailyReadiness[];
+}
 
-export const normalizeOura = (
-  raw: {
-    activity?: OuraDailyActivity[];
-    sleep?: OuraSleep[];
-    spo2?: OuraDailySpo2[];
-    workouts?: OuraWorkout[];
-    vo2Max?: OuraVo2Max[];
-    cardiovascularAge?: OuraDailyCardiovascularAge[];
-    readiness?: OuraDailyReadiness[];
-  },
-  subject: FHIRReference,
-): ProviderObservation[] => {
-  const out: ProviderObservation[] = [];
-  const add = (
-    spec: (typeof MetricSpecs)[keyof typeof MetricSpecs],
-    value: number | undefined,
-    effective: Date | { start: Date; end: Date },
-    sampleId: string,
+/** Push a draft only when it carries a value. */
+const pushIf = (
+  outputs: ObservationDraft[],
+  value: ObservationDraft["value"],
+  draft: Omit<ObservationDraft, "value">,
+): void => {
+  if (value !== undefined) outputs.push({ ...draft, value });
+};
+
+const ouraWorkoutRecordingMethod = (
+  source: string | null | undefined,
+): RecordingMethod | undefined => {
+  switch (source) {
+    case "manual":
+      return "manual-entry";
+    case "autodetected":
+      return "automatically-recorded";
+    default:
+      return undefined;
+  }
+};
+
+export const normalizeOura = (raw: OuraRawData): ObservationRecordDraft[] => {
+  const records: ObservationRecordDraft[] = [];
+
+  // Oura daily documents carry a civil `day`; the UTC offset of that day comes
+  // from the document's own `timestamp` or, failing that, any other document
+  // of the same day that has one (sleep bedtimes, activity, readiness).
+  const dayOffsets = new Map<string, number>();
+  const learn = (day: string, iso: string | null | undefined) => {
+    const offset = offsetOfIso(iso ?? undefined);
+    if (offset !== undefined && !dayOffsets.has(day))
+      dayOffsets.set(day, offset);
+  };
+  for (const item of raw.activity ?? []) learn(item.day, item.timestamp);
+  for (const item of raw.readiness ?? []) learn(item.day, item.timestamp);
+  for (const item of raw.dailySleep ?? []) learn(item.day, item.timestamp);
+  for (const item of raw.sleep ?? []) learn(item.day, item.bedtime_end);
+  const dayZone = (day: string, iso?: string | null): SourceZone => ({
+    offsetMinutes: offsetOfIso(iso ?? undefined) ?? dayOffsets.get(day),
+  });
+
+  const dailyRecord = (
+    sourceType: string,
+    nativeRecordId: string,
+    day: string,
+    zone: SourceZone,
+    build: (
+      effective: NonNullable<ReturnType<typeof civilDay>>,
+    ) => ObservationDraft[],
   ) => {
-    if (value === undefined || Number.isNaN(value)) return;
-    out.push(
-      buildProviderObservation({
-        provider: HealthProviderId.oura,
-        sourceName: "Oura",
-        subject,
-        spec,
-        value,
-        effective,
-        sampleId,
-      }),
-    );
+    const effective = civilDay(day, zone);
+    if (effective === undefined) return;
+    const outputs = build(effective);
+    if (outputs.length > 0) {
+      records.push({
+        kind: "observations",
+        sourceType,
+        nativeRecordId,
+        occurred: effective,
+        outputs,
+      });
+    }
   };
 
   for (const activity of raw.activity ?? []) {
-    add(MetricSpecs.steps, activity.steps, midday(activity.day), activity.id);
-    add(
-      MetricSpecs.activeEnergyBurned,
-      activity.active_calories,
-      midday(activity.day),
+    dailyRecord(
+      "daily_activity",
       activity.id,
-    );
-    add(
-      MetricSpecs.distanceWalkingRunning,
-      activity.equivalent_walking_distance,
-      midday(activity.day),
-      activity.id,
+      activity.day,
+      dayZone(activity.day, activity.timestamp),
+      (effective) => {
+        const outputs: ObservationDraft[] = [];
+        pushIf(outputs, quantity(activity.steps), {
+          measurement: "step-count",
+          effective,
+        });
+        pushIf(outputs, quantity(activity.active_calories), {
+          measurement: "active-energy",
+          effective,
+        });
+        pushIf(outputs, quantity(activity.equivalent_walking_distance), {
+          measurement: "distance",
+          effective,
+        });
+        pushIf(outputs, quantity(activity.score), {
+          measurement: MhcMeasurements.activityScore,
+          effective,
+        });
+        pushIf(outputs, quantity(activity.total_calories), {
+          measurement: MhcMeasurements.totalEnergyBurned,
+          effective,
+          method: "daily-total",
+        });
+        pushIf(outputs, quantity(minutes(activity.high_activity_time)), {
+          measurement: MhcMeasurements.highActivityDuration,
+          effective,
+          method: "daily-total",
+        });
+        pushIf(outputs, quantity(minutes(activity.medium_activity_time)), {
+          measurement: MhcMeasurements.mediumActivityDuration,
+          effective,
+          method: "daily-total",
+        });
+        pushIf(outputs, quantity(minutes(activity.low_activity_time)), {
+          measurement: MhcMeasurements.lowActivityDuration,
+          effective,
+          method: "daily-total",
+        });
+        pushIf(outputs, quantity(minutes(activity.sedentary_time)), {
+          measurement: MhcMeasurements.sedentaryDuration,
+          effective,
+          method: "daily-total",
+        });
+        return outputs;
+      },
     );
   }
 
   for (const sleep of raw.sleep ?? []) {
-    const period =
-      sleep.bedtime_start && sleep.bedtime_end ?
-        {
-          start: new Date(sleep.bedtime_start),
-          end: new Date(sleep.bedtime_end),
-        }
-      : midday(sleep.day);
-    add(
-      MetricSpecs.sleepDuration,
-      minutesFromSeconds(sleep.total_sleep_duration),
-      period,
-      sleep.id,
+    // Every sleep output needs the exact session Period; the catalog defers
+    // output when either bedtime bound is absent.
+    if (!sleep.bedtime_start || !sleep.bedtime_end) continue;
+    const start = Date.parse(sleep.bedtime_start);
+    const end = Date.parse(sleep.bedtime_end);
+    if (Number.isNaN(start) || Number.isNaN(end) || end <= start) continue;
+    const effective = period(start, end, {
+      offsetMinutes: offsetOfIso(sleep.bedtime_start),
+    });
+    const outputs: ObservationDraft[] = [];
+    const hours = num(sleep.total_sleep_duration);
+    pushIf(
+      outputs,
+      hours === undefined ? undefined : { quantity: roundTo(hours / 3600, 4) },
+      { measurement: "sleep-duration", effective },
     );
-    add(
-      MetricSpecs.sleepDeep,
-      minutesFromSeconds(sleep.deep_sleep_duration),
-      period,
-      sleep.id,
-    );
-    add(
-      MetricSpecs.sleepRem,
-      minutesFromSeconds(sleep.rem_sleep_duration),
-      period,
-      sleep.id,
-    );
-    add(
-      MetricSpecs.sleepLight,
-      minutesFromSeconds(sleep.light_sleep_duration),
-      period,
-      sleep.id,
-    );
-    add(
-      MetricSpecs.sleepAwake,
-      minutesFromSeconds(sleep.awake_time),
-      period,
-      sleep.id,
-    );
-    add(
-      MetricSpecs.restingHeartRate,
-      sleep.lowest_heart_rate,
-      midday(sleep.day),
-      sleep.id,
-    );
-    add(
-      MetricSpecs.heartRateVariability,
-      sleep.average_hrv,
-      midday(sleep.day),
-      sleep.id,
-    );
-    add(
-      MetricSpecs.respiratoryRate,
-      sleep.average_breath,
-      midday(sleep.day),
-      sleep.id,
+    pushIf(outputs, quantity(minutes(sleep.deep_sleep_duration)), {
+      measurement: "deep-sleep-duration",
+      effective,
+    });
+    pushIf(outputs, quantity(minutes(sleep.rem_sleep_duration)), {
+      measurement: "rem-sleep-duration",
+      effective,
+    });
+    pushIf(outputs, quantity(minutes(sleep.light_sleep_duration)), {
+      measurement: "light-sleep-duration",
+      effective,
+    });
+    pushIf(outputs, quantity(minutes(sleep.awake_time)), {
+      measurement: "sleep-awake-duration",
+      effective,
+    });
+    pushIf(outputs, quantity(sleep.lowest_heart_rate), {
+      measurement: "sleep-heart-rate",
+      effective,
+      method: "session-minimum",
+    });
+    pushIf(outputs, quantity(sleep.average_heart_rate), {
+      measurement: "sleep-heart-rate",
+      discriminator: "session-mean",
+      effective,
+      method: "session-mean",
+      outsideCatalog: true,
+    });
+    pushIf(outputs, quantity(sleep.average_breath), {
+      measurement: "respiratory-rate-average",
+      effective,
+      method: "session-mean",
+    });
+    // Catalog: average_hrv is `unmodeled` (no Grove session-HRV profile).
+    pushIf(outputs, quantity(sleep.average_hrv), {
+      measurement: MhcMeasurements.sleepHrvRmssd,
+      effective,
+      method: "session-mean",
+    });
+    pushIf(outputs, quantity(sleep.efficiency), {
+      measurement: MhcMeasurements.sleepEfficiency,
+      effective,
+    });
+    pushIf(outputs, quantity(minutes(sleep.latency)), {
+      measurement: MhcMeasurements.sleepLatency,
+      effective,
+    });
+    pushIf(outputs, quantity(minutes(sleep.time_in_bed)), {
+      measurement: MhcMeasurements.timeInBed,
+      effective,
+      method: "session-total",
+    });
+    if (sleep.type) {
+      outputs.push({
+        measurement: MhcMeasurements.sleepPeriodType,
+        effective,
+        value: {
+          concept: [
+            {
+              system: MhcUrl.providerToken("oura", "sleep-type"),
+              code: sleep.type,
+            },
+          ],
+          text: sleep.type,
+        },
+      });
+    }
+    if (outputs.length > 0) {
+      records.push({
+        kind: "observations",
+        sourceType: "sleep",
+        nativeRecordId: sleep.id,
+        occurred: effective,
+        outputs,
+      });
+    }
+  }
+
+  for (const dailySleep of raw.dailySleep ?? []) {
+    dailyRecord(
+      "daily_sleep",
+      dailySleep.id,
+      dailySleep.day,
+      dayZone(dailySleep.day, dailySleep.timestamp),
+      (effective) => {
+        const outputs: ObservationDraft[] = [];
+        pushIf(outputs, quantity(dailySleep.score), {
+          measurement: MhcMeasurements.sleepScore,
+          effective,
+        });
+        return outputs;
+      },
     );
   }
 
   for (const spo2 of raw.spo2 ?? []) {
-    add(
-      MetricSpecs.oxygenSaturation,
-      spo2.spo2_percentage?.average,
-      midday(spo2.day),
+    dailyRecord(
+      "daily_spo2",
       spo2.id,
+      spo2.day,
+      dayZone(spo2.day),
+      (effective) => {
+        const outputs: ObservationDraft[] = [];
+        pushIf(outputs, quantity(spo2.spo2_percentage?.average), {
+          measurement: "oxygen-saturation-daily-average",
+          effective,
+        });
+        pushIf(outputs, quantity(spo2.breathing_disturbance_index), {
+          measurement: MhcMeasurements.breathingDisturbanceIndex,
+          effective,
+        });
+        return outputs;
+      },
     );
   }
 
   for (const workout of raw.workouts ?? []) {
     if (!workout.start_datetime || !workout.end_datetime) continue;
-    const start = new Date(workout.start_datetime);
-    const end = new Date(workout.end_datetime);
-    const minutes =
-      Math.round(((end.getTime() - start.getTime()) / 60000) * 100) / 100;
-    add(MetricSpecs.workoutDuration, minutes, { start, end }, workout.id);
+    const start = Date.parse(workout.start_datetime);
+    const end = Date.parse(workout.end_datetime);
+    if (Number.isNaN(start) || Number.isNaN(end) || end <= start) continue;
+    const effective = period(start, end, {
+      offsetMinutes: offsetOfIso(workout.start_datetime),
+    });
+    const recordingMethod = ouraWorkoutRecordingMethod(workout.source);
+    const activity = groveWorkoutActivity(workout.activity ?? undefined);
+    const outputs: ObservationDraft[] = [
+      {
+        measurement: "workout",
+        effective,
+        recordingMethod,
+        value: {
+          concept: [{ system: GroveUrl.workoutActivity, code: activity }],
+          text: workout.activity ?? undefined,
+        },
+        components: [
+          ...workoutComponent(
+            "active-energy-sum",
+            num(workout.calories),
+            "kcal",
+          ),
+          ...workoutComponent("distance-sum", num(workout.distance), "m"),
+        ],
+      },
+    ];
+    if (workout.intensity) {
+      outputs.push({
+        measurement: MhcMeasurements.workoutIntensity,
+        effective,
+        recordingMethod,
+        value: {
+          concept: [
+            {
+              system: MhcUrl.providerToken("oura", "workout-intensity"),
+              code: workout.intensity,
+            },
+          ],
+          text: workout.intensity,
+        },
+      });
+    }
+    records.push({
+      kind: "observations",
+      sourceType: "workout",
+      nativeRecordId: workout.id,
+      occurred: effective,
+      outputs,
+    });
   }
 
   for (const v of raw.vo2Max ?? []) {
-    add(MetricSpecs.vo2Max, v.vo2_max, midday(v.day), v.id);
+    // The VO2 max profile is dateTime-only; without a source timestamp there
+    // is no honest instant to report, so the output is skipped.
+    const value = quantity(v.vo2_max);
+    if (value === undefined || !v.timestamp) continue;
+    const millis = Date.parse(v.timestamp);
+    if (Number.isNaN(millis)) continue;
+    const effective = instant(millis, {
+      offsetMinutes: offsetOfIso(v.timestamp),
+    });
+    records.push({
+      kind: "observations",
+      sourceType: "vO2_max",
+      nativeRecordId: v.id,
+      occurred: effective,
+      outputs: [{ measurement: "vo2-max", effective, value }],
+    });
   }
 
   for (const v of raw.cardiovascularAge ?? []) {
-    add(
-      MetricSpecs.cardiovascularAge,
-      v.vascular_age ?? undefined,
-      midday(v.day),
-      v.id,
+    // The endpoint documents no `id`; the civil day is the only stable key.
+    dailyRecord(
+      "daily_cardiovascular_age",
+      v.id ?? v.day,
+      v.day,
+      dayZone(v.day),
+      (effective) => {
+        const outputs: ObservationDraft[] = [];
+        pushIf(outputs, quantity(v.vascular_age), {
+          measurement: "oura-cardiovascular-age",
+          effective,
+        });
+        pushIf(outputs, quantity(v.pulse_wave_velocity), {
+          measurement: MhcMeasurements.pulseWaveVelocity,
+          effective,
+        });
+        return outputs;
+      },
     );
   }
 
   for (const v of raw.readiness ?? []) {
-    add(MetricSpecs.readinessScore, v.score ?? undefined, midday(v.day), v.id);
+    dailyRecord(
+      "daily_readiness",
+      v.id,
+      v.day,
+      dayZone(v.day, v.timestamp),
+      (effective) => {
+        const outputs: ObservationDraft[] = [];
+        pushIf(outputs, quantity(v.score), {
+          measurement: "oura-readiness-score",
+          effective,
+        });
+        pushIf(outputs, quantity(v.temperature_deviation), {
+          measurement: MhcMeasurements.temperatureDeviation,
+          effective,
+        });
+        pushIf(outputs, quantity(v.temperature_trend_deviation), {
+          measurement: MhcMeasurements.temperatureTrendDeviation,
+          effective,
+        });
+        return outputs;
+      },
+    );
   }
 
-  return out;
+  return records;
 };
 
 /** Parse an Oura webhook event POST body into a normalized notification. */
@@ -333,6 +619,49 @@ export const parseOuraEvent = (
   const parsed = ouraWebhookEventSchema.safeParse(body);
   if (!parsed.success) return undefined;
   return { providerUserId: parsed.data.user_id };
+};
+
+/**
+ * Verify Oura's webhook signature: `x-oura-signature` is the hex HMAC-SHA256,
+ * keyed with the client secret, of `x-oura-timestamp` concatenated with the
+ * raw request body. Returns `undefined` when the request carries no
+ * signature headers (verification cannot be performed).
+ */
+export const verifyOuraSignature = (params: {
+  signature: string | undefined;
+  timestamp: string | undefined;
+  rawBody: Buffer | undefined;
+  secret: string;
+  now?: number;
+}): boolean | undefined => {
+  const { signature, timestamp, rawBody, secret } = params;
+  if (!signature || !timestamp || rawBody === undefined) return undefined;
+  const seconds = Number(timestamp);
+  const sentAt =
+    Number.isFinite(seconds) ?
+      seconds > 1e12 ?
+        seconds
+      : seconds * 1000
+    : Date.parse(timestamp);
+  if (
+    Number.isNaN(sentAt) ||
+    Math.abs((params.now ?? Date.now()) - sentAt) > WEBHOOK_MAX_SKEW_MS
+  ) {
+    return false;
+  }
+  const expected = createHmac("sha256", secret)
+    .update(timestamp)
+    .update(rawBody)
+    .digest("hex")
+    .toLowerCase();
+  const actual = Buffer.from(signature.toLowerCase());
+  const wanted = Buffer.from(expected);
+  return actual.length === wanted.length && timingSafeEqual(actual, wanted);
+};
+
+const header = (req: Request, name: string): string | undefined => {
+  const value = req.headers[name];
+  return Array.isArray(value) ? value[0] : value;
 };
 
 export class OuraAdapter implements HealthProviderAdapter {
@@ -398,11 +727,18 @@ export class OuraAdapter implements HealthProviderAdapter {
   }
 
   async revoke(tokens: ProviderTokens): Promise<void> {
-    await fetch("https://api.ouraring.com/oauth/revoke", {
+    const response = await fetch(REVOKE_URL, {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
       body: new URLSearchParams({ access_token: tokens.accessToken }),
     });
+    if (!response.ok) {
+      throw new ProviderHttpError(
+        response.status,
+        await response.text(),
+        "Oura revoke",
+      );
+    }
   }
 
   async ensureSubscription(params: {
@@ -460,6 +796,21 @@ export class OuraAdapter implements HealthProviderAdapter {
       return { kind: "verification" };
     }
 
+    const verified = verifyOuraSignature({
+      signature: header(req, "x-oura-signature"),
+      timestamp: header(req, "x-oura-timestamp"),
+      rawBody: req.rawBody,
+      secret: getOuraClientSecret(),
+    });
+    if (verified === false) {
+      throw new Error("Oura webhook signature mismatch");
+    }
+    if (verified === undefined) {
+      // Unsigned events are still accepted (the fetch window is clamped and
+      // the data is pulled with our own token), but logged for monitoring.
+      logger.warn("OuraAdapter: webhook event without signature headers");
+    }
+
     const parsed = parseOuraEvent(req.body);
     if (parsed === undefined) {
       return { kind: "notifications", notifications: [] };
@@ -470,116 +821,81 @@ export class OuraAdapter implements HealthProviderAdapter {
     };
   }
 
-  async fetchObservations(
-    params: FetchObservationsParams,
-  ): Promise<ProviderObservation[]> {
-    const { tokens, since, until, subject } = params;
+  async fetchData(params: FetchDataParams): Promise<ProviderFetchResult> {
+    const { tokens, since, until } = params;
     const token = tokens.accessToken;
-    const startDate = isoDate(since);
+    const failures: string[] = [];
+    // Oura's end_date is inclusive on day documents; widen by one day at the
+    // start so a sleep ending today that started yesterday is included.
+    const startDate = isoDate(new Date(since.getTime() - 24 * 60 * 60 * 1000));
     const endDate = isoDate(until);
+    const daily = <T>(endpoint: string) =>
+      settleEndpoint(
+        `Oura ${endpoint}`,
+        this.fetchAll<T>(
+          `${API_BASE}/${endpoint}?start_date=${startDate}&end_date=${endDate}`,
+          token,
+          `Oura ${endpoint}`,
+        ),
+        failures,
+      );
 
-    // Each endpoint is isolated: a transient failure on one leaves the others'
-    // data intact rather than dropping the entire window (an auth failure still
-    // propagates to flip the connection status).
     const [
       activity,
       sleep,
+      dailySleep,
       spo2,
       workouts,
       vo2Max,
       cardiovascularAge,
       readiness,
+      heartRate,
     ] = await Promise.all([
+      daily<OuraDailyActivity>("daily_activity"),
+      daily<OuraSleep>("sleep"),
+      daily<OuraDailySleep>("daily_sleep"),
+      daily<OuraDailySpo2>("daily_spo2"),
+      daily<OuraWorkout>("workout"),
+      daily<OuraVo2Max>("vO2_max"),
+      daily<OuraDailyCardiovascularAge>("daily_cardiovascular_age"),
+      daily<OuraDailyReadiness>("daily_readiness"),
       settleEndpoint(
-        "Oura daily_activity",
-        this.fetchAll<OuraDailyActivity>(
-          `${API_BASE}/daily_activity?start_date=${startDate}&end_date=${endDate}`,
+        "Oura heartrate",
+        this.fetchAll<unknown>(
+          `${API_BASE}/heartrate?start_datetime=${encodeURIComponent(since.toISOString())}&end_datetime=${encodeURIComponent(until.toISOString())}`,
           token,
-          "Oura daily_activity",
+          "Oura heartrate",
         ),
-      ),
-      settleEndpoint(
-        "Oura sleep",
-        this.fetchAll<OuraSleep>(
-          `${API_BASE}/sleep?start_date=${startDate}&end_date=${endDate}`,
-          token,
-          "Oura sleep",
-        ),
-      ),
-      settleEndpoint(
-        "Oura daily_spo2",
-        this.fetchAll<OuraDailySpo2>(
-          `${API_BASE}/daily_spo2?start_date=${startDate}&end_date=${endDate}`,
-          token,
-          "Oura daily_spo2",
-        ),
-      ),
-      settleEndpoint(
-        "Oura workout",
-        this.fetchAll<OuraWorkout>(
-          `${API_BASE}/workout?start_date=${startDate}&end_date=${endDate}`,
-          token,
-          "Oura workout",
-        ),
-      ),
-      settleEndpoint(
-        "Oura vO2_max",
-        this.fetchAll<OuraVo2Max>(
-          `${API_BASE}/vO2_max?start_date=${startDate}&end_date=${endDate}`,
-          token,
-          "Oura vO2_max",
-        ),
-      ),
-      settleEndpoint(
-        "Oura daily_cardiovascular_age",
-        this.fetchAll<OuraDailyCardiovascularAge>(
-          `${API_BASE}/daily_cardiovascular_age?start_date=${startDate}&end_date=${endDate}`,
-          token,
-          "Oura daily_cardiovascular_age",
-        ),
-      ),
-      settleEndpoint(
-        "Oura daily_readiness",
-        this.fetchAll<OuraDailyReadiness>(
-          `${API_BASE}/daily_readiness?start_date=${startDate}&end_date=${endDate}`,
-          token,
-          "Oura daily_readiness",
-        ),
+        failures,
       ),
     ]);
 
-    return normalizeOura(
-      {
+    return {
+      records: normalizeOura({
         activity,
         sleep,
+        dailySleep,
         spo2,
         workouts,
         vo2Max,
         cardiovascularAge,
         readiness,
-      },
-      subject,
-    );
-  }
-
-  /** Continuous heart rate is high-cardinality; archive it raw instead of one Firestore doc per sample. */
-  async fetchRawArchives(
-    params: FetchObservationsParams,
-  ): Promise<ProviderRawArchive[]> {
-    const { tokens, since, until } = params;
-    const startDt = since.toISOString();
-    const endDt = until.toISOString();
-
-    const heartRate = await settleEndpoint(
-      "Oura heartrate",
-      this.fetchAll<OuraHeartRatePoint>(
-        `${API_BASE}/heartrate?start_datetime=${encodeURIComponent(startDt)}&end_datetime=${encodeURIComponent(endDt)}`,
-        tokens.accessToken,
-        "Oura heartrate",
-      ),
-    );
-    if (heartRate === undefined || heartRate.length === 0) return [];
-    return [{ dataType: "heartRate", payload: heartRate }];
+      }),
+      // Continuous heart rate is an irregular high-frequency series; the
+      // catalog maps it to a raw recording document (`mapped-standard`).
+      rawArchives:
+        heartRate !== undefined && heartRate.length > 0 ?
+          [
+            {
+              sourceType: "heartrate",
+              dataType: "heartRate",
+              typeText: "Oura heart-rate samples",
+              payload: heartRate,
+            },
+          ]
+        : [],
+      failures,
+    };
   }
 
   // Helpers ------------------------------------------------------------------
@@ -615,10 +931,10 @@ export class OuraAdapter implements HealthProviderAdapter {
       guard++;
     }
     if (url !== null) {
-      // Hit the page cap with more data pending: surface it rather than silently
-      // truncating the tail. The daily backfill re-fetches the same window.
-      logger.warn(
-        `${context}: reached ${MAX_PAGES}-page cap with more pages pending; window truncated`,
+      // Truncated: treat as a failure so the window is retried rather than
+      // silently marking it synced.
+      throw new Error(
+        `${context}: reached ${MAX_PAGES}-page cap with more pages pending`,
       );
     }
     return results;

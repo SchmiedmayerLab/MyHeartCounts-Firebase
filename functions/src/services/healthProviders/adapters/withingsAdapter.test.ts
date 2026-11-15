@@ -5,403 +5,339 @@
 
 import { expect } from "chai";
 import {
+  fakeTokens,
+  outputFor,
+  outputsFor,
+  quantityOf,
+  stubFetch,
+} from "./adapterTestSupport.js";
+import {
+  checkWithingsEnvelope,
   normalizeWithings,
   parseWithingsNotification,
   WithingsAdapter,
 } from "./withingsAdapter.js";
-import { type ProviderTokens } from "../../../models/index.js";
-import { type ProviderObservation } from "../healthProviderAdapter.js";
+import { ProviderAuthError } from "../httpClient.js";
 
-const subject = { reference: "user/u1" };
-
-const fakeTokens: ProviderTokens = {
-  accessToken: "access",
-  refreshToken: "refresh",
-  expiresAt: new Date(Date.now() + 3600_000),
-  scopes: [],
-  providerUserId: "u",
-};
-
-const stubFetch = (
-  route: (url: string, body: string) => unknown,
-): { restore: () => void; bodies: Map<string, string> } => {
-  const original = globalThis.fetch;
-  const bodies = new Map<string, string>();
-  globalThis.fetch = ((
-    input: unknown,
-    init?: { body?: URLSearchParams | string },
-  ) => {
-    const url =
-      typeof input === "string" ? input : (input as { url: string }).url;
-    const body = init?.body?.toString() ?? "";
-    bodies.set(url, body);
-    const payload = route(url, body);
-    return Promise.resolve({
-      ok: true,
-      status: 200,
-      text: () =>
-        Promise.resolve(payload === undefined ? "" : JSON.stringify(payload)),
-    } as Response);
-  }) as typeof fetch;
-  return {
-    restore: () => {
-      globalThis.fetch = original;
-    },
-    bodies,
-  };
-};
-
-const observationFor = (
-  observations: ProviderObservation[],
-  metric: string,
-) => {
-  const match = observations.find((o) => o.metric === metric);
-  if (match === undefined)
-    throw new Error(`no observation for metric ${metric}`);
-  return match.observation;
-};
+const measureDate = Date.parse("2026-08-20T14:45:00Z") / 1000;
 
 describe("WithingsAdapter: normalizeWithings", () => {
-  it("applies the value * 10^unit scaling and maps measure types", () => {
-    const result = normalizeWithings(
-      {
-        measureGroups: [
-          {
-            grpid: 100,
-            date: 1735732800, // 2025-01-01T12:00:00Z
-            measures: [
-              { value: 705, type: 1, unit: -1 }, // weight 70.5 kg
-              { value: 60, type: 11, unit: 0 }, // heart pulse 60 bpm
-              { value: 981, type: 54, unit: -1 }, // spo2 98.1 %
-            ],
-          },
-        ],
-      },
-      subject,
+  it("applies value × 10^unit, converts height to cm, and keeps the IANA zone", () => {
+    const records = normalizeWithings({
+      measureTimezone: "Europe/Paris",
+      measureGroups: [
+        {
+          grpid: 1,
+          date: measureDate,
+          attrib: 2,
+          measures: [
+            { type: 1, value: 72500, unit: -3 },
+            { type: 4, value: 178, unit: -2 },
+            { type: 77, value: 41, unit: 0 },
+            { type: 999, value: 1, unit: 0 },
+          ],
+        },
+      ],
+    });
+    const weight = outputFor(records, "body-weight");
+    expect(weight.record.sourceType).to.equal("getmeas:1");
+    expect(weight.record.nativeRecordId).to.equal("1");
+    expect(quantityOf(weight.output)).to.equal(72.5);
+    expect(weight.output.recordingMethod).to.equal("manual-entry");
+    expect(weight.output.effective).to.deep.equal({
+      kind: "instant",
+      value: "2026-08-20T16:45:00+02:00",
+      timezone: "Europe/Paris",
+    });
+    expect(quantityOf(outputFor(records, "body-height").output)).to.equal(178);
+    expect(quantityOf(outputFor(records, "body-water-mass").output)).to.equal(
+      41,
     );
-
-    expect(observationFor(result, "bodyWeight").valueQuantity?.value).to.equal(
-      70.5,
-    );
-    expect(observationFor(result, "heartRate").valueQuantity?.value).to.equal(
-      60,
-    );
-    expect(
-      observationFor(result, "oxygenSaturation").valueQuantity?.value,
-    ).to.be.closeTo(98.1, 1e-9);
-    // Document id combines group id and measure type for uniqueness.
-    expect(observationFor(result, "bodyWeight").id).to.equal("withings-100-1");
+    expect(records).to.have.lengthOf(3);
   });
 
-  it("maps sleep summary durations from seconds to minutes", () => {
-    const result = normalizeWithings(
-      {
-        sleep: [
-          {
-            id: 7,
-            startdate: 1735689600,
-            enddate: 1735718400,
-            data: {
-              deepsleepduration: 5400,
-              remsleepduration: 3600,
-              lightsleepduration: 7200,
-              wakeupduration: 600,
-              hr_average: 52,
-              rr_average: 13,
-            },
-          },
-        ],
-      },
-      subject,
-    );
-    expect(observationFor(result, "sleepDeep").valueQuantity?.value).to.equal(
-      90,
-    );
-    expect(observationFor(result, "sleepRem").valueQuantity?.value).to.equal(
-      60,
-    );
+  it("emits one blood-pressure panel only when systolic and diastolic share a group", () => {
+    const records = normalizeWithings({
+      measureGroups: [
+        {
+          grpid: 17348211,
+          date: measureDate,
+          timezone: "America/Los_Angeles",
+          measures: [
+            { type: 10, value: 118, unit: 0 },
+            { type: 9, value: 76, unit: 0 },
+            { type: 11, value: 64, unit: 0 },
+          ],
+        },
+        {
+          grpid: 2,
+          date: measureDate,
+          measures: [{ type: 10, value: 120, unit: 0 }],
+        },
+      ],
+    });
+    const panels = outputsFor(records, "blood-pressure");
+    expect(panels).to.have.lengthOf(1);
+    expect(panels[0].record.sourceType).to.equal("getmeas:9+10");
+    expect(panels[0].record.nativeRecordId).to.equal("17348211");
     expect(
-      observationFor(result, "restingHeartRate").valueQuantity?.value,
-    ).to.equal(52);
-    expect(observationFor(result, "sleepDeep").id).to.equal("withings-7");
+      panels[0].output.components?.map((c) => [
+        c.code.code,
+        "quantity" in c.value ? c.value.quantity : undefined,
+      ]),
+    ).to.deep.equal([
+      ["8480-6", 118],
+      ["8462-4", 76],
+    ]);
+    expect(outputFor(records, "heart-rate").record.sourceType).to.equal(
+      "getmeas:11",
+    );
   });
 
-  it("skips sleep stages that are absent instead of emitting zeros", () => {
-    const result = normalizeWithings(
-      {
-        sleep: [
-          {
-            id: 8,
-            startdate: 1735689600,
-            enddate: 1735718400,
-            data: { deepsleepduration: 5400 },
-          },
-        ],
-      },
-      subject,
-    );
-    const metrics = result.map((o) => o.metric);
-    expect(metrics).to.include("sleepDeep");
-    expect(metrics).to.not.include("sleepRem");
-    expect(metrics).to.not.include("sleepLight");
-    expect(metrics).to.not.include("sleepAwake");
+  it("emits AFib notifications only for a positive screen", () => {
+    const records = normalizeWithings({
+      measureGroups: [
+        {
+          grpid: 3,
+          date: measureDate,
+          measures: [
+            { type: 130, value: 1, unit: 0 },
+            { type: 139, value: 0, unit: 0 },
+          ],
+        },
+      ],
+    });
+    expect(
+      outputsFor(records, "withings-atrial-fibrillation-notification-ecg"),
+    ).to.have.lengthOf(1);
+    expect(
+      outputsFor(records, "withings-atrial-fibrillation-notification-ppg"),
+    ).to.have.lengthOf(0);
   });
 
-  it("maps height, blood pressure, VO2 max and cardiovascular age measure types", () => {
-    const result = normalizeWithings(
-      {
-        measureGroups: [
-          {
-            grpid: 200,
-            date: 1735732800,
-            measures: [
-              { value: 175, type: 4, unit: -2 }, // height 1.75 m
-              { value: 80, type: 9, unit: 0 }, // diastolic 80 mmHg
-              { value: 120, type: 10, unit: 0 }, // systolic 120 mmHg
-              { value: 421, type: 123, unit: -1 }, // vo2max 42.1 mL/kg/min
-              { value: 41, type: 155, unit: 0 }, // vascular age 41 years
-            ],
-          },
-        ],
-      },
-      subject,
-    );
-    expect(observationFor(result, "height").valueQuantity?.value).to.equal(
-      1.75,
-    );
-    expect(
-      observationFor(result, "bloodPressureDiastolic").valueQuantity?.value,
-    ).to.equal(80);
-    expect(
-      observationFor(result, "bloodPressureSystolic").valueQuantity?.value,
-    ).to.equal(120);
-    expect(observationFor(result, "vo2Max").valueQuantity?.value).to.equal(
-      42.1,
+  it("maps daily activity fields to separate records over the local civil day", () => {
+    const records = normalizeWithings({
+      activities: [
+        {
+          date: "2026-08-20",
+          timezone: "America/New_York",
+          steps: 9000,
+          distance: 6500,
+          calories: 410,
+          totalcalories: 2300,
+          intense: 1200,
+        },
+      ],
+    });
+    const steps = outputFor(records, "step-count");
+    expect(steps.record.sourceType).to.equal("getactivity:steps");
+    expect(steps.record.nativeRecordId).to.equal("2026-08-20");
+    expect(steps.output.effective).to.deep.equal({
+      kind: "period",
+      start: "2026-08-20T00:00:00-04:00",
+      end: "2026-08-21T00:00:00-04:00",
+      timezone: "America/New_York",
+    });
+    expect(outputFor(records, "active-energy").record.sourceType).to.equal(
+      "getactivity:calories",
     );
     expect(
-      observationFor(result, "cardiovascularAge").valueQuantity?.value,
-    ).to.equal(41);
+      quantityOf(outputFor(records, "total-energy-burned").output),
+    ).to.equal(2300);
+    expect(
+      quantityOf(outputFor(records, "high-activity-duration").output),
+    ).to.equal(20);
   });
 
-  it("computes workout duration in minutes from the interval", () => {
-    const result = normalizeWithings(
-      {
-        workouts: [{ id: 9, startdate: 1735732800, enddate: 1735734600 }],
-      },
-      subject,
-    );
+  it("maps sleep summary fields with conversions and methods", () => {
+    const records = normalizeWithings({
+      sleep: [
+        {
+          id: 42,
+          startdate: Date.parse("2026-08-19T22:00:00Z") / 1000,
+          enddate: Date.parse("2026-08-20T06:00:00Z") / 1000,
+          timezone: "UTC",
+          data: {
+            deepsleepduration: 3600,
+            remsleepduration: 5400,
+            hr_average: 55,
+            hr_min: 47,
+            rr_average: 14,
+            total_sleep_time: 25200,
+            sleep_score: 80,
+            sleep_efficiency: 0.92,
+          },
+        },
+      ],
+    });
     expect(
-      observationFor(result, "workoutDuration").valueQuantity?.value,
-    ).to.equal(30);
-    expect(observationFor(result, "workoutDuration").id).to.equal("withings-9");
+      quantityOf(outputFor(records, "deep-sleep-duration").output),
+    ).to.equal(60);
+    const heartRates = outputsFor(records, "sleep-heart-rate");
+    expect(
+      heartRates.map(({ record, output }) => [
+        record.sourceType,
+        output.method,
+        output.outsideCatalog,
+      ]),
+    ).to.deep.equal([
+      ["getsummary:hr_average", "session-mean", undefined],
+      ["getsummary:hr_min", "session-minimum", true],
+    ]);
+    const total = outputFor(records, "sleep-duration");
+    expect(quantityOf(total.output)).to.equal(7);
+    expect(total.output.outsideCatalog).to.equal(true);
+    expect(quantityOf(outputFor(records, "sleep-score").output)).to.equal(80);
+    expect(quantityOf(outputFor(records, "sleep-efficiency").output)).to.equal(
+      92,
+    );
   });
 
-  it("ignores unmapped measure types", () => {
-    const result = normalizeWithings(
-      {
-        measureGroups: [
-          {
-            grpid: 1,
-            date: 1735732800,
-            measures: [{ value: 5, type: 88, unit: 0 }],
+  it("maps workouts with category and statistics", () => {
+    const records = normalizeWithings({
+      workouts: [
+        {
+          id: 7,
+          category: 2,
+          startdate: Date.parse("2026-08-20T07:00:00Z") / 1000,
+          enddate: Date.parse("2026-08-20T07:45:00Z") / 1000,
+          data: {
+            calories: 400,
+            distance: 7000,
+            effduration: 2600,
+            hr_average: 150,
           },
-        ],
-      },
-      subject,
-    );
-    expect(result).to.have.lengthOf(0);
+        },
+      ],
+    });
+    const workout = outputFor(records, "workout");
+    expect(workout.record.sourceType).to.equal("getworkouts:interval");
+    expect(
+      (workout.output.value as { concept: Array<{ code: string }> }).concept[0]
+        .code,
+    ).to.equal("running");
+    expect(workout.output.components?.map((c) => c.code.code)).to.deep.equal([
+      "active-duration",
+      "active-energy-sum",
+      "distance-sum",
+      "heart-rate-avg",
+    ]);
   });
 });
 
-describe("WithingsAdapter: fetchObservations", () => {
-  it("calls the measure endpoints and normalizes measure groups", async () => {
-    const { restore } = stubFetch((url) => {
-      if (url.endsWith("/measure")) {
-        return {
-          status: 0,
-          body: {
-            measuregrps: [
-              {
-                grpid: 1,
-                date: 1735732800,
-                measures: [{ value: 705, type: 1, unit: -1 }],
-              },
-            ],
-          },
-        };
-      }
-      return { status: 0, body: {} };
-    });
-    try {
-      const adapter = new WithingsAdapter();
-      const result = await adapter.fetchObservations({
-        tokens: fakeTokens,
-        since: new Date("2026-01-01T00:00:00Z"),
-        until: new Date("2026-01-02T00:00:00Z"),
-        subject,
-      });
-      expect(
-        observationFor(result, "bodyWeight").valueQuantity?.value,
-      ).to.equal(70.5);
-    } finally {
-      restore();
-    }
+describe("WithingsAdapter: envelopes and notifications", () => {
+  it("maps auth envelope statuses to ProviderAuthError", () => {
+    expect(() =>
+      checkWithingsEnvelope("x", { status: 401, body: {} }),
+    ).to.throw(ProviderAuthError);
+    expect(() =>
+      checkWithingsEnvelope("x", { status: 601, body: {} }),
+    ).to.throw(Error);
+    expect(() =>
+      checkWithingsEnvelope("x", { status: 0, body: {} }),
+    ).to.not.throw();
   });
 
-  it("calls getworkouts and normalizes workout duration", async () => {
-    const { restore, bodies } = stubFetch((url) => {
-      if (url.endsWith("/v2/measure")) {
-        return {
-          status: 0,
-          body: {
-            series: [{ id: 5, startdate: 1735732800, enddate: 1735734600 }],
-          },
-        };
-      }
-      return { status: 0, body: {} };
+  it("parses Notify bodies", () => {
+    expect(
+      parseWithingsNotification({
+        userid: "12",
+        startdate: "100",
+        enddate: "200",
+      }),
+    ).to.deep.equal({
+      providerUserId: "12",
+      since: new Date(100_000),
+      until: new Date(200_000),
     });
-    try {
-      const adapter = new WithingsAdapter();
-      const result = await adapter.fetchObservations({
-        tokens: fakeTokens,
-        since: new Date("2026-01-01T00:00:00Z"),
-        until: new Date("2026-01-02T00:00:00Z"),
-        subject,
-      });
-      expect(
-        observationFor(result, "workoutDuration").valueQuantity?.value,
-      ).to.equal(30);
-      const workoutsBody = bodies.get("https://wbsapi.withings.net/v2/measure");
-      expect(workoutsBody).to.contain("action=getworkouts");
-    } finally {
-      restore();
-    }
+    expect(parseWithingsNotification({})).to.equal(undefined);
   });
 });
 
-describe("WithingsAdapter: fetchRawArchives", () => {
-  it("archives intraday activity, sleep and unmapped measure types as raw dataType-tagged payloads", async () => {
-    const { restore } = stubFetch((url) => {
-      if (url.includes("/v2/measure")) {
-        return { status: 0, body: { series: { "1735732800": { steps: 5 } } } };
-      }
-      if (url.includes("/v2/sleep")) {
-        return { status: 0, body: { series: [{ startdate: 1, hr: [60] }] } };
-      }
-      // Plain (non-v2) /measure is the unmapped-measure-types getmeas call.
-      if (url.endsWith("/measure")) {
-        return {
-          status: 0,
-          body: {
-            measuregrps: [
-              {
-                grpid: 1,
-                date: 1735732800,
-                measures: [{ value: 1, type: 76, unit: 0 }],
-              },
-            ],
-          },
-        };
-      }
-      return { status: 0, body: {} };
-    });
-    try {
-      const adapter = new WithingsAdapter();
-      const archives = await adapter.fetchRawArchives({
-        tokens: fakeTokens,
-        since: new Date("2026-01-01T00:00:00Z"),
-        until: new Date("2026-01-02T00:00:00Z"),
-        subject,
-      });
-      const dataTypes = archives.map((a) => a.dataType);
-      expect(dataTypes).to.include("activityIntraday");
-      expect(dataTypes).to.include("sleepIntraday");
-      expect(dataTypes).to.include("measuresUnmapped");
-    } finally {
-      restore();
-    }
-  });
-
-  it("drops an endpoint's archive instead of failing when it errors", async () => {
-    const { restore } = stubFetch((url) => {
-      if (url.includes("/measure")) {
-        return { status: 293, error: "unauthorized", body: {} };
-      }
-      return { status: 0, body: { series: [] } };
-    });
-    try {
-      const adapter = new WithingsAdapter();
-      const archives = await adapter.fetchRawArchives({
-        tokens: fakeTokens,
-        since: new Date("2026-01-01T00:00:00Z"),
-        until: new Date("2026-01-02T00:00:00Z"),
-        subject,
-      });
-      expect(archives.map((a) => a.dataType)).to.deep.equal(["sleepIntraday"]);
-    } finally {
-      restore();
-    }
-  });
-});
-
-describe("WithingsAdapter: removeSubscription", () => {
-  it("includes the callbackurl in the revoke request", async () => {
-    const { restore, bodies } = stubFetch(() => ({ status: 0, body: {} }));
-    try {
-      const adapter = new WithingsAdapter();
-      await adapter.removeSubscription({
-        tokens: fakeTokens,
-        callbackUrl: "https://example.test/withingsWebhook",
-      });
-      const notifyBody = bodies.get("https://wbsapi.withings.net/notify");
-      expect(notifyBody).to.contain("action=revoke");
-      expect(notifyBody).to.contain(
-        encodeURIComponent("https://example.test/withingsWebhook"),
+describe("WithingsAdapter: fetchData", () => {
+  it("follows more/offset pagination and archives intraday payloads", async () => {
+    const getmeasOffsets: Array<string | null> = [];
+    const restore = stubFetch((url, init) => {
+      const body = new URLSearchParams(
+        typeof init?.body === "string" ?
+          init.body
+        : ((init?.body as URLSearchParams | undefined)?.toString() ?? ""),
       );
-    } finally {
-      restore();
-    }
-  });
-
-  it("skips the revoke entirely when no callbackUrl is supplied", async () => {
-    const { restore, bodies } = stubFetch(() => ({ status: 0, body: {} }));
-    try {
-      const adapter = new WithingsAdapter();
-      await adapter.removeSubscription({ tokens: fakeTokens });
-      expect(bodies.size).to.equal(0);
-    } finally {
-      restore();
-    }
-  });
-});
-
-describe("WithingsAdapter: parseWithingsNotification", () => {
-  it("parses userid and the epoch window", () => {
-    const result = parseWithingsNotification({
-      userid: "12345",
-      appli: "44",
-      startdate: "1735689600",
-      enddate: "1735718400",
+      const action = body.get("action");
+      if (action === "getmeas" && body.get("meastypes")?.startsWith("174")) {
+        return { status: 0, body: { measuregrps: [] } };
+      }
+      if (action === "getmeas") {
+        getmeasOffsets.push(body.get("offset"));
+        return body.get("offset") === null ?
+            {
+              status: 0,
+              body: {
+                timezone: "UTC",
+                more: 1,
+                offset: 1,
+                measuregrps: [
+                  {
+                    grpid: 1,
+                    date: measureDate,
+                    measures: [{ type: 1, value: 70, unit: 0 }],
+                  },
+                ],
+              },
+            }
+          : {
+              status: 0,
+              body: {
+                more: 0,
+                measuregrps: [
+                  {
+                    grpid: 2,
+                    date: measureDate,
+                    measures: [{ type: 1, value: 71, unit: 0 }],
+                  },
+                ],
+              },
+            };
+      }
+      if (action === "getintradayactivity")
+        return { status: 0, body: { series: {} } };
+      if (action === "get") return { status: 0, body: { series: [] } };
+      return { status: 0, body: {} };
     });
-    expect(result?.providerUserId).to.equal("12345");
-    expect(result?.since?.toISOString()).to.equal("2025-01-01T00:00:00.000Z");
+    try {
+      const result = await new WithingsAdapter().fetchData({
+        tokens: fakeTokens,
+        since: new Date("2026-08-19T00:00:00Z"),
+        until: new Date("2026-08-21T00:00:00Z"),
+      });
+      expect(getmeasOffsets).to.deep.equal([null, "1"]);
+      expect(outputsFor(result.records, "body-weight")).to.have.lengthOf(2);
+      expect(result.rawArchives.map((a) => a.sourceType)).to.deep.equal([
+        "activityIntraday",
+        "sleepIntraday",
+      ]);
+      expect(result.failures).to.deep.equal([]);
+    } finally {
+      restore();
+    }
   });
 
-  it("accepts a numeric userid", () => {
-    expect(parseWithingsNotification({ userid: 99 })?.providerUserId).to.equal(
-      "99",
-    );
-  });
-
-  it("returns undefined when userid is missing", () => {
-    expect(parseWithingsNotification({ appli: "1" })).to.equal(undefined);
-    expect(parseWithingsNotification(null)).to.equal(undefined);
-  });
-
-  it("leaves the window undefined when dates are absent or non-numeric", () => {
-    const result = parseWithingsNotification({ userid: "7", appli: "44" });
-    expect(result?.providerUserId).to.equal("7");
-    expect(result?.since).to.equal(undefined);
-    expect(result?.until).to.equal(undefined);
+  it("propagates an envelope auth failure instead of reporting success", async () => {
+    const restore = stubFetch(() => ({ status: 401, body: {} }));
+    try {
+      let thrown: unknown;
+      try {
+        await new WithingsAdapter().fetchData({
+          tokens: fakeTokens,
+          since: new Date("2026-08-19T00:00:00Z"),
+          until: new Date("2026-08-21T00:00:00Z"),
+        });
+      } catch (error) {
+        thrown = error;
+      }
+      expect(thrown).to.be.instanceOf(ProviderAuthError);
+    } finally {
+      restore();
+    }
   });
 });

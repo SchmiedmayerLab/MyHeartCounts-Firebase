@@ -11,8 +11,8 @@ import {
 } from "./httpClient.js";
 
 describe("httpClient: ProviderHttpError", () => {
-  it("flags 400/401/403 as auth failures and others as transient", () => {
-    expect(new ProviderHttpError(400, "", "ctx").isAuthFailure).to.equal(true);
+  it("flags 401/403 as auth failures and others as transient", () => {
+    expect(new ProviderHttpError(400, "", "ctx").isAuthFailure).to.equal(false);
     expect(new ProviderHttpError(401, "", "ctx").isAuthFailure).to.equal(true);
     expect(new ProviderHttpError(403, "", "ctx").isAuthFailure).to.equal(true);
     expect(new ProviderHttpError(429, "", "ctx").isAuthFailure).to.equal(false);
@@ -56,6 +56,26 @@ describe("httpClient: settleEndpoint", () => {
       Promise.reject<number[]>(new Error("boom")),
     );
     expect(value).to.equal(undefined);
+  });
+
+  it("records failed endpoints when a collector is passed", async () => {
+    const failures: string[] = [];
+    await settleEndpoint("a", Promise.resolve(1), failures);
+    await settleEndpoint("b", Promise.reject<number>(new Error("x")), failures);
+    expect(failures).to.deep.equal(["b"]);
+  });
+
+  it("rethrows a ProviderAuthError", async () => {
+    let thrown: unknown;
+    try {
+      await settleEndpoint(
+        "ctx",
+        Promise.reject(new ProviderAuthError("x", 1)),
+      );
+    } catch (error) {
+      thrown = error;
+    }
+    expect(thrown).to.be.instanceOf(ProviderAuthError);
   });
 
   it("rethrows an auth HTTP error so the caller can surface it", async () => {

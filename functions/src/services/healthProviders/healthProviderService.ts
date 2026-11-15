@@ -6,35 +6,49 @@
 import { createHash, randomBytes } from "crypto";
 import { type Bucket } from "@google-cloud/storage";
 import { type Response } from "express";
-import { Timestamp } from "firebase-admin/firestore";
+import { type Firestore, Timestamp } from "firebase-admin/firestore";
 import { logger } from "firebase-functions/v2";
 import { type Request } from "firebase-functions/v2/https";
+import { buildExchangeBundles } from "./grove/bundleBuilder.js";
+import {
+  archiveRawPayloads,
+  uploadProviderBundles,
+} from "./grove/bundleStorage.js";
+import { type RecordDraft } from "./grove/drafts.js";
+import { type GroveIdentityKey } from "./grove/identity.js";
+import { loadGroveIdentityKey } from "./grove/identityConfig.js";
 import {
   type HealthProviderAdapter,
-  type ProviderObservation,
   type ProviderWebhookNotification,
   type WebhookHandling,
 } from "./healthProviderAdapter.js";
-import { ProviderAuthError, ProviderHttpError } from "./httpClient.js";
+import {
+  isProviderAuthFailure,
+  ProviderAuthError,
+  ProviderHttpError,
+} from "./httpClient.js";
 import { getAdapter } from "./providerRegistry.js";
-import { archiveRawPayloads } from "./rawArchiveStorage.js";
 import {
   getHealthProviderBaseUrl,
   getHealthProviderAppRedirectUrl,
 } from "../../env.js";
+import { getPackageVersion } from "../../helpers/packageVersion.js";
 import {
-  type FHIRReference,
   HealthProviderConnectionStatus,
   type HealthProviderId,
+  HealthProviderSyncError,
   HealthProviderSyncStatus,
   healthProviderUserIndexId,
   type ProviderTokens,
-  providerObservationCollectionName,
 } from "../../models/index.js";
 import { type DatabaseService } from "../database/databaseService.js";
 
-/** How far back the first scheduled backfill reaches after a fresh connection. */
-const INITIAL_BACKFILL_DAYS = 30;
+/** How far back the initial import reaches after a fresh connection. */
+export const INITIAL_BACKFILL_DAYS = 30;
+/** Minimum spacing between manual (`syncHealthProvider`) syncs. */
+export const MANUAL_SYNC_THROTTLE_MS = 15 * 60 * 1000;
+/** OAuth state lifetime. */
+const AUTH_REQUEST_TTL_MS = 15 * 60 * 1000;
 /** Refresh access tokens this long before their nominal expiry. */
 const TOKEN_EXPIRY_SKEW_MS = 60_000;
 /**
@@ -42,17 +56,14 @@ const TOKEN_EXPIRY_SKEW_MS = 60_000;
  * bodies (notably Withings Notify) carry a caller-supplied `startdate` with no
  * per-request signature, so the window is clamped here to prevent a forged
  * notification from forcing an unbounded backfill on a victim's token. Deeper
- * history is covered by the daily scheduled backfill.
+ * history is covered by the scheduled backfill.
  */
 const WEBHOOK_MAX_LOOKBACK_DAYS = 7;
+/** Default window for a webhook without bounds, and after a missing lastSyncAt. */
+const DEFAULT_LOOKBACK_DAYS = 2;
 
-const daysAgo = (days: number): Date =>
-  new Date(Date.now() - days * 24 * 60 * 60 * 1000);
-
-/** Whether an ingest error indicates the stored credentials are unusable. */
-const isAuthFailure = (error: unknown): boolean =>
-  error instanceof ProviderAuthError ||
-  (error instanceof ProviderHttpError && error.isAuthFailure);
+const daysAgo = (days: number, now = Date.now()): Date =>
+  new Date(now - days * 24 * 60 * 60 * 1000);
 
 const base64url = (buffer: Buffer): string =>
   buffer
@@ -61,25 +72,59 @@ const base64url = (buffer: Buffer): string =>
     .replace(/\//g, "_")
     .replace(/=+$/, "");
 
+/** Map an ingest failure to the sanitized client-facing error code. */
+const syncErrorCode = (error: unknown): HealthProviderSyncError => {
+  if (isProviderAuthFailure(error)) return HealthProviderSyncError.authFailed;
+  if (error instanceof ProviderHttpError) {
+    return HealthProviderSyncError.providerUnavailable;
+  }
+  return HealthProviderSyncError.unknown;
+};
+
+/** A connection attempt failed; `provider` is set whenever it is known. */
+export class HealthProviderConnectionError extends Error {
+  constructor(
+    readonly reason: string,
+    readonly provider?: HealthProviderId,
+    cause?: unknown,
+  ) {
+    super(
+      `${reason}${cause === undefined ? "" : `: ${cause instanceof Error ? cause.message : JSON.stringify(cause)}`}`,
+    );
+    this.name = "HealthProviderConnectionError";
+    Object.setPrototypeOf(this, HealthProviderConnectionError.prototype);
+  }
+}
+
+/** How one ingest relates to the connection's sync bookkeeping. */
+interface IngestMode {
+  /** Advance `lastSyncAt` to `until` when the window fully succeeds. */
+  advancesLastSync: boolean;
+  /** Mark the initial history import complete when the window fully succeeds. */
+  completesInitialSync: boolean;
+}
+
 export class HealthProviderService {
   private readonly databaseService: DatabaseService;
   private readonly bucket: Bucket;
   private readonly resolveAdapter: (
     provider: HealthProviderId,
   ) => HealthProviderAdapter;
+  private readonly identityKey: () => GroveIdentityKey;
 
   constructor(
     databaseService: DatabaseService,
     bucket: Bucket,
-    // Injectable so tests can substitute a fake adapter without hitting provider
-    // networks; production uses the real registry.
+    // Injectable so tests can substitute a fake adapter and identity key.
     resolveAdapter: (
       provider: HealthProviderId,
     ) => HealthProviderAdapter = getAdapter,
+    identityKey: () => GroveIdentityKey = loadGroveIdentityKey,
   ) {
     this.databaseService = databaseService;
     this.bucket = bucket;
     this.resolveAdapter = resolveAdapter;
+    this.identityKey = identityKey;
   }
 
   // URLs ---------------------------------------------------------------------
@@ -92,8 +137,28 @@ export class HealthProviderService {
     return `${getHealthProviderBaseUrl()}/${provider}Webhook`;
   }
 
-  private subject(userId: string): FHIRReference {
-    return { reference: `user/${userId}` };
+  /** App deep link for a successful connection. */
+  static connectedRedirect(provider: HealthProviderId): string {
+    return `${getHealthProviderAppRedirectUrl()}/${provider}/connected`;
+  }
+
+  /** App deep link for a failed connection (provider-scoped when known). */
+  static errorRedirect(reason: string, provider?: HealthProviderId): string {
+    const base = getHealthProviderAppRedirectUrl();
+    const query = `reason=${encodeURIComponent(reason)}`;
+    return provider ?
+        `${base}/${provider}/error?${query}`
+      : `${base}/error?${query}`;
+  }
+
+  private connectionRef(userId: string, provider: HealthProviderId) {
+    // Converter-free reference: partial merges must not re-encode the document.
+    return (collections: { firestore: Firestore }) =>
+      collections.firestore
+        .collection("users")
+        .doc(userId)
+        .collection("healthProviderConnections")
+        .doc(provider);
   }
 
   // Connection lifecycle -----------------------------------------------------
@@ -101,7 +166,7 @@ export class HealthProviderService {
   /**
    * Begin an OAuth connection: persist a one-time state record (carrying a PKCE
    * verifier where needed) and return the provider authorization URL the client
-   * opens for consent.
+   * opens for consent. `expiresAt` is also the Firestore TTL field.
    */
   async startConnection(
     userId: string,
@@ -126,7 +191,7 @@ export class HealthProviderService {
         redirectUri,
         codeVerifier,
         createdAt: new Date(),
-        expiresAt: new Date(Date.now() + 15 * 60 * 1000),
+        expiresAt: new Date(Date.now() + AUTH_REQUEST_TTL_MS),
       },
     );
 
@@ -134,30 +199,67 @@ export class HealthProviderService {
   }
 
   /**
-   * Complete an OAuth connection from the provider's redirect: validate/consume
-   * the state record, exchange the code, persist tokens, register the webhook
-   * subscription and reverse-lookup index, and mark the connection connected.
+   * Atomically read and delete the auth request for `state`, so a replayed or
+   * concurrent callback can never consume it twice.
+   */
+  private async consumeAuthRequest(state: string) {
+    return this.databaseService.runTransaction(async (collections, tx) => {
+      const ref = collections.healthProviderAuthRequests.doc(state);
+      const snap = await tx.get(ref);
+      const content = snap.data();
+      if (content !== undefined) tx.delete(ref);
+      return content;
+    });
+  }
+
+  /**
+   * Abort a pending connection after a provider-reported error. Consumes the
+   * state (if valid) and returns the provider it was for.
+   */
+  async abandonConnection(
+    state: string | undefined,
+  ): Promise<HealthProviderId | undefined> {
+    if (!state) return undefined;
+    try {
+      return (await this.consumeAuthRequest(state))?.provider;
+    } catch (error) {
+      logger.warn(
+        `HealthProviderService: could not consume abandoned state: ${String(error)}`,
+      );
+      return undefined;
+    }
+  }
+
+  /**
+   * Complete an OAuth connection from the provider's redirect: consume the
+   * state record, exchange the code, persist tokens, register the webhook
+   * subscription and reverse-lookup index, and mark the connection connected
+   * (which starts the initial history import via the connection trigger).
    * Returns the app deep link the callback should redirect the browser to.
+   * Throws {@link HealthProviderConnectionError}.
    */
   async completeConnection(state: string, code: string): Promise<string> {
-    const authRequest = await this.databaseService.getDocument((collections) =>
-      collections.healthProviderAuthRequests.doc(state),
-    );
+    const authRequest = await this.consumeAuthRequest(state);
     if (authRequest === undefined) {
-      throw new Error("Unknown or expired OAuth state.");
+      throw new HealthProviderConnectionError("invalid_state");
     }
-    if (authRequest.content.expiresAt.getTime() < Date.now()) {
-      throw new Error("OAuth state has expired.");
+    const { provider, userId, redirectUri, codeVerifier, expiresAt } =
+      authRequest;
+    if (expiresAt.getTime() < Date.now()) {
+      throw new HealthProviderConnectionError("state_expired", provider);
     }
-
-    const { provider, userId, redirectUri, codeVerifier } = authRequest.content;
     const adapter = this.resolveAdapter(provider);
 
-    const tokens = await adapter.exchangeCode({
-      code,
-      redirectUri,
-      codeVerifier,
-    });
+    let tokens: ProviderTokens;
+    try {
+      tokens = await adapter.exchangeCode({ code, redirectUri, codeVerifier });
+    } catch (error) {
+      throw new HealthProviderConnectionError(
+        "token_exchange_failed",
+        provider,
+        error,
+      );
+    }
 
     let subscriptionId: string | undefined;
     try {
@@ -167,42 +269,39 @@ export class HealthProviderService {
       });
       subscriptionId = result.subscriptionId;
     } catch (error) {
-      // A missing subscription degrades to scheduled-poll only; don't fail the
-      // whole connection over it.
+      // A missing subscription degrades to scheduled polling only.
       logger.error(
         `HealthProviderService: ensureSubscription failed for ${provider}/${userId}: ${String(error)}`,
       );
     }
 
-    await this.storeTokens(userId, provider, tokens, subscriptionId);
-
-    // Add this user to the reverse index (a set-union so a provider account
-    // shared across two MHC accounts routes to both). Kept out of the bulkWrite
-    // below because it is a read-modify-write on a shared root doc.
-    await this.addUserToIndex(provider, tokens.providerUserId, userId);
-
-    await this.databaseService.bulkWrite(async (collections, writer) => {
-      // The per-op promises can't be awaited here: the bulkWrite wrapper closes
-      // the writer only after this callback returns, so awaiting them would
-      // deadlock. flush() commits the buffered writes and resolves when done.
-      void writer.set(
-        collections.healthProviderConnections(userId).doc(provider),
+    try {
+      await this.storeTokens(userId, provider, tokens, subscriptionId);
+      await this.addUserToIndex(provider, tokens.providerUserId, userId);
+      await this.databaseService.setDocument(
+        (collections) =>
+          collections.healthProviderConnections(userId).doc(provider),
         {
           provider,
           status: HealthProviderConnectionStatus.connected,
           scopes: tokens.scopes,
           connectedAt: new Date(),
-          // Seed the first scheduled backfill to reach INITIAL_BACKFILL_DAYS back.
-          lastSyncAt: daysAgo(INITIAL_BACKFILL_DAYS),
+          lastSyncAt: undefined,
+          lastSyncAttemptAt: undefined,
+          initialSyncCompletedAt: undefined,
           lastSyncStatus: undefined,
           lastError: undefined,
         },
       );
-      void writer.delete(collections.healthProviderAuthRequests.doc(state));
-      await writer.flush();
-    });
+    } catch (error) {
+      throw new HealthProviderConnectionError(
+        "storage_failed",
+        provider,
+        error,
+      );
+    }
 
-    return `${getHealthProviderAppRedirectUrl()}/${provider}/connected`;
+    return HealthProviderService.connectedRedirect(provider);
   }
 
   /** Revoke and remove a provider connection. Best-effort at the provider. */
@@ -253,6 +352,8 @@ export class HealthProviderService {
           scopes: [],
           connectedAt: undefined,
           lastSyncAt: undefined,
+          lastSyncAttemptAt: undefined,
+          initialSyncCompletedAt: undefined,
           lastSyncStatus: undefined,
           lastError: undefined,
         },
@@ -353,12 +454,13 @@ export class HealthProviderService {
     }
 
     if (handling.kind === "verification") {
-      // Adapter already wrote the verification response.
+      // Adapter already wrote the response.
       return;
     }
 
     // Acknowledge before the (possibly slow) fetch work so providers don't retry
-    // on a timeout; individual failures are logged and retried by the backfill.
+    // on a timeout; failures are recorded on the connection document and the
+    // window is covered again by the scheduled backfill.
     res.status(204).send();
 
     for (const notification of handling.notifications) {
@@ -397,25 +499,122 @@ export class HealthProviderService {
       Math.min((notification.until ?? now).getTime(), now.getTime()),
     );
     const earliest = daysAgo(WEBHOOK_MAX_LOOKBACK_DAYS);
-    const requestedSince = notification.since ?? daysAgo(2);
+    const requestedSince = notification.since ?? daysAgo(DEFAULT_LOOKBACK_DAYS);
     const since = new Date(
       Math.max(requestedSince.getTime(), earliest.getTime()),
     );
 
-    // A shared provider account may map to more than one MHC user.
+    // A shared provider account may map to more than one MHC user. A webhook
+    // window is partial by nature, so it never advances `lastSyncAt` or
+    // completes the initial import — those stay owned by full-window syncs.
     for (const userId of index.content.userIds) {
-      await this.ingest(userId, provider, adapter, since, until);
+      try {
+        await this.ingest(userId, provider, adapter, since, until, {
+          advancesLastSync: false,
+          completesInitialSync: false,
+        });
+      } catch (error) {
+        logger.error(
+          `HealthProviderService: webhook ingest failed for ${provider}/${userId}: ${String(error)}`,
+        );
+      }
     }
   }
 
-  // Backfill / polling -------------------------------------------------------
+  // Full-window syncs --------------------------------------------------------
 
   /**
-   * Iterate every stored connection for a provider and pull anything since the
-   * connection's `lastSyncAt`. Used by the daily scheduled backfill.
+   * Sync one connection from its `lastSyncAt` (or, until the initial import
+   * has fully succeeded, from INITIAL_BACKFILL_DAYS ago) up to now. Skipped for
+   * disconnected or unknown connections.
+   */
+  async syncConnection(
+    userId: string,
+    provider: HealthProviderId,
+  ): Promise<void> {
+    const connection = await this.databaseService.getDocument((collections) =>
+      collections.healthProviderConnections(userId).doc(provider),
+    );
+    if (
+      connection === undefined ||
+      connection.content.status === HealthProviderConnectionStatus.disconnected
+    ) {
+      return;
+    }
+    const initialPending =
+      connection.content.initialSyncCompletedAt === undefined;
+    const since =
+      initialPending ?
+        daysAgo(INITIAL_BACKFILL_DAYS)
+      : (connection.content.lastSyncAt ?? daysAgo(DEFAULT_LOOKBACK_DAYS));
+    await this.ingest(
+      userId,
+      provider,
+      this.resolveAdapter(provider),
+      since,
+      new Date(),
+      { advancesLastSync: true, completesInitialSync: initialPending },
+    );
+  }
+
+  /**
+   * Run the initial history import for a freshly connected provider (called
+   * by the connection-document trigger).
+   */
+  async runInitialSync(
+    userId: string,
+    provider: HealthProviderId,
+  ): Promise<void> {
+    await this.syncConnection(userId, provider);
+  }
+
+  /**
+   * Manual sync requested by the app. Throttled to one attempt per
+   * MANUAL_SYNC_THROTTLE_MS per connection (by `lastSyncAttemptAt`, checked
+   * and reserved atomically).
+   */
+  async requestSync(
+    userId: string,
+    provider: HealthProviderId,
+  ): Promise<"started" | "throttled" | "not_connected"> {
+    const reserved = await this.databaseService.runTransaction(
+      async (collections, tx) => {
+        const ref = this.connectionRef(userId, provider)(collections);
+        const snap = await tx.get(ref);
+        const data = snap.data();
+        if (
+          data === undefined ||
+          data.status === HealthProviderConnectionStatus.disconnected
+        ) {
+          return "not_connected" as const;
+        }
+        const last = (
+          data.lastSyncAttemptAt as Timestamp | null | undefined
+        )?.toMillis();
+        if (last !== undefined && Date.now() - last < MANUAL_SYNC_THROTTLE_MS) {
+          return "throttled" as const;
+        }
+        tx.set(ref, { lastSyncAttemptAt: Timestamp.now() }, { merge: true });
+        return "started" as const;
+      },
+    );
+    if (reserved !== "started") return reserved;
+    try {
+      await this.syncConnection(userId, provider);
+    } catch (error) {
+      // Recorded on the connection document; the call itself succeeded.
+      logger.warn(
+        `HealthProviderService: manual sync failed for ${provider}/${userId}: ${String(error)}`,
+      );
+    }
+    return "started";
+  }
+
+  /**
+   * Iterate every stored connection for a provider and sync it. Used by the
+   * daily scheduled backfill.
    */
   async backfillProvider(provider: HealthProviderId): Promise<void> {
-    const adapter = this.resolveAdapter(provider);
     const tokenDocs = await this.databaseService.getQuery((collections) =>
       collections.firestore
         .collectionGroup("healthProviderTokens")
@@ -427,12 +626,7 @@ export class HealthProviderService {
       const userId = tokenDoc.path.split("/")[1];
       if (!userId) continue;
       try {
-        const connection = await this.databaseService.getDocument(
-          (collections) =>
-            collections.healthProviderConnections(userId).doc(provider),
-        );
-        const since = connection?.content.lastSyncAt ?? daysAgo(2);
-        await this.ingest(userId, provider, adapter, since, new Date());
+        await this.syncConnection(userId, provider);
       } catch (error) {
         logger.error(
           `HealthProviderService: backfill failed for ${provider}/${userId}: ${String(error)}`,
@@ -449,103 +643,71 @@ export class HealthProviderService {
     adapter: HealthProviderAdapter,
     since: Date,
     until: Date,
+    mode: IngestMode,
   ): Promise<void> {
+    if (!(await this.markAttempt(userId, provider))) {
+      // Disconnected (or never connected) in the meantime: nothing to do.
+      return;
+    }
     try {
       const tokens = await this.validAccessToken(userId, provider, adapter);
-      const subject = this.subject(userId);
-      const observations = await adapter.fetchObservations({
-        tokens,
-        since,
-        until,
-        subject,
-      });
-      await this.writeObservations(userId, provider, observations);
-      await this.archiveRawData(
-        userId,
-        provider,
-        adapter,
-        tokens,
-        subject,
-        since,
-        until,
-      );
-      await this.markSync(userId, provider, HealthProviderSyncStatus.ok, until);
-    } catch (error) {
-      // Only a credential failure (unrenewable/rejected token) flips the
-      // client-visible connection status to `error`; a transient fetch failure
-      // records the error but leaves the connection `connected` so a single blip
-      // doesn't show the wearable as broken until the next sync.
-      await this.markSync(
-        userId,
-        provider,
-        HealthProviderSyncStatus.error,
-        undefined,
-        String(error),
-        isAuthFailure(error),
-      );
-      throw error;
-    }
-  }
-
-  private async writeObservations(
-    userId: string,
-    provider: HealthProviderId,
-    observations: ProviderObservation[],
-  ): Promise<void> {
-    if (observations.length === 0) return;
-    // BulkWriter batches and throttles the fan-out for us. The per-op promises
-    // can't be awaited inside the callback (the wrapper closes the writer only
-    // afterwards), so we buffer the sets and await a flush to confirm completion.
-    await this.databaseService.bulkWrite(async (collections, writer) => {
-      for (const { metric, observation } of observations) {
-        if (observation.id === undefined) continue;
-        const ref = collections
-          .userHealthObservations(
-            userId,
-            providerObservationCollectionName(provider, metric),
-          )
-          .doc(observation.id);
-        void writer.set(ref, observation);
-      }
-      await writer.flush();
-    });
-  }
-
-  /**
-   * Best-effort: an adapter without `fetchRawArchives`, or a failure while
-   * archiving, must not affect the observation sync that already succeeded.
-   */
-  private async archiveRawData(
-    userId: string,
-    provider: HealthProviderId,
-    adapter: HealthProviderAdapter,
-    tokens: ProviderTokens,
-    subject: FHIRReference,
-    since: Date,
-    until: Date,
-  ): Promise<void> {
-    if (!adapter.fetchRawArchives) return;
-    try {
-      const archives = await adapter.fetchRawArchives({
-        tokens,
-        since,
-        until,
-        subject,
-      });
-      if (archives.length === 0) return;
-      await archiveRawPayloads({
+      const result = await adapter.fetchData({ tokens, since, until });
+      const recordings = await archiveRawPayloads({
         bucket: this.bucket,
-        databaseService: this.databaseService,
         userId,
         provider,
-        archives,
+        archives: result.rawArchives,
         since,
         until,
+      });
+      const records: RecordDraft[] = [...result.records, ...recordings];
+      if (records.length > 0) {
+        const now = new Date();
+        const bundles = buildExchangeBundles({
+          provider,
+          userId,
+          providerUserId: tokens.providerUserId,
+          key: this.identityKey(),
+          records,
+          recordedAt: now,
+          packedAt: now,
+          applicationVersion: getPackageVersion(),
+        });
+        await uploadProviderBundles({
+          bucket: this.bucket,
+          userId,
+          provider,
+          bundles,
+        });
+      }
+
+      if (result.failures.length > 0) {
+        logger.warn(
+          `HealthProviderService: partial sync for ${provider}/${userId}; failed: ${result.failures.join(", ")}`,
+        );
+        await this.markSync(userId, provider, {
+          status: HealthProviderSyncStatus.error,
+          error:
+            records.length === 0 ?
+              HealthProviderSyncError.providerUnavailable
+            : HealthProviderSyncError.partialFailure,
+        });
+        return;
+      }
+      await this.markSync(userId, provider, {
+        status: HealthProviderSyncStatus.ok,
+        lastSyncAt: mode.advancesLastSync ? until : undefined,
+        initialSyncCompleted: mode.completesInitialSync,
       });
     } catch (error) {
       logger.error(
-        `HealthProviderService: raw archive capture failed for ${provider}/${userId}: ${String(error)}`,
+        `HealthProviderService: ingest failed for ${provider}/${userId}: ${String(error)}`,
       );
+      await this.markSync(userId, provider, {
+        status: HealthProviderSyncStatus.error,
+        error: syncErrorCode(error),
+      });
+      throw error;
     }
   }
 
@@ -585,7 +747,10 @@ export class HealthProviderService {
       collections.healthProviderTokens(userId).doc(provider),
     );
     if (tokenDoc === undefined) {
-      throw new Error(`No stored tokens for ${provider}/${userId}.`);
+      throw new ProviderAuthError(
+        `${provider} tokens`,
+        new Error(`No stored tokens for ${provider}/${userId}.`),
+      );
     }
 
     const stored: ProviderTokens = tokenDoc.content;
@@ -601,7 +766,6 @@ export class HealthProviderService {
       // surface it as an auth failure so the connection status flips to `error`.
       throw new ProviderAuthError(`${provider} token refresh`, error);
     }
-    // Preserve providerUserId if the refresh response omits it.
     const merged: ProviderTokens = {
       ...refreshed,
       providerUserId: refreshed.providerUserId || stored.providerUserId,
@@ -609,9 +773,7 @@ export class HealthProviderService {
     };
 
     // Compare-and-set: persist only if no concurrent sync already rotated the
-    // refresh token (Withings invalidates the old one on first use). If
-    // another writer got there first, keep its tokens rather than clobbering
-    // them with a now-stale value.
+    // refresh token (Withings invalidates the old one on first use).
     return this.databaseService.runTransaction(async (collections, tx) => {
       const ref = collections.healthProviderTokens(userId).doc(provider);
       const snap = await tx.get(ref);
@@ -637,41 +799,86 @@ export class HealthProviderService {
     });
   }
 
+  // Status bookkeeping ------------------------------------------------------
+
+  /** Record a sync attempt; false when the connection is gone/disconnected. */
+  private async markAttempt(
+    userId: string,
+    provider: HealthProviderId,
+  ): Promise<boolean> {
+    return this.databaseService.runTransaction(async (collections, tx) => {
+      const ref = this.connectionRef(userId, provider)(collections);
+      const snap = await tx.get(ref);
+      const data = snap.data();
+      if (
+        data === undefined ||
+        data.status === HealthProviderConnectionStatus.disconnected
+      ) {
+        return false;
+      }
+      tx.set(ref, { lastSyncAttemptAt: Timestamp.now() }, { merge: true });
+      return true;
+    });
+  }
+
+  /**
+   * Merge a sync outcome into the connection document. A no-op when the
+   * connection was disconnected (or deleted) while the sync ran, so a late
+   * sync never resurrects it. `lastSyncAt` only moves forward.
+   */
   private async markSync(
     userId: string,
     provider: HealthProviderId,
-    status: HealthProviderSyncStatus,
-    lastSyncAt?: Date,
-    lastError?: string,
-    markConnectionError = false,
+    outcome: {
+      status: HealthProviderSyncStatus;
+      error?: HealthProviderSyncError;
+      lastSyncAt?: Date;
+      initialSyncCompleted?: boolean;
+    },
   ): Promise<void> {
-    const data: Record<string, unknown> = {
-      provider,
-      lastSyncStatus: status,
-    };
-    // Only touch the client-visible connection `status` on success (→ connected)
-    // or a credential failure (→ error). A transient sync failure leaves the
-    // existing status untouched so the wearable isn't shown as broken over a blip.
-    if (status === HealthProviderSyncStatus.ok) {
-      data.status = HealthProviderConnectionStatus.connected;
-    } else if (markConnectionError) {
-      data.status = HealthProviderConnectionStatus.error;
+    try {
+      await this.databaseService.runTransaction(async (collections, tx) => {
+        const ref = this.connectionRef(userId, provider)(collections);
+        const snap = await tx.get(ref);
+        const current = snap.data();
+        if (
+          current === undefined ||
+          current.status === HealthProviderConnectionStatus.disconnected
+        ) {
+          return;
+        }
+        const data: Record<string, unknown> = {
+          lastSyncStatus: outcome.status,
+          lastError: outcome.error ?? null,
+        };
+        if (outcome.status === HealthProviderSyncStatus.ok) {
+          data.status = HealthProviderConnectionStatus.connected;
+        } else if (outcome.error === HealthProviderSyncError.authFailed) {
+          data.status = HealthProviderConnectionStatus.error;
+        }
+        if (outcome.lastSyncAt !== undefined) {
+          const previous = (
+            current.lastSyncAt as Timestamp | null | undefined
+          )?.toMillis();
+          if (
+            previous === undefined ||
+            previous < outcome.lastSyncAt.getTime()
+          ) {
+            data.lastSyncAt = Timestamp.fromDate(outcome.lastSyncAt);
+          }
+        }
+        if (
+          outcome.initialSyncCompleted === true &&
+          (current.initialSyncCompletedAt ?? null) === null
+        ) {
+          data.initialSyncCompletedAt = Timestamp.now();
+        }
+        tx.set(ref, data, { merge: true });
+      });
+    } catch (error) {
+      logger.error(
+        `HealthProviderService: failed to record sync status for ${provider}/${userId}: ${String(error)}`,
+      );
     }
-    if (lastSyncAt) data.lastSyncAt = Timestamp.fromDate(lastSyncAt);
-    if (lastError) data.lastError = lastError;
-
-    // Partial merge onto a converter-free reference so we don't clobber
-    // scopes/connectedAt written at connection time (the converter always
-    // encodes the full document, which would defeat a merge).
-    await this.databaseService.setDocument(
-      (collections) =>
-        collections.firestore
-          .collection("users")
-          .doc(userId)
-          .collection("healthProviderConnections")
-          .doc(provider),
-      data,
-      { merge: true },
-    );
   }
 }

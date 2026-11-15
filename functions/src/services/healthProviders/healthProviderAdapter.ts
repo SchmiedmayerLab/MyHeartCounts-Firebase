@@ -5,27 +5,16 @@
 
 import { type Response } from "express";
 import { type Request } from "firebase-functions/v2/https";
+import { type ObservationRecordDraft } from "./grove/drafts.js";
 import {
-  type FHIRObservation,
-  type FHIRReference,
   type HealthProviderId,
   type ProviderTokens,
 } from "../../models/index.js";
 
 /**
- * A normalized observation together with the metric slug that selects its
- * destination collection (`{Provider}Observations_{metric}`). The metric suffix
- * must be alphanumeric to satisfy the deletion-queue collection pattern.
- */
-export interface ProviderObservation {
-  metric: string;
-  observation: FHIRObservation;
-}
-
-/**
  * A single unit of "something changed for this provider user" extracted from a
  * webhook payload. The orchestrator maps `providerUserId` to our Firebase uid
- * and then pulls the affected window via {@link HealthProviderAdapter.fetchObservations}.
+ * and then pulls the affected window via {@link HealthProviderAdapter.fetchData}.
  */
 export interface ProviderWebhookNotification {
   providerUserId: string;
@@ -47,30 +36,45 @@ export type WebhookHandling =
   | { kind: "verification" }
   | { kind: "notifications"; notifications: ProviderWebhookNotification[] };
 
-export interface FetchObservationsParams {
+export interface FetchDataParams {
   tokens: ProviderTokens;
   since: Date;
   until: Date;
-  /** FHIR subject reference to stamp on every produced observation. */
-  subject: FHIRReference;
 }
 
 /**
- * An unnormalized provider payload archived verbatim to Cloud Storage instead
- * of Firestore. `dataType` becomes part of the archived blob's filename and
- * must be alphanumeric.
+ * A provider payload kept verbatim (high-frequency series, or measure types
+ * with no Grove profile). It is stored zstd-compressed in Cloud Storage and
+ * described in the exchange Bundle by a `providers-recording-document`.
  */
 export interface ProviderRawArchive {
+  /** Bare provider source-type token (e.g. Oura `heartrate`). */
+  sourceType: string;
+  /** Alphanumeric slug used in the archive's Storage file name. */
   dataType: string;
+  /** `DocumentReference.type.text`. */
+  typeText: string;
   payload: unknown;
+}
+
+export interface ProviderFetchResult {
+  /** Normalized source records (Grove drafts), one per provider record. */
+  records: ObservationRecordDraft[];
+  rawArchives: ProviderRawArchive[];
+  /**
+   * Contexts of endpoints that failed transiently. Any entry makes the sync
+   * partial: data that did arrive is still stored, but `lastSyncAt` does not
+   * advance so the window is fetched again.
+   */
+  failures: string[];
 }
 
 /**
  * Per-provider integration surface. Everything provider-specific — OAuth
  * dialect, token lifetime, webhook signature/handshake, API schema and its
- * mapping to FHIR — is confined to an implementation of this interface. The
- * shared orchestration (token storage/refresh, routing, batched writes, status
- * bookkeeping) lives in {@link HealthProviderService} and is written once.
+ * mapping to Grove drafts — is confined to an implementation of this
+ * interface. The shared orchestration (token storage/refresh, routing, Bundle
+ * building/upload, status bookkeeping) lives in {@link HealthProviderService}.
  */
 export interface HealthProviderAdapter {
   readonly id: HealthProviderId;
@@ -121,13 +125,6 @@ export interface HealthProviderAdapter {
    */
   handleWebhook(req: Request, res: Response): WebhookHandling;
 
-  /** Pull and normalize all supported observations in `[since, until]`. */
-  fetchObservations(
-    params: FetchObservationsParams,
-  ): Promise<ProviderObservation[]>;
-
-  /** Pull raw/high-frequency payloads in `[since, until]` for archival. */
-  fetchRawArchives?(
-    params: FetchObservationsParams,
-  ): Promise<ProviderRawArchive[]>;
+  /** Pull everything in `[since, until]`: normalized records and raw archives. */
+  fetchData(params: FetchDataParams): Promise<ProviderFetchResult>;
 }

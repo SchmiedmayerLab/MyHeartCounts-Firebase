@@ -1,15 +1,23 @@
 rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
-    match /users/{userId}/{allPaths=**} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
+    // `{rest=**}` also matches zero segments, so this covers every object
+    // below users/{userId}/, with `folder` its first path segment.
+    match /users/{userId}/{folder}/{rest=**} {
+      allow read: if request.auth != null && request.auth.uid == userId;
+      // Wearable-provider data is written by the backend only: the Grove
+      // exchange Bundles (providerHealthSamples/) and the raw provider
+      // archives they reference ({provider}HealthSamples/). Clients may read
+      // their own copies but never create, overwrite or delete them.
+      allow write: if request.auth != null && request.auth.uid == userId
+        && !(folder in ["providerHealthSamples", "ouraHealthSamples", "googleHealthHealthSamples", "withingsHealthSamples"]);
     }
 
     match /news/{id} {
       allow read: if true;
       allow write: if false;
     }
-    
+
     match /public/{allPaths=**} {
       allow read: if true;
       allow write: if false;

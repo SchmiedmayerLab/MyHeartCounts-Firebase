@@ -9,20 +9,37 @@ import { type Request } from "firebase-functions/v2/https";
 import { z } from "zod";
 import { getWithingsClientId, getWithingsClientSecret } from "../../../env.js";
 import {
-  type FHIRReference,
   HealthProviderId,
   type ProviderTokens,
 } from "../../../models/index.js";
 import {
-  type FetchObservationsParams,
+  type AggregationMethod,
+  GroveUrl,
+  groveWorkoutActivity,
+  type MhcMeasurement,
+  MhcMeasurements,
+  MhcUrl,
+} from "../grove/constants.js";
+import {
+  isoDate as ymd,
+  minutesFromSeconds as minutes,
+  num,
+  type ObservationDraft,
+  type ObservationRecordDraft,
+  type RecordingMethod,
+  round,
+  roundTo,
+  workoutComponent,
+} from "../grove/drafts.js";
+import { civilDay, instant, period, type SourceZone } from "../grove/time.js";
+import {
+  type FetchDataParams,
   type HealthProviderAdapter,
-  type ProviderObservation,
+  type ProviderFetchResult,
   type ProviderRawArchive,
   type WebhookHandling,
 } from "../healthProviderAdapter.js";
-import { postJson, settleEndpoint } from "../httpClient.js";
-import { buildProviderObservation } from "../observationBuilder.js";
-import { MetricSpecs, type MetricSpec } from "../providerCodes.js";
+import { postJson, ProviderAuthError, settleEndpoint } from "../httpClient.js";
 
 const AUTH_URL = "https://account.withings.com/oauth2_user/authorize2";
 const OAUTH_URL = "https://wbsapi.withings.net/v2/oauth2";
@@ -33,65 +50,105 @@ const NOTIFY_URL = "https://wbsapi.withings.net/notify";
 
 const WITHINGS_SCOPES = ["user.metrics", "user.activity", "user.info"];
 
-/** Withings `appli` notification categories we subscribe to. */
-const NOTIFY_APPLI = [1 /* weight */, 16 /* activity */, 44 /* sleep */];
+/**
+ * Withings Notify `appli` categories: 1 weight/body composition, 4 blood
+ * pressure/heart rate/SpO2/temperature, 16 activity, 44 sleep, 54 ECG.
+ */
+const NOTIFY_APPLI = [1, 4, 16, 44, 54];
 
-/** Withings integer measure types -> shared metric specs (getmeas). */
-const MEASURE_TYPE_SPECS = new Map<number, MetricSpec>([
-  [1, MetricSpecs.bodyWeight],
-  [4, MetricSpecs.height],
-  [6, MetricSpecs.bodyFatPercentage],
-  [9, MetricSpecs.bloodPressureDiastolic],
-  [10, MetricSpecs.bloodPressureSystolic],
-  [11, MetricSpecs.heartRate],
-  [54, MetricSpecs.oxygenSaturation],
-  [71, MetricSpecs.bodyTemperature],
-  [123, MetricSpecs.vo2Max],
-  [155, MetricSpecs.cardiovascularAge],
-]);
+/** Withings envelope statuses that mean the access token is unusable. */
+const AUTH_FAILURE_STATUSES = new Set([100, 101, 102, 200, 401]);
+
+/** Safety cap on `more`/`offset` pagination. */
+const MAX_PAGES = 200;
 
 /**
- * Withings measure types with no shared MetricSpec (body composition beyond
- * weight/fat%, ECG-derived interval durations, AFib classification, nerve
- * health, etc.) — no HealthKit-equivalent construct exists for most of these,
- * and some (AFib, ECG intervals) are diagnostic-adjacent enough that treating
- * a raw provider code as a physiological quantity would misrepresent it.
- * getmeas is already being called for the mapped types above, so these are
- * fetched too and archived raw rather than silently dropped.
+ * Withings `getmeas` measure types with a Grove profile (catalog rows
+ * `getmeas:N`). Values are `value × 10^unit` in the unit the catalog names;
+ * height arrives in metres and is converted to the profile's centimetres.
+ * Types 9 and 10 are only emitted together as one blood-pressure panel.
  */
-const UNMAPPED_MEASURE_TYPES = [
-  5, // fat-free mass
-  8, // fat mass weight
-  73, // skin temperature
-  76, // muscle mass
-  77, // hydration
-  88, // bone mass
-  91, // pulse wave velocity
-  130, // AFib result
-  135, // QRS interval (ECG)
-  136, // PR interval (ECG)
-  137, // QT interval (ECG)
-  138, // corrected QT interval (ECG)
-  139, // AFib result (PPG)
-  167, // nerve health score
-  168, // extracellular water
-  169, // intracellular water
-  170, // visceral fat
-  174, // segmental fat mass
-  175, // segmental muscle mass
-  196, // electrodermal activity (feet)
+const MEASURE_TYPES: Partial<
+  Record<number, { measurement: string; scale?: number }>
+> = {
+  1: { measurement: "body-weight" },
+  4: { measurement: "body-height", scale: 100 },
+  5: { measurement: "lean-body-mass" },
+  6: { measurement: "body-fat-percentage" },
+  8: { measurement: "body-fat-mass" },
+  11: { measurement: "heart-rate" },
+  54: { measurement: "oxygen-saturation" },
+  71: { measurement: "body-temperature" },
+  73: { measurement: "skin-temperature" },
+  76: { measurement: "muscle-mass" },
+  77: { measurement: "body-water-mass" },
+  88: { measurement: "bone-mass" },
+  91: { measurement: "withings-pulse-wave-velocity" },
+  123: { measurement: "vo2-max" },
+  135: { measurement: "qrs-duration" },
+  136: { measurement: "pr-interval" },
+  137: { measurement: "qt-interval" },
+  138: { measurement: "corrected-qt-interval" },
+  155: { measurement: "withings-vascular-age" },
+  167: { measurement: "withings-nerve-health-score" },
+  168: { measurement: "extracellular-water-mass" },
+  169: { measurement: "intracellular-water-mass" },
+  170: { measurement: "withings-visceral-fat-index" },
+  196: { measurement: "electrodermal-activity" },
+};
+
+/** AFib screening results; only a positive result (`1`) is emitted. */
+const AFIB_TYPES: Partial<Record<number, string>> = {
+  130: "withings-atrial-fibrillation-notification-ecg",
+  139: "withings-atrial-fibrillation-notification-ppg",
+};
+
+/** Catalog `intentionally-unsupported` types, kept only as a raw archive. */
+const RAW_ONLY_MEASURE_TYPES = [174, 175];
+
+const ALL_MEASURE_TYPES = [
+  ...Object.keys(MEASURE_TYPES).map(Number),
+  ...Object.keys(AFIB_TYPES).map(Number),
+  9,
+  10,
 ];
 
-const epochSeconds = (date: Date): number => Math.floor(date.getTime() / 1000);
-const ymd = (date: Date): string => date.toISOString().slice(0, 10);
-const minutesFromSeconds = (
-  seconds: number | null | undefined,
-): number | undefined =>
-  seconds === null || seconds === undefined ?
-    undefined
-  : Math.round((seconds / 60) * 100) / 100;
+/** Withings workout `category` → Grove workout activity. */
+const WORKOUT_CATEGORIES: Partial<Record<number, string>> = {
+  1: "walking",
+  2: "running",
+  3: "hiking",
+  6: "cycling",
+  7: "swimming",
+  12: "tennis",
+  13: "table-tennis",
+  14: "squash",
+  15: "badminton",
+  16: "strength-training",
+  18: "elliptical",
+  19: "pilates",
+  20: "basketball",
+  21: "soccer",
+  22: "american-football",
+  24: "volleyball",
+  27: "golf",
+  28: "yoga",
+  29: "dancing",
+  30: "boxing",
+  33: "martial-arts",
+  34: "skiing",
+  35: "snowboarding",
+  187: "rowing",
+  188: "dancing",
+  191: "baseball",
+  306: "walking",
+  307: "running",
+  308: "cycling",
+};
 
-// --- Raw response shapes (only the fields we consume) ----------------------
+const epochSeconds = (date: Date): number => Math.floor(date.getTime() / 1000);
+
+// --- Raw response shapes ------------------------------------------------------
 
 interface WithingsEnvelope<T> {
   status: number;
@@ -107,45 +164,51 @@ interface WithingsTokenBody {
   scope?: string;
 }
 
-interface WithingsMeasure {
+export interface WithingsMeasure {
   value: number;
   type: number;
   unit: number;
 }
-interface WithingsMeasureGroup {
+export interface WithingsMeasureGroup {
   grpid: number;
   date: number;
+  attrib?: number;
+  category?: number;
+  timezone?: string;
   measures: WithingsMeasure[];
 }
-interface WithingsActivity {
+export interface WithingsActivity {
   date: string;
+  timezone?: string;
   steps?: number;
   distance?: number;
   calories?: number;
+  totalcalories?: number;
+  elevation?: number;
+  soft?: number;
+  moderate?: number;
+  intense?: number;
+  active?: number;
 }
-interface WithingsSleepSeries {
+export interface WithingsSleepSummary {
   id: number;
   startdate: number;
   enddate: number;
   date?: string;
-  data?: {
-    deepsleepduration?: number;
-    remsleepduration?: number;
-    lightsleepduration?: number;
-    wakeupduration?: number;
-    hr_average?: number;
-    rr_average?: number;
-  };
+  timezone?: string;
+  data?: Record<string, number | undefined>;
 }
-interface WithingsWorkout {
+export interface WithingsWorkout {
   id: number;
+  category?: number;
+  timezone?: string;
+  attrib?: number;
   startdate: number;
   enddate: number;
+  data?: Record<string, number | undefined>;
 }
 
-// --- Response / notification validation (zod) ------------------------------
-// Withings payloads are untrusted; validate the fields we depend on and stay
-// permissive about the rest.
+// --- Validation (zod) ----------------------------------------------------------
 
 const withingsTokenBodySchema = z
   .object({
@@ -175,122 +238,334 @@ const tokensFrom = (body: WithingsTokenBody): ProviderTokens => ({
 
 // --- Pure normalization (exported for unit tests) --------------------------
 
-const midday = (day: string): Date => new Date(`${day}T12:00:00Z`);
+export interface WithingsRawData {
+  measureGroups?: WithingsMeasureGroup[];
+  /** Top-level `timezone` of the getmeas body. */
+  measureTimezone?: string;
+  activities?: WithingsActivity[];
+  sleep?: WithingsSleepSummary[];
+  workouts?: WithingsWorkout[];
+}
+
+/** Withings `attrib` 2 and 4 are user-entered values. */
+const recordingMethodOf = (
+  attrib: number | undefined,
+): RecordingMethod | undefined =>
+  attrib === 2 || attrib === 4 ? "manual-entry" : undefined;
+
+const single = (
+  sourceType: string,
+  nativeRecordId: string,
+  output: ObservationDraft,
+): ObservationRecordDraft => ({
+  kind: "observations",
+  sourceType,
+  nativeRecordId,
+  occurred: output.effective,
+  outputs: [output],
+});
+
+/** One `getsummary` / `getactivity` field, catalog (Grove id) or MHC extra. */
+interface FieldMapping {
+  field: string;
+  measurement: string | MhcMeasurement;
+  convert?: (value: number) => number | undefined;
+  method?: AggregationMethod;
+  discriminator?: string;
+  outsideCatalog?: boolean;
+}
+
+const SLEEP_FIELDS: FieldMapping[] = [
+  {
+    field: "deepsleepduration",
+    measurement: "deep-sleep-duration",
+    convert: minutes,
+  },
+  {
+    field: "remsleepduration",
+    measurement: "rem-sleep-duration",
+    convert: minutes,
+  },
+  {
+    field: "lightsleepduration",
+    measurement: "light-sleep-duration",
+    convert: minutes,
+  },
+  {
+    field: "wakeupduration",
+    measurement: "sleep-awake-duration",
+    convert: minutes,
+  },
+  {
+    field: "hr_average",
+    measurement: "sleep-heart-rate",
+    method: "session-mean",
+  },
+  {
+    field: "rr_average",
+    measurement: "respiratory-rate-average",
+    method: "session-mean",
+  },
+  // Out-of-catalog fields (Grove measurement where one fits, else MHC).
+  {
+    field: "total_sleep_time",
+    measurement: "sleep-duration",
+    convert: (s) => round(s / 3600, 4),
+    outsideCatalog: true,
+  },
+  {
+    field: "hr_min",
+    measurement: "sleep-heart-rate",
+    method: "session-minimum",
+    outsideCatalog: true,
+  },
+  { field: "hr_max", measurement: MhcMeasurements.sleepHeartRateMaximum },
+  { field: "rr_min", measurement: MhcMeasurements.sleepRespiratoryRateMinimum },
+  { field: "rr_max", measurement: MhcMeasurements.sleepRespiratoryRateMaximum },
+  {
+    field: "total_timeinbed",
+    measurement: MhcMeasurements.timeInBed,
+    convert: minutes,
+    method: "session-total",
+  },
+  { field: "sleep_score", measurement: MhcMeasurements.sleepScore },
+  // Withings reports efficiency as a ratio in [0, 1].
+  {
+    field: "sleep_efficiency",
+    measurement: MhcMeasurements.sleepEfficiency,
+    convert: (r) => round(r * 100, 2),
+  },
+  {
+    field: "sleep_latency",
+    measurement: MhcMeasurements.sleepLatency,
+    convert: minutes,
+  },
+  { field: "wakeupcount", measurement: MhcMeasurements.sleepAwakeningCount },
+  {
+    field: "snoring",
+    measurement: MhcMeasurements.snoringDuration,
+    convert: minutes,
+    method: "session-total",
+  },
+  {
+    field: "snoringepisodecount",
+    measurement: MhcMeasurements.snoringEpisodeCount,
+  },
+  {
+    field: "breathing_disturbances_intensity",
+    measurement: MhcMeasurements.breathingDisturbanceIndex,
+  },
+];
+
+const ACTIVITY_FIELDS: FieldMapping[] = [
+  { field: "steps", measurement: "step-count" },
+  { field: "distance", measurement: "distance" },
+  { field: "calories", measurement: "active-energy" },
+  {
+    field: "totalcalories",
+    measurement: MhcMeasurements.totalEnergyBurned,
+    method: "daily-total",
+  },
+  {
+    field: "elevation",
+    measurement: MhcMeasurements.elevationGain,
+    method: "daily-total",
+  },
+  {
+    field: "soft",
+    measurement: MhcMeasurements.lowActivityDuration,
+    convert: minutes,
+    method: "daily-total",
+  },
+  {
+    field: "moderate",
+    measurement: MhcMeasurements.mediumActivityDuration,
+    convert: minutes,
+    method: "daily-total",
+  },
+  {
+    field: "intense",
+    measurement: MhcMeasurements.highActivityDuration,
+    convert: minutes,
+    method: "daily-total",
+  },
+  {
+    field: "active",
+    measurement: MhcMeasurements.activeDuration,
+    convert: minutes,
+    method: "daily-total",
+  },
+];
 
 export const normalizeWithings = (
-  raw: {
-    measureGroups?: WithingsMeasureGroup[];
-    activities?: WithingsActivity[];
-    sleep?: WithingsSleepSeries[];
-    workouts?: WithingsWorkout[];
-  },
-  subject: FHIRReference,
-): ProviderObservation[] => {
-  const out: ProviderObservation[] = [];
-  const add = (
-    spec: MetricSpec,
-    value: number | undefined,
-    effective: Date | { start: Date; end: Date },
-    sampleId: string,
-  ) => {
-    if (value === undefined || Number.isNaN(value)) return;
-    out.push(
-      buildProviderObservation({
-        provider: HealthProviderId.withings,
-        sourceName: "Withings",
-        subject,
-        spec,
-        value,
-        effective,
-        sampleId,
-      }),
-    );
-  };
+  raw: WithingsRawData,
+): ObservationRecordDraft[] => {
+  const records: ObservationRecordDraft[] = [];
 
   for (const group of raw.measureGroups ?? []) {
-    const effective = new Date(group.date * 1000);
+    const zone: SourceZone = { iana: group.timezone ?? raw.measureTimezone };
+    const effective = instant(group.date * 1000, zone);
+    const recordingMethod = recordingMethodOf(group.attrib);
+    const nativeId = String(group.grpid);
+    const valueOf = (measure: WithingsMeasure) =>
+      measure.value * Math.pow(10, measure.unit);
+
     for (const measure of group.measures) {
-      const spec = MEASURE_TYPE_SPECS.get(measure.type);
-      if (!spec) continue;
-      const value = measure.value * Math.pow(10, measure.unit);
-      add(spec, value, effective, `${group.grpid}-${measure.type}`);
+      const spec = MEASURE_TYPES[measure.type];
+      if (spec !== undefined) {
+        records.push(
+          single(`getmeas:${measure.type}`, nativeId, {
+            measurement: spec.measurement,
+            effective,
+            recordingMethod,
+            value: {
+              quantity: roundTo(valueOf(measure) * (spec.scale ?? 1), 4),
+            },
+          }),
+        );
+        continue;
+      }
+      const afib = AFIB_TYPES[measure.type];
+      if (afib !== undefined && valueOf(measure) === 1) {
+        records.push(
+          single(`getmeas:${measure.type}`, nativeId, {
+            measurement: afib,
+            effective,
+            recordingMethod,
+            value: {
+              concept: [
+                {
+                  system: `https://grovealliance.org/fhir/withings/CodeSystem/${afib}`,
+                  code: "signs-detected",
+                  display: "Signs Detected",
+                },
+              ],
+            },
+          }),
+        );
+      }
+    }
+
+    // Blood pressure: one panel only when exactly one systolic (10) and one
+    // diastolic (9) value share this measure group; otherwise neither.
+    const systolic = group.measures.filter((m) => m.type === 10);
+    const diastolic = group.measures.filter((m) => m.type === 9);
+    if (systolic.length === 1 && diastolic.length === 1) {
+      const component = (code: string, value: number) => ({
+        code: { system: GroveUrl.loinc, code },
+        value: {
+          quantity: roundTo(value, 2),
+          unit: { code: "mm[Hg]", unit: "mmHg" },
+        },
+      });
+      records.push(
+        single("getmeas:9+10", nativeId, {
+          measurement: "blood-pressure",
+          effective,
+          recordingMethod,
+          components: [
+            component("8480-6", valueOf(systolic[0])),
+            component("8462-4", valueOf(diastolic[0])),
+          ],
+        }),
+      );
     }
   }
 
   for (const activity of raw.activities ?? []) {
-    add(
-      MetricSpecs.steps,
-      activity.steps,
-      midday(activity.date),
-      activity.date,
-    );
-    add(
-      MetricSpecs.distanceWalkingRunning,
-      activity.distance,
-      midday(activity.date),
-      activity.date,
-    );
-    add(
-      MetricSpecs.activeEnergyBurned,
-      activity.calories,
-      midday(activity.date),
-      activity.date,
-    );
+    const effective = civilDay(activity.date, { iana: activity.timezone });
+    if (effective === undefined) continue;
+    for (const mapping of ACTIVITY_FIELDS) {
+      const rawValue = num(
+        (activity as unknown as Record<string, unknown>)[mapping.field],
+      );
+      if (rawValue === undefined) continue;
+      const value = mapping.convert ? mapping.convert(rawValue) : rawValue;
+      if (value === undefined) continue;
+      records.push(
+        single(`getactivity:${mapping.field}`, activity.date, {
+          measurement: mapping.measurement,
+          effective,
+          method: mapping.method,
+          outsideCatalog: mapping.outsideCatalog,
+          value: { quantity: value },
+        }),
+      );
+    }
   }
 
   for (const series of raw.sleep ?? []) {
-    const period = {
-      start: new Date(series.startdate * 1000),
-      end: new Date(series.enddate * 1000),
-    };
-    const id = String(series.id);
-    add(
-      MetricSpecs.sleepDeep,
-      minutesFromSeconds(series.data?.deepsleepduration),
-      period,
-      id,
-    );
-    add(
-      MetricSpecs.sleepRem,
-      minutesFromSeconds(series.data?.remsleepduration),
-      period,
-      id,
-    );
-    add(
-      MetricSpecs.sleepLight,
-      minutesFromSeconds(series.data?.lightsleepduration),
-      period,
-      id,
-    );
-    add(
-      MetricSpecs.sleepAwake,
-      minutesFromSeconds(series.data?.wakeupduration),
-      period,
-      id,
-    );
-    add(
-      MetricSpecs.restingHeartRate,
-      series.data?.hr_average,
-      period.start,
-      id,
-    );
-    add(MetricSpecs.respiratoryRate, series.data?.rr_average, period.start, id);
+    if (!(series.enddate > series.startdate)) continue;
+    const effective = period(series.startdate * 1000, series.enddate * 1000, {
+      iana: series.timezone,
+    });
+    for (const mapping of SLEEP_FIELDS) {
+      const rawValue = num(series.data?.[mapping.field]);
+      if (rawValue === undefined) continue;
+      const value = mapping.convert ? mapping.convert(rawValue) : rawValue;
+      if (value === undefined) continue;
+      records.push(
+        single(`getsummary:${mapping.field}`, String(series.id), {
+          measurement: mapping.measurement,
+          effective,
+          method: mapping.method,
+          outsideCatalog: mapping.outsideCatalog,
+          value: { quantity: value },
+        }),
+      );
+    }
   }
 
   for (const workout of raw.workouts ?? []) {
-    const start = new Date(workout.startdate * 1000);
-    const end = new Date(workout.enddate * 1000);
-    const minutes =
-      Math.round(((end.getTime() - start.getTime()) / 60000) * 100) / 100;
-    add(
-      MetricSpecs.workoutDuration,
-      minutes,
-      { start, end },
-      String(workout.id),
+    if (!(workout.enddate > workout.startdate)) continue;
+    const effective = period(workout.startdate * 1000, workout.enddate * 1000, {
+      iana: workout.timezone,
+    });
+    const data = workout.data ?? {};
+    const activity =
+      workout.category !== undefined ?
+        (WORKOUT_CATEGORIES[workout.category] ??
+        groveWorkoutActivity(undefined))
+      : "other";
+    records.push(
+      single("getworkouts:interval", String(workout.id), {
+        measurement: "workout",
+        effective,
+        recordingMethod: recordingMethodOf(workout.attrib),
+        value: {
+          concept: [
+            { system: GroveUrl.workoutActivity, code: activity },
+            ...(workout.category !== undefined ?
+              [
+                {
+                  system: MhcUrl.providerToken("withings", "workout-category"),
+                  code: String(workout.category),
+                },
+              ]
+            : []),
+          ],
+        },
+        components: [
+          ...workoutComponent("active-duration", num(data.effduration), "s"),
+          ...workoutComponent("active-energy-sum", num(data.calories), "kcal"),
+          ...workoutComponent("distance-sum", num(data.distance), "m"),
+          ...workoutComponent("heart-rate-avg", num(data.hr_average), "/min"),
+          ...workoutComponent("heart-rate-max", num(data.hr_max), "/min"),
+          ...workoutComponent("heart-rate-min", num(data.hr_min), "/min"),
+          ...workoutComponent("step-count-sum", num(data.steps), "{steps}"),
+          ...workoutComponent("elevation-gain", num(data.elevation), "m"),
+          ...workoutComponent(
+            "swimming-stroke-count-sum",
+            num(data.strokes),
+            "{strokes}",
+          ),
+          ...workoutComponent("pool-lap-count", num(data.pool_laps), "{laps}"),
+        ],
+      }),
     );
   }
 
-  return out;
+  return records;
 };
 
 /**
@@ -313,6 +588,21 @@ export const parseWithingsNotification = (
     since: Number.isFinite(start) ? new Date(start * 1000) : undefined,
     until: Number.isFinite(end) ? new Date(end * 1000) : undefined,
   };
+};
+
+/** Throw the right error for a non-zero Withings envelope status. */
+export const checkWithingsEnvelope = (
+  context: string,
+  envelope: WithingsEnvelope<unknown>,
+): void => {
+  if (envelope.status === 0) return;
+  const error = new Error(
+    `${context} failed: status=${envelope.status} ${envelope.error ?? ""}`,
+  );
+  if (AUTH_FAILURE_STATUSES.has(envelope.status)) {
+    throw new ProviderAuthError(context, error);
+  }
+  throw error;
 };
 
 export class WithingsAdapter implements HealthProviderAdapter {
@@ -387,8 +677,7 @@ export class WithingsAdapter implements HealthProviderAdapter {
   }): Promise<void> {
     // Withings `revoke` requires the exact `callbackurl` that was subscribed (in
     // addition to `appli`); omitting it makes the call fail with a non-zero
-    // status and leaves the subscription live. The callback URL is deterministic
-    // from the deployment origin, so the service passes the current one.
+    // status and leaves the subscription live.
     if (!params.callbackUrl) {
       logger.warn(
         "WithingsAdapter: removeSubscription called without callbackUrl; skipping revoke",
@@ -433,129 +722,132 @@ export class WithingsAdapter implements HealthProviderAdapter {
     };
   }
 
-  async fetchObservations(
-    params: FetchObservationsParams,
-  ): Promise<ProviderObservation[]> {
-    const { tokens, since, until, subject } = params;
+  async fetchData(params: FetchDataParams): Promise<ProviderFetchResult> {
+    const { tokens, since, until } = params;
     const token = tokens.accessToken;
+    const failures: string[] = [];
+    const epochRange = {
+      startdate: String(epochSeconds(since)),
+      enddate: String(epochSeconds(until)),
+    };
+    const ymdRange = { startdateymd: ymd(since), enddateymd: ymd(until) };
 
-    // Isolate per-endpoint failures so a transient error on one measure type
-    // doesn't discard the others (an auth failure still propagates).
-    const [measures, activity, sleep, workouts] = await Promise.all([
+    const [
+      measures,
+      activities,
+      sleep,
+      workouts,
+      activityIntraday,
+      sleepIntraday,
+      rawOnly,
+    ] = await Promise.all([
       settleEndpoint(
         "Withings getmeas",
-        this.call<{ measuregrps?: WithingsMeasureGroup[] }>(
-          MEASURE_URL,
-          token,
-          {
-            action: "getmeas",
-            meastypes: Array.from(MEASURE_TYPE_SPECS.keys()).join(","),
-            category: "1",
-            startdate: String(epochSeconds(since)),
-            enddate: String(epochSeconds(until)),
-          },
-        ),
+        this.paged<WithingsMeasureGroup>(MEASURE_URL, token, "measuregrps", {
+          action: "getmeas",
+          meastypes: ALL_MEASURE_TYPES.join(","),
+          category: "1",
+          ...epochRange,
+        }),
+        failures,
       ),
       settleEndpoint(
         "Withings getactivity",
-        this.call<{ activities?: WithingsActivity[] }>(V2_MEASURE_URL, token, {
+        this.paged<WithingsActivity>(V2_MEASURE_URL, token, "activities", {
           action: "getactivity",
-          startdateymd: ymd(since),
-          enddateymd: ymd(until),
-          data_fields: "steps,distance,calories",
+          ...ymdRange,
+          data_fields: ACTIVITY_FIELDS.map((f) => f.field).join(","),
         }),
+        failures,
       ),
       settleEndpoint(
         "Withings getsummary",
-        this.call<{ series?: WithingsSleepSeries[] }>(V2_SLEEP_URL, token, {
+        this.paged<WithingsSleepSummary>(V2_SLEEP_URL, token, "series", {
           action: "getsummary",
-          startdateymd: ymd(since),
-          enddateymd: ymd(until),
-          data_fields:
-            "deepsleepduration,remsleepduration,lightsleepduration,wakeupduration,hr_average,rr_average",
+          ...ymdRange,
+          data_fields: SLEEP_FIELDS.map((f) => f.field).join(","),
         }),
+        failures,
       ),
       settleEndpoint(
         "Withings getworkouts",
-        this.call<{ series?: WithingsWorkout[] }>(V2_MEASURE_URL, token, {
+        this.paged<WithingsWorkout>(V2_MEASURE_URL, token, "series", {
           action: "getworkouts",
-          startdateymd: ymd(since),
-          enddateymd: ymd(until),
-          data_fields: "calories,distance,effduration",
+          ...ymdRange,
+          data_fields:
+            "calories,distance,effduration,hr_average,hr_min,hr_max,steps,elevation,strokes,pool_laps",
         }),
+        failures,
+      ),
+      // Intraday series are irregular/high frequency: kept verbatim as raw
+      // recordings (catalog `mapped-standard`).
+      settleEndpoint(
+        "Withings getintradayactivity",
+        this.call<unknown>(V2_MEASURE_URL, token, {
+          action: "getintradayactivity",
+          ...epochRange,
+          data_fields: "steps,calories,distance,elevation,heart_rate,spo2_auto",
+        }),
+        failures,
+      ),
+      settleEndpoint(
+        "Withings sleep get",
+        this.call<unknown>(V2_SLEEP_URL, token, {
+          action: "get",
+          ...epochRange,
+          data_fields: "hr,rr,snoring,sdnn_1,rmssd",
+        }),
+        failures,
+      ),
+      settleEndpoint(
+        "Withings getmeas (segmental)",
+        this.call<{ measuregrps?: unknown[] }>(MEASURE_URL, token, {
+          action: "getmeas",
+          meastypes: RAW_ONLY_MEASURE_TYPES.join(","),
+          category: "1",
+          ...epochRange,
+        }),
+        failures,
       ),
     ]);
 
-    return normalizeWithings(
-      {
-        measureGroups: measures?.measuregrps,
-        activities: activity?.activities,
-        sleep: sleep?.series,
-        workouts: workouts?.series,
-      },
-      subject,
-    );
-  }
-
-  /**
-   * Withings intraday endpoints only cover a bounded window per call, so a
-   * `since`/`until` spanning a full scheduled backfill may return a partial or
-   * empty result rather than an error.
-   */
-  async fetchRawArchives(
-    params: FetchObservationsParams,
-  ): Promise<ProviderRawArchive[]> {
-    const { tokens, since, until } = params;
-    const token = tokens.accessToken;
-    const archives: ProviderRawArchive[] = [];
-
-    const activityIntraday = await settleEndpoint(
-      "Withings getintradayactivity",
-      this.call<unknown>(V2_MEASURE_URL, token, {
-        action: "getintradayactivity",
-        startdate: String(epochSeconds(since)),
-        enddate: String(epochSeconds(until)),
-        data_fields: "steps,calories,distance,elevation,heart_rate,spo2_auto",
-      }),
-    );
+    const rawArchives: ProviderRawArchive[] = [];
     if (activityIntraday !== undefined) {
-      archives.push({
+      rawArchives.push({
+        sourceType: "activityIntraday",
         dataType: "activityIntraday",
+        typeText: "Withings intraday activity",
         payload: activityIntraday,
       });
     }
-
-    const sleepIntraday = await settleEndpoint(
-      "Withings sleep get",
-      this.call<unknown>(V2_SLEEP_URL, token, {
-        action: "get",
-        startdate: String(epochSeconds(since)),
-        enddate: String(epochSeconds(until)),
-        data_fields: "hr,rr,snoring,sdnn_1,rmssd",
-      }),
-    );
     if (sleepIntraday !== undefined) {
-      archives.push({ dataType: "sleepIntraday", payload: sleepIntraday });
+      rawArchives.push({
+        sourceType: "sleepIntraday",
+        dataType: "sleepIntraday",
+        typeText: "Withings intraday sleep",
+        payload: sleepIntraday,
+      });
     }
-
-    const unmappedMeasures = await settleEndpoint(
-      "Withings getmeas (unmapped types)",
-      this.call<unknown>(MEASURE_URL, token, {
-        action: "getmeas",
-        meastypes: UNMAPPED_MEASURE_TYPES.join(","),
-        category: "1",
-        startdate: String(epochSeconds(since)),
-        enddate: String(epochSeconds(until)),
-      }),
-    );
-    if (unmappedMeasures !== undefined) {
-      archives.push({
-        dataType: "measuresUnmapped",
-        payload: unmappedMeasures,
+    if ((rawOnly?.measuregrps?.length ?? 0) > 0) {
+      rawArchives.push({
+        sourceType: "getmeas:174+175",
+        dataType: "measuresSegmental",
+        typeText: "Withings segmental body composition",
+        payload: rawOnly,
       });
     }
 
-    return archives;
+    return {
+      records: normalizeWithings({
+        measureGroups: measures?.items,
+        measureTimezone: measures?.timezone,
+        activities: activities?.items,
+        sleep: sleep?.items,
+        workouts: workouts?.items,
+      }),
+      rawArchives,
+      failures,
+    };
   }
 
   // Helpers ------------------------------------------------------------------
@@ -581,24 +873,50 @@ export class WithingsAdapter implements HealthProviderAdapter {
     return withingsTokenBodySchema.parse(envelope.body);
   }
 
+  /** Follow Withings `more`/`offset` pagination, concatenating `listKey`. */
+  // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-parameters -- T types the concatenated list for callers
+  private async paged<T>(
+    url: string,
+    accessToken: string,
+    listKey: string,
+    params: Record<string, string>,
+  ): Promise<{ items: T[]; timezone?: string }> {
+    const items: T[] = [];
+    let timezone: string | undefined;
+    let offset: string | undefined;
+    for (let page = 0; page < MAX_PAGES; page++) {
+      const body = await this.call<Record<string, unknown>>(url, accessToken, {
+        ...params,
+        ...(offset !== undefined ? { offset } : {}),
+      });
+      const list = body[listKey];
+      if (Array.isArray(list)) items.push(...(list as T[]));
+      if (typeof body.timezone === "string") timezone ??= body.timezone;
+      const more = body.more === true || body.more === 1 || body.more === "1";
+      const nextOffset = body.offset;
+      if (!more || nextOffset === undefined || nextOffset === null) {
+        return { items, timezone };
+      }
+      offset = String(nextOffset as string | number);
+    }
+    throw new Error(`Withings ${params.action}: reached ${MAX_PAGES}-page cap`);
+  }
+
   private async call<T>(
     url: string,
     accessToken: string,
     params: Record<string, string>,
   ): Promise<T> {
+    const context = `Withings ${params.action}`;
     const envelope = await postJson<WithingsEnvelope<T>>(
       url,
       {
         headers: { Authorization: `Bearer ${accessToken}` },
         body: new URLSearchParams(params),
       },
-      `Withings ${params.action}`,
+      context,
     );
-    if (envelope.status !== 0) {
-      throw new Error(
-        `Withings ${params.action} failed: status=${envelope.status} ${envelope.error ?? ""}`,
-      );
-    }
+    checkWithingsEnvelope(context, envelope);
     return envelope.body;
   }
 }

@@ -26,15 +26,13 @@ service cloud.firestore {
 
     match /users/{userId}/{collectionName}/{documentId} {
 
-      // documentSnapshots is server-only snapshot history, healthProviderTokens
-      // holds OAuth secrets, and healthProviderRawArchives points at internal
-      // Cloud Storage paths; all three must stay server-only.
+      // documentSnapshots is server-only snapshot history and
+      // healthProviderTokens holds OAuth secrets; both must stay server-only.
       // healthProviderConnections is server-written status the client may read
       // (handled by the dedicated rule below), so it is excluded here too.
       allow read, write: if isUser(userId)
         && collectionName != "documentSnapshots"
         && collectionName != "healthProviderTokens"
-        && collectionName != "healthProviderRawArchives"
         && collectionName != "healthProviderConnections";
     }
 

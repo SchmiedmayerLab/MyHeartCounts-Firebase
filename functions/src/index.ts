@@ -44,6 +44,8 @@ export * from "./functions/disconnectHealthProvider.js";
 export * from "./functions/healthProviderOAuthCallback.js";
 export * from "./functions/healthProviderWebhooks.js";
 export * from "./functions/healthProviderBackfill.js";
+export * from "./functions/syncHealthProvider.js";
+export * from "./functions/onHealthProviderConnectionWritten.js";
 export * from "./functions/joinWaitlist.js";
 export * from "./functions/updateStaticData.js";
 export * from "./functions/updateUserInformation.js";

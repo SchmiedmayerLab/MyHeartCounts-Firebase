@@ -58,10 +58,8 @@ My Heart Counts Firebase makes extensive usage of both the Firestore Database (N
 |`/users/{USER-ID}/HealthObservations_{HEALTHKIT.IDENTIFIER}/{UUID}`|FHIR Observation for given health kit type|See [FHIR observation documentation](https://hl7.org/fhir/R4/observation.html)|
 |`/users/{USER-ID}/HealthObservations_{SENSORKIT.IDENTIFIER}/{Timestamp}`|FHIR Observation for given sensor kit type|See [FHIR observation documentation](https://hl7.org/fhir/R4/observation.html)|
 |`/users/{USER-ID}/healthProviderTokens/{PROVIDER}`|**Server-only** OAuth tokens for a connected third-party provider (`oura`/`googleHealth`/`withings`). Locked out of client access in `firestore.rules`.|`provider`, `accessToken`, `refreshToken`, `expiresAt`, `scopes`, `providerUserId`, `updatedAt`, `subscriptionId`|
-|`/users/{USER-ID}/healthProviderConnections/{PROVIDER}`|Client-readable connection status for a third-party provider (no secrets); server-written only.|`provider`, `status` (`connected`/`disconnected`/`error`), `scopes`, `connectedAt`, `lastSyncAt`, `lastSyncStatus`, `lastError`|
-|`/users/{USER-ID}/{OuraObservations,GoogleHealthObservations,WithingsObservations}_{METRIC}/{PROVIDER}-{SAMPLE-ID}`|Normalized FHIR Observations pulled from a third-party provider. Metric is a curated core (e.g. `heartRate`, `restingHeartRate`, `steps`, `sleepDuration`, `oxygenSaturation`).|See [FHIR observation documentation](https://hl7.org/fhir/R4/observation.html)|
-|`/users/{USER-ID}/healthProviderRawArchives/{UUID}`|**Server-only** pointers to zstd-compressed raw/high-frequency provider payloads (e.g. continuous heart rate) archived in Cloud Storage rather than normalized into per-sample documents.|`provider`, `dataType`, `storagePath`, `byteSize`, `sha256`, `since`, `until`, `createdAt`|
-|`/healthProviderAuthRequests/{STATE}`|**Server-only**, short-lived pending OAuth state (with PKCE verifier) spanning the redirect round-trip. Root collection, default-deny.|`provider`, `userId`, `state`, `redirectUri`, `codeVerifier`, `createdAt`, `expiresAt`|
+|`/users/{USER-ID}/healthProviderConnections/{PROVIDER}`|Client-readable connection status for a third-party provider (no secrets); server-written only.|`provider`, `status` (`connected`/`disconnected`/`error`), `scopes`, `connectedAt`, `lastSyncAt`, `lastSyncAttemptAt`, `initialSyncCompletedAt`, `lastSyncStatus`, `lastError` (code)|
+|`/healthProviderAuthRequests/{STATE}`|**Server-only**, short-lived (15 min, TTL on `expiresAt`), single-use pending OAuth state spanning the redirect round-trip. Root collection, default-deny.|`provider`, `userId`, `state`, `redirectUri`, `codeVerifier`, `createdAt`, `expiresAt`|
 |`/healthProviderUserIndex/{PROVIDER}:{PROVIDER-USER-ID}`|**Server-only** reverse lookup mapping a provider's user id back to our `{USER-ID}`(s) for webhook routing. A shared provider account may map to more than one user. Root collection, default-deny.|`provider`, `providerUserId`, `userIds`|
 
 #### User Document Fields
@@ -113,55 +111,38 @@ The following table provides an overview of all fields in the `/users/{USER-ID}`
 |`/user/{USER-ID}/historicalHealthSamples/{HEALTHKIT.IDENTIFIER}{UUID}.json.zstd`|We collect health samples that were recorded before the user enrolled into the app, compress them via zstd and store them as-is in the folder historicalHealthSamples for future analytics|
 |`/user/{USER-ID}/liveHealthSamples/{UUID}.json.zstd`|Most recorded ongoing (new) health samples get directly uploaded into the Firestore NoSQL Database - however, if a large amount of data has accumulated, we archive these samples for server-side decoding and upload them into liveHealthSamples. **This folder will be empty most of the time!** On Upload, the function [onArchivedLiveHealthSampleUploaded.ts](functions/src/functions/onArchivedLiveHealthSampleUploaded.ts) gets triggered which upon successful unpacking and storing into the Firestore Database deletes the live health sample archive.|
 |`/user/{USER-ID}/SensorKit/{SENSORKIT.IDENTIFIER}/{UUID}.csv.zstd`|Samples from Apple's SensorKit Framework, sorted in sub-folders.|
+|`/users/{USER-ID}/providerHealthSamples/{PROVIDER}/{PROVIDER}_{SOURCE-TYPE}_{HASH}.json.zstd`|Grove FHIR exchange Bundles encoded from connected wearable providers (Oura, Withings, Google Health). Server-written, client read-only.|
+|`/users/{USER-ID}/{PROVIDER}HealthSamples/{PROVIDER}_{DATA-TYPE}_{UUID}.json.zstd`|Raw provider payloads (e.g. continuous heart rate), referenced from the Bundles as recording DocumentReferences. Server-written, client read-only.|
 
 ### Third-Party Health Data Providers (Oura, Google Health, Withings)
 
-Participants can connect wearables from Oura, Withings, and Fitbit/Google/Android devices via the Google Health API. To avoid duplicating logic across the iOS and Android apps, **all** provider logic — OAuth token exchange/refresh, webhook handling, polling, and normalization to FHIR — lives in these Cloud Functions. The mobile apps only open a consent URL and read connection status.
+Participants can connect Oura, Withings and Google Health (Fitbit / Pixel Watch) accounts. All provider logic (OAuth, token refresh, webhooks, polling and FHIR encoding) lives in these functions. The apps only open a consent URL, read the connection status, and call the connection callables.
 
-Each provider is a thin adapter (`functions/src/services/healthProviders/adapters/`) behind one shared orchestrator (`healthProviderService.ts`), so provider-specific quirks (Google Health `reconcile`/`list` data-type endpoints with no push notifications yet — see below; Withings `action=requesttoken` + Notify API + 3 h tokens; Oura app-level webhook subscriptions) stay isolated while the common flow is written once. Provider samples are normalized to the shared `FHIRObservation` model and stored in provider-scoped collections (see the Firestore table above); they flow through the existing health-sample deletion pipeline unchanged. Raw and high-frequency payloads (e.g. continuous heart rate) are archived as zstd-compressed blobs in Cloud Storage instead, with a pointer document in `healthProviderRawArchives` — normalizing every sample into its own Firestore document does not scale to intraday data (see `functions/src/functions/onArchivedLiveHealthSampleUploaded.ts`, disabled in `index.ts` for exactly this reason).
+- **Code:** one adapter per provider in `functions/src/services/healthProviders/adapters/`, behind a shared orchestrator, `healthProviderService.ts`. The Grove encoding lives in `functions/src/services/healthProviders/grove/`.
+- **Encoding:** data is encoded per the Grove FHIR 0.8.0 provider implementation guides (`providers`, `oura`, `withings`, `google-health`) and written as zstd-compressed `grove-mobile-exchange-bundle` collections to Cloud Storage at `users/{uid}/providerHealthSamples/{provider}/…`. This mirrors what the iOS app uploads for HealthKit data. Each record has:
+  - HMAC-derived identifiers (`HEALTH_PROVIDER_IDENTITY_KEY`);
+  - one conversion Provenance;
+  - the provider's raw payloads as `providers-recording-document` DocumentReferences.
+- **Fields outside the Grove provider catalog** are still encoded, using the `https://myheartcounts.stanford.edu/fhir/CodeSystem/provider-measurement` CodeSystem. They are tagged `meta.tag` `…/CodeSystem/grove-conformance#outside-provider-catalog`.
+- **Connection flow:**
+  1. `getHealthProviderAuthUrl` returns the provider consent URL. It is backed by a single-use, 15-minute `state`.
+  2. The provider redirects to `healthProviderOAuthCallback`, which stores the tokens, registers webhooks where supported, and 302-redirects to `{HEALTH_PROVIDER_APP_REDIRECT_URL}/{provider}/connected` (or `…/error?reason=…`).
+  3. Creating the connection triggers the 30-day initial import.
+- **Keeping data current:** Oura and Withings push changes to `ouraWebhook` / `withingsWebhook`. `healthProviderBackfill` runs daily for every provider, and `syncHealthProvider` lets the app request a sync, throttled to once per 15 minutes. `disconnectHealthProvider` revokes the connection; already imported data is kept until the account is deleted.
 
-**Coverage vs. the iOS HealthKit ingestion pipeline.** The iOS app's collected-type list (`MyHeartCounts-StudyDefinitions`'s `Study.swift`, consumed via `HealthKitPermissions.swift`) is the reference point for "parity." Wearables are physically incapable of producing most of that list — HealthKit aggregates manual entry, EHR records, and iPhone/Watch-only sensors/algorithms that no third-party wearable API exposes — so the honest comparison is per HealthKit type: normalized into Firestore, archived raw (fetched but not per-sample-normalized), or genuinely unobtainable from any of the three provider APIs.
+**Secrets and config** (Secret Manager, per Firebase project):
+- `OURA_CLIENT_ID`, `OURA_CLIENT_SECRET`, `OURA_WEBHOOK_VERIFICATION_TOKEN`
+- `GOOGLE_HEALTH_CLIENT_ID`, `GOOGLE_HEALTH_CLIENT_SECRET` (a Google Cloud OAuth client)
+- `WITHINGS_CLIENT_ID`, `WITHINGS_CLIENT_SECRET`
+- `HEALTH_PROVIDER_IDENTITY_KEY` (at least 32 bytes, hex or base64)
 
-| HealthKit type | Oura | Google Health | Withings | Status |
-|-|-|-|-|-|
-| `stepCount` | ✅ | ✅ | ✅ | Normalized (`steps`) |
-| `distanceWalkingRunning` | ✅ | ✅ | ✅ | Normalized |
-| `activeEnergyBurned` | ✅ | ✅ | ✅ | Normalized |
-| `heartRate` | 📦 raw archive | 📦 raw archive | ✅ (spot reads) | Continuous streams archived, not per-sample; Withings only has spot readings |
-| `restingHeartRate` | ✅ | ✅ | ✅ | Normalized |
-| `heartRateVariabilitySDNN` | ✅ | ✅ | — | Withings exposes no HRV field in any endpoint used |
-| `respiratoryRate` | ✅ | ✅ | ✅ | Normalized |
-| `oxygenSaturation` (bloodOxygen) | ✅ | ✅ | ✅ | Normalized |
-| `bodyTemperature` | — | ✅ (`core-body-temperature`) | ✅ | Normalized |
-| `bloodGlucose` | — | ✅ | — | Withings' glucose meastype could not be independently verified against a second source, so it was left unmapped rather than guessed |
-| `bloodPressure` (systolic+diastolic) | — | — | ✅ | Google Health API exposes no blood-pressure data type; Oura doesn't measure BP |
-| `height` | — | ✅ | ✅ | Oura has no height endpoint (only a one-time profile fetch, not a series) |
-| `bodyMass` (weight) | — | ✅ | ✅ | Oura doesn't track weight |
-| `bodyFatPercentage` | — | ✅ | ✅ | |
-| `bodyMassIndex` | — | — | — | Computed downstream from weight+height, not ingested directly (BMI computed against a provider's own height can silently diverge from HealthKit height) |
-| `vo2Max` | ✅ | ✅ | ✅ | Same-name-different-methodology across all 4 sources (in-app test + 3 providers) — labeled per-source, never averaged |
-| `sleepAnalysis` (duration + stages) | ✅ | ✅ | ✅ (stages only) | Withings' sleep summary has no total-duration field, only per-stage minutes |
-| `workoutDuration` | ✅ (`workout`) | ✅ (`exercise`) | ✅ (`getworkouts`) | Normalized |
-| Vascular/cardiovascular age | ✅ | — | ✅ | No HealthKit equivalent exists at all; kept as its own labeled metric (`cardiovascularAge`), not merged into anything |
-| Readiness score | ✅ | — | — | Oura-specific composite index, no HealthKit equivalent; own labeled metric (`readinessScore`) |
-| `electrocardiogram` | — | — | 📦 raw archive (interval durations only) | No provider exposes a full ECG waveform; Withings' QRS/PR/QT/AFib codes are archived raw, not normalized, since treating a diagnostic classification code as a physiological quantity would misrepresent it |
-| `basalEnergyBurned`, `flightsClimbed` | — | ✅ (`basal-energy-burned`/`floors`) | — | Normalized; neither Oura nor Withings exposes an equivalent construct |
-| Body composition (`leanBodyMass`, muscle/bone mass, hydration, waist circumference) | — | — | 📦 raw archive (`measuresUnmapped`) | No HealthKit-equivalent construct for most of these; fetched (via the same `getmeas` call already made) and archived rather than silently dropped, not normalized |
-| `distanceCycling`/`distanceWheelchair`/`distanceSwimming` | — | — | — | No provider breaks distance out by activity type |
-| `appleExerciseTime`, `appleMoveTime`, `appleStandTime`, `appleStandHour` | — | — | — | No equivalent construct in any of the three provider APIs |
-| `walkingSpeed`, `walkingStepLength`, `walkingAsymmetryPercentage`, `walkingDoubleSupportPercentage`, `stairAscentSpeed`, `stairDescentSpeed`, `appleWalkingSteadiness`, `sixMinuteWalkTestDistance`, `numberOfTimesFallen` | — | — | — | iPhone/Apple Watch gait-analysis and fall-detection algorithms; not a wearable-API-producible construct |
-| `heartRateRecoveryOneMinute`, `walkingHeartRateAverage`, `atrialFibrillationBurden`, `basalBodyTemperature`, `bloodAlcoholContent` | — | — | — | No equivalent field in any of the three provider APIs (Withings' AFib *classification*, above, is a different construct from HealthKit's burden percentage) |
-| Reproductive health (~13 category types), clinical records (9 types), `stateOfMind`, `gad7`, `mindfulSession`, dietary logging, `inhalerUsage`, characteristics (biological sex, blood type, etc.) | — | — | — | Not physiological wearable-sensor data at all (manual entry, EHR records, app-generated); out of scope for a wearables integration by construction, not a gap in it |
+String params:
+- `HEALTH_PROVIDER_BASE_URL`: this deployment's function origin, used for callback and webhook URLs. It must be set.
+- `HEALTH_PROVIDER_APP_REDIRECT_URL`
+- `HEALTH_PROVIDER_IDENTITY_KEY_ID`
+- `HEALTH_PROVIDER_IDENTITY_EPOCH`
 
-**Connection flow (backend-hosted redirect):**
-
-1. App calls the `getHealthProviderAuthUrl` callable → backend mints a signed state (with a PKCE verifier where needed) and returns the provider authorization URL.
-2. App opens the URL in `ASWebAuthenticationSession` (iOS) / Chrome Custom Tab (Android). The provider redirects to the backend `healthProviderOAuthCallback` endpoint.
-3. The callback exchanges the code for tokens (client secrets never leave the server), stores them, registers the provider webhook subscription where supported, and 302-redirects back into the app via a deep link.
-4. Provider data changes arrive at the per-provider `ouraWebhook` / `googleHealthWebhook` / `withingsWebhook` endpoints, which fetch and store the changed window. Authenticity is enforced per provider by what each supports — Oura and Withings verify the subscription handshake and rely on the secret callback URL, and because their notification bodies are otherwise unauthenticated the backend treats them as untrusted triggers and clamps the fetch window (never trusting caller-supplied timestamps). `googleHealthWebhook` currently receives no real traffic: Google Health's push-subscription model (a project-level Subscriber with endpoint verification and ECDSA-signed payloads) is not implemented yet, so that provider relies entirely on the daily backfill. A daily `healthProviderBackfill` scheduled function catches gaps and pulls the initial 30-day history for every provider.
-5. App calls `disconnectHealthProvider` to revoke and remove a connection.
-
-**Secrets/config** (Secret Manager, per Firebase project — dev / staging / prod-US / prod-UK): `OURA_CLIENT_ID`/`OURA_CLIENT_SECRET`/`OURA_WEBHOOK_VERIFICATION_TOKEN`, `GOOGLE_HEALTH_CLIENT_ID`/`GOOGLE_HEALTH_CLIENT_SECRET` (a Google Cloud OAuth 2.0 client, not a legacy Fitbit developer app), `WITHINGS_CLIENT_ID`/`WITHINGS_CLIENT_SECRET`, plus the string params `HEALTH_PROVIDER_BASE_URL` (this deployment's function origin, used to build the callback/webhook URLs) and `HEALTH_PROVIDER_APP_REDIRECT_URL` (the app deep link). Each provider's developer console must register this environment's callback and webhook URLs.
+Each provider's developer console must register this environment's callback and webhook URLs.
 
 ## Development
 

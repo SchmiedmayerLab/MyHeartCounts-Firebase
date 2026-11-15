@@ -28,6 +28,21 @@ export interface DisconnectHealthProviderOutput {
   status: "disconnected";
 }
 
+export const syncHealthProviderInputSchema = z.object({
+  userId: z.string().min(1, "User ID is required"),
+  provider: healthProviderIdSchema,
+});
+export type SyncHealthProviderInput = z.input<
+  typeof syncHealthProviderInputSchema
+>;
+/**
+ * `started`: a sync ran (its outcome is reflected in the connection document).
+ * `throttled`: a sync was attempted less than 15 minutes ago; nothing was done.
+ */
+export interface SyncHealthProviderOutput {
+  status: "started" | "throttled";
+}
+
 /**
  * Query parameters on the provider's OAuth redirect back to
  * `healthProviderOAuthCallback`. Everything here is untrusted external input, so

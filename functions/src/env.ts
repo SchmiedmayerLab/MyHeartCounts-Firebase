@@ -14,6 +14,7 @@ enum SecretKey {
   GOOGLE_HEALTH_CLIENT_SECRET = "GOOGLE_HEALTH_CLIENT_SECRET",
   WITHINGS_CLIENT_ID = "WITHINGS_CLIENT_ID",
   WITHINGS_CLIENT_SECRET = "WITHINGS_CLIENT_SECRET",
+  HEALTH_PROVIDER_IDENTITY_KEY = "HEALTH_PROVIDER_IDENTITY_KEY",
 }
 
 // OpenAI --------------------------------------------------------------------
@@ -75,6 +76,32 @@ export const getWithingsClientId = (): string => withingsClientId.value();
 export const getWithingsClientSecret = (): string =>
   withingsClientSecret.value();
 
+// Grove FHIR identity key: the ≥32-byte HMAC-SHA-256 key behind every opaque
+// Grove identifier (source record/output/artifact, device snapshot, record
+// version) in the provider exchange Bundles. Stored hex- or base64-encoded.
+// The key id and epoch name it in every identifier system
+// (`…/NamingSystem/grove-<kind>-v0/<keyId>/<epoch>`); rotating the key means a
+// new key id or epoch, and old keys must be kept while their identifiers can
+// still be replayed or retracted.
+const healthProviderIdentityKey = defineSecret(
+  SecretKey.HEALTH_PROVIDER_IDENTITY_KEY,
+);
+const healthProviderIdentityKeyId = defineString(
+  "HEALTH_PROVIDER_IDENTITY_KEY_ID",
+  { default: "mhcbackend1" },
+);
+const healthProviderIdentityEpoch = defineString(
+  "HEALTH_PROVIDER_IDENTITY_EPOCH",
+  { default: "1" },
+);
+
+export const getHealthProviderIdentityKey = (): string =>
+  healthProviderIdentityKey.value();
+export const getHealthProviderIdentityKeyId = (): string =>
+  healthProviderIdentityKeyId.value();
+export const getHealthProviderIdentityEpoch = (): string =>
+  healthProviderIdentityEpoch.value();
+
 export const getHealthProviderBaseUrl = (): string =>
   healthProviderBaseUrl.value();
 export const getHealthProviderAppRedirectUrl = (): string =>
@@ -94,4 +121,5 @@ export const healthProviderSecretParams: Array<
   googleHealthClientSecret,
   withingsClientId,
   withingsClientSecret,
+  healthProviderIdentityKey,
 ];

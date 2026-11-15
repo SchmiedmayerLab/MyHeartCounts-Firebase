@@ -24,7 +24,6 @@ export * from "./healthProviders/healthProviderId.js";
 export * from "./healthProviders/healthProviderTokens.js";
 export * from "./healthProviders/healthProviderConnection.js";
 export * from "./healthProviders/healthProviderAuthRequest.js";
-export * from "./healthProviders/healthProviderRawArchive.js";
 export * from "./helpers/date+extras.js";
 export * from "./helpers/dateConverter.js";
 export * from "./helpers/lazy.js";
