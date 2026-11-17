@@ -93,6 +93,8 @@ The following table provides an overview of all fields in the `/users/{USER-ID}`
 |`mhcGenderIdentity`|int64|Client||Gender identity|
 |`mostRecentOnboardingStep`|string|Client||Identifier of the last completed onboarding step|
 |`nhsNumber`|string|Client||UK National Health Service number|
+|`parQPlusAuthored`|timestamp|Server||`authored` date of the Par-Q+ response `parQPlusCleared` was computed from|
+|`parQPlusCleared`|boolean|Server||Whether the latest Par-Q+ response clears the user for physical activity (no follow-up question answered "yes")|
 |`participantGroup`|int64|Server||Randomly assigned trial group (1 or 2)|
 |`preferredMeasurementSystem`|string|Client||User's preferred measurement system (e.g. metric, imperial)|
 |`preferredNotificationTime`|string|Client||Preferred time for notifications (e.g. `"09:00"`)|
