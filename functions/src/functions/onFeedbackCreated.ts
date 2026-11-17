@@ -6,16 +6,11 @@
 import { Timestamp } from "firebase-admin/firestore";
 import { logger } from "firebase-functions";
 import { onDocumentCreated } from "firebase-functions/v2/firestore";
-import { createTransport } from "nodemailer";
+import { feedbackEmailSecretParams } from "../env.js";
 import {
-  feedbackEmailSecretParams,
-  getFeedbackCoordinatorEmail,
-  getFeedbackSenderEmail,
-  getSmtpHost,
-  getSmtpPassword,
-  getSmtpPort,
-  getSmtpUsername,
-} from "../env.js";
+  type CoordinatorMail,
+  sendCoordinatorMail,
+} from "./coordinatorMail.js";
 import { privilegedServiceAccount } from "./helpers.js";
 
 // Renders in the submitter's timezone when the feedback carries one, e.g.
@@ -40,7 +35,7 @@ const formatTimestamp = (
 const formatFeedbackEmail = (
   feedbackId: string,
   data: Record<string, unknown>,
-): { subject: string; text: string } => {
+): CoordinatorMail => {
   const subject = `[MyHeartCounts] New Feedback Received (ID: ${feedbackId})`;
 
   const { accountId, ...rest } = data;
@@ -81,39 +76,6 @@ export const onFeedbackCreated = onDocumentCreated(
 
     const feedbackId = event.params.feedbackId;
     const data = snapshot.data();
-    const { subject, text } = formatFeedbackEmail(feedbackId, data);
-
-    try {
-      // requireTLS/forceAuth make the transport fail loudly if the server does
-      // not offer STARTTLS or AUTH, instead of silently sending unauthenticated.
-      const port = Number(getSmtpPort());
-      const transporter = createTransport({
-        host: getSmtpHost(),
-        port,
-        secure: port === 465,
-        requireTLS: true,
-        forceAuth: true,
-        logger: true,
-        auth: {
-          user: getSmtpUsername(),
-          pass: getSmtpPassword(),
-        },
-      });
-
-      await transporter.sendMail({
-        from: `"MyHeart Counts" <${getFeedbackSenderEmail()}>`,
-        to: getFeedbackCoordinatorEmail(),
-        subject,
-        text,
-      });
-
-      logger.info(
-        `Feedback notification sent for ${feedbackId} to ${getFeedbackCoordinatorEmail()}`,
-      );
-    } catch (error) {
-      logger.error(
-        `Failed to send feedback notification for ${feedbackId}: ${String(error)}`,
-      );
-    }
+    await sendCoordinatorMail(formatFeedbackEmail(feedbackId, data));
   },
 );
