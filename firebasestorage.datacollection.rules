@@ -1,0 +1,13 @@
+// This source file is part of the My Heart Counts Firebase open-source project
+//
+// SPDX-FileCopyrightText: 2026 Stanford University and the project authors (see CONTRIBUTORS.md)
+// SPDX-License-Identifier: MIT
+
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    match /users/{userId}/{allPaths=**} {
+      allow create, update: if request.auth != null && request.auth.uid == userId;
+    }
+  }
+}

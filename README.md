@@ -114,6 +114,14 @@ The following table provides an overview of all fields in the `/users/{USER-ID}`
 |`/user/{USER-ID}/liveHealthSamples/{UUID}.json.zstd`|Most recorded ongoing (new) health samples get directly uploaded into the Firestore NoSQL Database - however, if a large amount of data has accumulated, we archive these samples for server-side decoding and upload them into liveHealthSamples. **This folder will be empty most of the time!** On Upload, the function [onArchivedLiveHealthSampleUploaded.ts](functions/src/functions/onArchivedLiveHealthSampleUploaded.ts) gets triggered which upon successful unpacking and storing into the Firestore Database deletes the live health sample archive.|
 |`/user/{USER-ID}/SensorKit/{SENSORKIT.IDENTIFIER}/{UUID}.csv.zstd`|Samples from Apple's SensorKit Framework, sorted in sub-folders.|
 
+#### Data Collection Bucket
+
+The iOS app uploads HealthKit and SensorKit data to a separate data collection bucket when its Firebase config names one under `DATA_COLLECTION_BUCKET`, and to the default bucket otherwise. The bucket uses the same `users/{USER-ID}/...` layout. Its rules in [firebasestorage.datacollection.rules](firebasestorage.datacollection.rules) let participants write their own files, but not read or delete them.
+
+1. Link the bucket to Firebase: Firebase console, Storage, import an existing Google Cloud Storage bucket.
+2. Map it as the `datacollection` storage target in [.firebaserc](.firebaserc) with `firebase target:apply storage datacollection <bucket> --project <project-id>`, then deploy its rules with `npm run deploy:datacollection-rules -- --project <project-id>`.
+3. Set `DATA_COLLECTION_BUCKET` in `functions/.env.<project-id>`, so that account deletion also removes the participant's files from it.
+
 ## Development
 
 This section contains developer information to kickstart local- and cloud development using the ressources from this repository.
@@ -139,6 +147,7 @@ To make this structure simpler to use, we provide different scripts as part of t
 |`npm run prepare`|Combines cleaning, installing and building both packages.|
 |`npm run test:ci`|Tests the Firebase functions with emulators running and with test coverage collection active.|
 |`npm run serve:seeded`|Starts up the relevant emulators for My Heart Counts and seeds them. Make sure to build the project first before executing this command.|
+|`npm run deploy:datacollection-rules`|Deploys the storage rules of the [data collection bucket](#data-collection-bucket). Append `-- --project <project-id>`.|
 
 For using the emulators for client applications, it is probably easiest to call `npm run prepare` whenever files could have changed (e.g. when changing branch or pulling new changes) and then calling `npm run serve:seeded` to start up the emulators in a seeded state. Both of these commands are performed in the root directory of this repository.
 

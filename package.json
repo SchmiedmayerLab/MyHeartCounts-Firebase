@@ -26,7 +26,8 @@
     "prepare": "npm run clean && npm run install && npm run build",
     "test:ci": "firebase emulators:exec --only auth,firestore,storage 'npm --prefix functions run test:emulators'",
     "serve": "npm --prefix functions run serve",
-    "serve:seeded": "npm --prefix functions run serve:seeded"
+    "serve:seeded": "npm --prefix functions run serve:seeded",
+    "deploy:datacollection-rules": "firebase deploy --only storage --config firebase.datacollection.json"
   },
   "devDependencies": {
     "@stanfordspezi/spezi-web-configurations": "^0.6.0",
