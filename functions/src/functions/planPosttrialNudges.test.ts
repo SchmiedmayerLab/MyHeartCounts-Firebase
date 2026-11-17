@@ -673,6 +673,36 @@ describeWithEmulators("function: planPosttrialNudges", (env) => {
       expect(userAfter.data()?.posttrialWelcomeNudgeScheduled).to.equal(true);
     });
 
+    it("does not queue a second welcome when the flag read is stale", async () => {
+      const userId = "posttrial-welcome-stale-flag";
+      const userData = baseEligibleUser();
+      await env.firestore.collection("users").doc(userId).set(userData);
+      const service = new PosttrialNudgeService(env.firestore);
+
+      const first = await service.scheduleWelcomeIfNeeded(
+        userId,
+        userData,
+        new Date(Date.now() + 24 * 60 * 60 * 1000),
+        "en",
+      );
+      // Second overlapping run: same stale userData (flag unset), later slot.
+      const second = await service.scheduleWelcomeIfNeeded(
+        userId,
+        userData,
+        new Date(Date.now() + 25 * 60 * 60 * 1000),
+        "en",
+      );
+
+      expect(first).to.equal(true);
+      expect(second).to.equal(false);
+      const backlog = await env.firestore
+        .collection("users")
+        .doc(userId)
+        .collection("notificationBacklog")
+        .get();
+      expect(backlog.size).to.equal(1);
+    });
+
     it("is idempotent when the flag is already set", async () => {
       const userId = "posttrial-welcome-idempotent";
       const userData = baseEligibleUser({

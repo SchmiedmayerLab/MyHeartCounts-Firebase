@@ -3,7 +3,7 @@
 // SPDX-FileCopyrightText: 2026 Stanford University and the project authors (see CONTRIBUTORS.md)
 // SPDX-License-Identifier: MIT
 
-import { createHash, randomUUID } from "crypto";
+import { createHash } from "crypto";
 import admin from "firebase-admin";
 import { logger } from "firebase-functions";
 import { onSchedule } from "firebase-functions/v2/scheduler";
@@ -116,10 +116,11 @@ const LLM_RETRY_DELAYS_MS: readonly number[] = [10_000, 30_000];
 
 // How long a run may keep starting new LLM generations. The rest of the
 // function timeout is reserved for generations still in flight (worst case
-// three 60 s request timeouts plus 40 s of retry waits) and the failure mail,
-// so a slow gateway ends the run cleanly instead of getting it killed.
+// three 60 s request timeouts plus 40 s of retry waits) and the failure mail
+// (up to 50 s of SMTP timeouts), so a slow gateway ends the run cleanly
+// instead of getting it killed.
 const FUNCTION_TIMEOUT_SECONDS = 1800;
-const RUN_BUDGET_MS = (FUNCTION_TIMEOUT_SECONDS - 5 * 60) * 1000;
+const RUN_BUDGET_MS = (FUNCTION_TIMEOUT_SECONDS - 7 * 60) * 1000;
 
 // Version of the LLM prompt template built in generateLLMNudge. Bump this
 // whenever the prompt wording changes so generated nudges can be traced back
@@ -197,17 +198,12 @@ export class PosttrialNudgeService {
 
   // Methods
 
-  // Derives the backlog document ID from the user and the delivery slot, so
-  // overlapping runs (Cloud Scheduler delivers at least once) write to the
-  // same document instead of queueing a second nudge. The result keeps the
-  // uppercase UUID format of the randomly generated IDs (RFC 9562 version 8).
-  private static posttrialNudgeId(userId: string, targetUtc: Date): string {
-    const bytes = createHash("sha256")
-      .update(
-        `${PosttrialNudgeService.CATEGORY}:${userId}:${targetUtc.toISOString()}`,
-      )
-      .digest()
-      .subarray(0, 16);
+  // Derives a backlog document ID from a stable key, so overlapping runs
+  // (Cloud Scheduler delivers at least once) write to the same document
+  // instead of queueing a second nudge. The result keeps the uppercase UUID
+  // format of the randomly generated IDs (RFC 9562 version 8).
+  private static deterministicId(key: string): string {
+    const bytes = createHash("sha256").update(key).digest().subarray(0, 16);
     bytes[6] = (bytes[6] & 0x0f) | 0x80;
     bytes[8] = (bytes[8] & 0x3f) | 0x80;
     const hex = bytes.toString("hex").toUpperCase();
@@ -715,38 +711,41 @@ export class PosttrialNudgeService {
           maxRetries: 0, // the enclosing attempt loop handles retries
         });
 
-        const response = await llmClient.chat.completions.create({
-          model: LLM_MODEL,
-          messages: [
-            {
-              role: "user",
-              content: prompt,
-            },
-          ],
-          response_format: {
-            type: "json_schema",
-            json_schema: {
-              name: "nudge_message",
-              schema: {
-                type: "object",
-                properties: {
-                  title: {
-                    type: "string",
-                    description:
-                      "Short summary/call to action for the push notification",
+        const response = await llmClient.chat.completions.create(
+          {
+            model: LLM_MODEL,
+            messages: [
+              {
+                role: "user",
+                content: prompt,
+              },
+            ],
+            response_format: {
+              type: "json_schema",
+              json_schema: {
+                name: "nudge_message",
+                schema: {
+                  type: "object",
+                  properties: {
+                    title: {
+                      type: "string",
+                      description:
+                        "Short summary/call to action for the push notification",
+                    },
+                    body: {
+                      type: "string",
+                      description:
+                        "Motivational message content for the push notification",
+                    },
                   },
-                  body: {
-                    type: "string",
-                    description:
-                      "Motivational message content for the push notification",
-                  },
+                  required: ["title", "body"],
+                  additionalProperties: false,
                 },
-                required: ["title", "body"],
-                additionalProperties: false,
               },
             },
           },
-        });
+          { signal: AbortSignal.timeout(LLM_REQUEST_TIMEOUT_MS) },
+        );
 
         const parsedContent = JSON.parse(
           response.choices[0].message.content ?? "{}",
@@ -791,6 +790,15 @@ export class PosttrialNudgeService {
         logger.warn(
           `Attempt ${attempt}/${maxRetries} failed for post-trial LLM nudge generation for user ${userId}: ${String(error)}`,
         );
+        if (
+          error instanceof OpenAI.APIError &&
+          error.status !== undefined &&
+          error.status < 500 &&
+          error.status !== 408 &&
+          error.status !== 429
+        ) {
+          break; // permanent client error, retrying cannot help
+        }
 
         if (attempt < maxRetries) {
           const delayMs = this.llmRetryDelaysMs[attempt - 1] ?? 0;
@@ -815,7 +823,9 @@ export class PosttrialNudgeService {
     nudge: PosttrialNudgeMessage,
     targetUtc: Date,
   ): Promise<boolean> {
-    const nudgeId = PosttrialNudgeService.posttrialNudgeId(userId, targetUtc);
+    const nudgeId = PosttrialNudgeService.deterministicId(
+      `${PosttrialNudgeService.CATEGORY}:${userId}:${targetUtc.toISOString()}`,
+    );
     try {
       await this.firestore
         .collection("users")
@@ -876,12 +886,14 @@ export class PosttrialNudgeService {
     const welcomeTime = new Date(
       firstNudgeTargetUtc.getTime() - PosttrialNudgeService.WELCOME_LEAD_MS,
     );
-    const welcomeId = randomUUID().toUpperCase();
+    const welcomeId = PosttrialNudgeService.deterministicId(
+      `${PosttrialNudgeService.WELCOME_CATEGORY}:${userId}`,
+    );
     const userRef = this.firestore.collection("users").doc(userId);
     const welcomeRef = userRef.collection("notificationBacklog").doc(welcomeId);
 
     const batch = this.firestore.batch();
-    batch.set(welcomeRef, {
+    batch.create(welcomeRef, {
       id: welcomeId,
       title: welcomeTitle,
       body: welcomeBody,
@@ -891,7 +903,12 @@ export class PosttrialNudgeService {
       generatedAt: admin.firestore.Timestamp.now(),
     });
     batch.update(userRef, { posttrialWelcomeNudgeScheduled: true });
-    await batch.commit();
+    try {
+      await batch.commit();
+    } catch (error) {
+      if (isAlreadyExistsError(error)) return false;
+      throw error;
+    }
 
     logger.info(
       `Scheduled post-trial welcome nudge for user ${userId} at ${welcomeTime.toISOString()} (1 h before first post-trial nudge at ${firstNudgeTargetUtc.toISOString()})`,
@@ -1122,6 +1139,8 @@ export const onScheduleDailyPosttrialNudgeCreation = onSchedule(
     schedule: "30 8 * * *",
     timeZone: "UTC",
     timeoutSeconds: FUNCTION_TIMEOUT_SECONDS,
+    concurrency: 1,
+    maxInstances: 1,
     secrets: [...llmSecretParams, ...feedbackEmailSecretParams],
     serviceAccount: privilegedServiceAccount,
   },
