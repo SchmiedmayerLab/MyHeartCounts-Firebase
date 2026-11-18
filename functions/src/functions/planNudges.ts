@@ -820,7 +820,7 @@ export class NudgeService {
     await reportNudgeGenerationFailures(
       "onScheduleDailyNudgeCreation",
       generationFailures,
-      "Predefined nudges were scheduled for these users instead, unless noted otherwise below.",
+      "All retry attempts against the LLM backend failed. Predefined nudges were scheduled for these users instead, unless noted otherwise below.",
     );
   }
 }
