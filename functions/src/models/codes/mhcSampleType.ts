@@ -7,6 +7,7 @@ import { CodingSystem } from "./codes.js";
 import { type FHIRCoding } from "../fhir/baseTypes/fhirCoding.js";
 
 export enum MhcSampleTypeCode {
+  bloodGlucoseA1c = "MHCCustomSampleTypeBloodGlucoseA1c",
   bloodLipidMeasurement = "MHCCustomSampleTypeBloodLipidMeasurement",
   dietMEPAScore = "MHCCustomSampleTypeDietMEPAScore",
   nicotineExposure = "MHCCustomSampleTypeNicotineExposure",

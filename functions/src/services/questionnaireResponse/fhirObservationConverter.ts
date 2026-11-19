@@ -116,3 +116,10 @@ export const getLdlObservationConfig = (): QuestionnaireObservationConfig => ({
   display: "LDL Cholesterol",
   unit: QuantityUnit.mg_dL,
 });
+
+export const getHbA1cObservationConfig =
+  (): QuestionnaireObservationConfig => ({
+    customCode: MhcSampleTypeCode.bloodGlucoseA1c,
+    display: "Hemoglobin A1c",
+    unit: QuantityUnit.percent_hba1c,
+  });
