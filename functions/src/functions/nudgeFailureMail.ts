@@ -24,7 +24,7 @@ export const formatNudgeGenerationFailureMail = (
     subject: `[MyHeartCounts] LLM nudge generation failed for ${users} (${functionName})`,
     text: [
       `The ${functionName} run at ${new Date().toISOString()} could not generate LLM nudges for ${users}.`,
-      `All retry attempts against the LLM backend failed. ${consequence}`,
+      consequence,
       ``,
       `Check the Cloud Functions logs and the LLM gateway status (LLM_API_BASE_URL secret).`,
       ``,
