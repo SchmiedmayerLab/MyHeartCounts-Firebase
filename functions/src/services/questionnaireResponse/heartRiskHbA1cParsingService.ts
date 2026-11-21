@@ -21,10 +21,8 @@ import {
   type DatabaseService,
 } from "../database/databaseService.js";
 
-// HbA1c: converts an IFCC value (mmol/mol) to NGSP/DCCT percent. This is the inverse of the
-// IFCC-NGSP master equation, NGSP % = 0.09148 * IFCC mmol/mol + 2.152, in its commonly used
-// rounded form. The two scales are related by an offset, so a plain factor would be wrong.
-export const hbA1cPercentFromMmolPerMol = (mmolPerMol: number): number =>
+// Inverse of the IFCC-NGSP master equation; the scales differ by an offset, not a factor.
+const hbA1cPercentFromMmolPerMol = (mmolPerMol: number): number =>
   mmolPerMol / 10.929 + 2.15;
 
 export class HeartRiskHbA1cParsingQuestionnaireResponseService extends QuestionnaireResponseService {
@@ -40,11 +38,11 @@ export class HeartRiskHbA1cParsingQuestionnaireResponseService extends Questionn
     response: Document<FHIRQuestionnaireResponse>,
     _options: { isNew: boolean },
   ): Promise<boolean> {
-    const targetQuestionnaireUrls = [
-      "https://myheartcounts.stanford.edu/fhir/survey/heartRisk",
-    ];
-
-    if (!this.targetsQuestionnaire(response.content, targetQuestionnaireUrls)) {
+    if (
+      !this.targetsQuestionnaire(response.content, [
+        "https://myheartcounts.stanford.edu/fhir/survey/heartRisk",
+      ])
+    ) {
       return false;
     }
 
@@ -61,7 +59,7 @@ export class HeartRiskHbA1cParsingQuestionnaireResponseService extends Questionn
         userId,
         response.id,
         hbA1cValue,
-        new Date(response.content.authored),
+        response.content.authored,
       );
 
       logger.info(
