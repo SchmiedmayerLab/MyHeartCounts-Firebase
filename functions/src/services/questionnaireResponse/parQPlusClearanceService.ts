@@ -15,7 +15,7 @@ import {
   type DatabaseService,
 } from "../database/databaseService.js";
 
-export const parQPlusQuestionnaireUrl =
+const parQPlusQuestionnaireUrl =
   "https://myheartcounts.stanford.edu/fhir/survey/parQplus";
 
 // The seven general Par-Q+ questions. Every other boolean item in the
@@ -30,9 +30,8 @@ export const parQPlusGeneralQuestionLinkIds = [
   "97e68f50-4ec0-4f29-9709-0dc21de559b3", // medically supervised activity only
 ];
 
-// Par-Q+ rule: cleared when all general questions are "no", or when no
-// follow-up question is "yes". Null when a general question is unanswered.
-export const parQPlusClearance = (
+// Cleared when no follow-up question is "yes"; null when a general question is unanswered.
+const parQPlusClearance = (
   response: FHIRQuestionnaireResponse,
 ): boolean | null => {
   const answers: Record<string, boolean> = {};

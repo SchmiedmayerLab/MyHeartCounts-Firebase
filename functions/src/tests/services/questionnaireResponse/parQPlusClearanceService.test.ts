@@ -14,7 +14,11 @@ import {
 } from "../../../services/questionnaireResponse/parQPlusClearanceService.js";
 import {
   authoredAt,
+  booleanItem,
   groveQuestionnaireResponse,
+  parQPlusGeneralItems as generalItems,
+  parQPlusHeartFailureLinkId as heartFailureLinkId,
+  parQPlusHeartFollowUpLinkId as heartFollowUpLinkId,
   preGroveQuestionnaireResponse,
   questionnaireResponseDocument,
   testUserId,
@@ -22,18 +26,6 @@ import {
 import { MockFirestore } from "../../mocks/firestore.js";
 
 const heartConditionLinkId = parQPlusGeneralQuestionLinkIds[0];
-const heartFollowUpLinkId = "6ab1cdf1-f8fa-429b-ba08-7097a87ffb82"; // heart or cardiovascular condition
-const heartFailureLinkId = "c59933b4-153b-4067-88e8-327075dbd22c"; // chronic heart failure
-
-const booleanItem = (linkId: string, value: boolean) => ({
-  linkId,
-  answer: [{ valueBoolean: value }],
-});
-
-const generalItems = (overrides: Record<string, boolean> = {}) =>
-  parQPlusGeneralQuestionLinkIds.map((linkId) =>
-    booleanItem(linkId, overrides[linkId] ?? false),
-  );
 
 const setup = async (userData: Record<string, unknown> = {}) => {
   const databaseService = new FirestoreService(
@@ -54,15 +46,14 @@ const setup = async (userData: Record<string, unknown> = {}) => {
         collections.firestore.collection("users").doc(testUserId),
       )
     )?.content as Record<string, unknown>;
-  return { databaseService, service, userDoc };
+  return { service, userDoc };
 };
 
 const handle = (
   service: ParQPlusClearanceQuestionnaireResponseService,
-  id: string,
   content: FHIRQuestionnaireResponse,
 ) =>
-  service.handle(testUserId, questionnaireResponseDocument(id, content), {
+  service.handle(testUserId, questionnaireResponseDocument("r1", content), {
     isNew: true,
   });
 
@@ -71,7 +62,6 @@ describe("ParQPlusClearanceQuestionnaireResponseService", () => {
     const { service, userDoc } = await setup();
     const handled = await handle(
       service,
-      "r1",
       groveQuestionnaireResponse("who5", "r1", generalItems()),
     );
     expect(handled).to.equal(false);
@@ -82,7 +72,6 @@ describe("ParQPlusClearanceQuestionnaireResponseService", () => {
     const { service, userDoc } = await setup();
     const handled = await handle(
       service,
-      "r1",
       groveQuestionnaireResponse("parQplus", "r1", generalItems()),
     );
     expect(handled).to.equal(true);
@@ -97,7 +86,6 @@ describe("ParQPlusClearanceQuestionnaireResponseService", () => {
     const { service, userDoc } = await setup();
     const handled = await handle(
       service,
-      "r1",
       preGroveQuestionnaireResponse("parQplus", "r1", [
         ...generalItems({ [heartConditionLinkId]: true }),
         booleanItem(heartFollowUpLinkId, false),
@@ -111,7 +99,6 @@ describe("ParQPlusClearanceQuestionnaireResponseService", () => {
     const { service, userDoc } = await setup();
     await handle(
       service,
-      "r1",
       groveQuestionnaireResponse("parQplus", "r1", [
         ...generalItems({ [heartConditionLinkId]: true }),
         booleanItem(heartFollowUpLinkId, true),
@@ -125,7 +112,6 @@ describe("ParQPlusClearanceQuestionnaireResponseService", () => {
     const { service, userDoc } = await setup({ parQPlusCleared: false });
     const handled = await handle(
       service,
-      "r1",
       groveQuestionnaireResponse("parQplus", "r1", generalItems().slice(1)),
     );
     expect(handled).to.equal(false);
@@ -139,7 +125,6 @@ describe("ParQPlusClearanceQuestionnaireResponseService", () => {
     });
     const handled = await handle(
       service,
-      "r1",
       preGroveQuestionnaireResponse("parQplus", "r1", generalItems()),
     );
     expect(handled).to.equal(true);
@@ -153,7 +138,6 @@ describe("ParQPlusClearanceQuestionnaireResponseService", () => {
     });
     await handle(
       service,
-      "r1",
       preGroveQuestionnaireResponse("parQplus", "r1", generalItems()),
     );
     expect((await userDoc()).parQPlusCleared).to.equal(true);

@@ -7,28 +7,23 @@ import { expect } from "chai";
 import { type Firestore, Timestamp } from "firebase-admin/firestore";
 import { describe, it } from "mocha";
 import { backfillParQPlusClearance } from "../../functions/backfillParQPlusClearance.js";
-import { fhirQuestionnaireResponseConverter } from "../../models/index.js";
 import { FirestoreService } from "../../services/database/firestoreService.js";
 import { parQPlusGeneralQuestionLinkIds } from "../../services/questionnaireResponse/parQPlusClearanceService.js";
 import {
+  booleanItem,
   groveQuestionnaireResponse,
+  parQPlusGeneralItems,
+  parQPlusHeartFailureLinkId,
+  parQPlusHeartFollowUpLinkId,
   preGroveQuestionnaireResponse,
 } from "../helpers/questionnaireResponses.js";
 import { MockFirestore } from "../mocks/firestore.js";
 
-const generalItems = (first: boolean) =>
-  parQPlusGeneralQuestionLinkIds.map((linkId, index) => ({
-    linkId,
-    answer: [{ valueBoolean: index === 0 && first }],
-  }));
-
 describe("backfillParQPlusClearance", () => {
   it("computes the flag from the newest Par-Q+ response and skips flagged users", async () => {
-    const firestore = new MockFirestore();
     const databaseService = new FirestoreService(
-      firestore as unknown as Firestore,
+      new MockFirestore() as unknown as Firestore,
     );
-    const encode = fhirQuestionnaireResponseConverter.value.encode;
     await databaseService.runTransaction((collections, transaction) => {
       const users = collections.firestore.collection("users");
       transaction.set(users.doc("answered"), {});
@@ -37,44 +32,30 @@ describe("backfillParQPlusClearance", () => {
         parQPlusCleared: false,
         parQPlusAuthored: Timestamp.fromDate(new Date("2026-10-01T00:00:00Z")),
       });
-      const responses = users
-        .doc("answered")
-        .collection("questionnaireResponses");
+      const responses = collections.userQuestionnaireResponses("answered");
       // Older pre-Grove response says "no" everywhere, newer Grove one has a general "yes" and follow-up "yes".
       transaction.set(
         responses.doc("old"),
-        encode(
-          preGroveQuestionnaireResponse("parQplus", "old", generalItems(false)),
+        preGroveQuestionnaireResponse(
+          "parQplus",
+          "old",
+          parQPlusGeneralItems(),
+          new Date("2026-01-01T00:00:00Z"),
         ),
       );
       transaction.set(
         responses.doc("new"),
-        encode(
-          groveQuestionnaireResponse("parQplus", "new", [
-            ...generalItems(true),
-            {
-              linkId: "6ab1cdf1-f8fa-429b-ba08-7097a87ffb82",
-              answer: [{ valueBoolean: true }],
-            },
-            {
-              linkId: "c59933b4-153b-4067-88e8-327075dbd22c",
-              answer: [{ valueBoolean: true }],
-            },
-          ]),
-        ),
+        groveQuestionnaireResponse("parQplus", "new", [
+          ...parQPlusGeneralItems({
+            [parQPlusGeneralQuestionLinkIds[0]]: true,
+          }),
+          booleanItem(parQPlusHeartFollowUpLinkId, true),
+          booleanItem(parQPlusHeartFailureLinkId, true),
+        ]),
       );
       transaction.set(
-        responses.doc("who5"),
-        encode(groveQuestionnaireResponse("who5", "who5", [])),
-      );
-      transaction.set(
-        users
-          .doc("already-flagged")
-          .collection("questionnaireResponses")
-          .doc("r"),
-        encode(
-          preGroveQuestionnaireResponse("parQplus", "r", generalItems(false)),
-        ),
+        collections.userQuestionnaireResponses("already-flagged").doc("r"),
+        preGroveQuestionnaireResponse("parQplus", "r", parQPlusGeneralItems()),
       );
     });
 

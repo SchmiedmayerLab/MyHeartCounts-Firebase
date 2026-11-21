@@ -36,13 +36,16 @@ export const backfillParQPlusClearance = async (
       const responses = await databaseService.getQuery((collections) =>
         collections.userQuestionnaireResponses(user.id),
       );
-      let handled = false;
+      // Newest first, so the first Par-Q+ response handled is the one that counts.
+      responses.sort(
+        (a, b) => b.content.authored.getTime() - a.content.authored.getTime(),
+      );
       for (const response of responses) {
         if (await service.handle(user.id, response, { isNew: false })) {
-          handled = true;
+          updated += 1;
+          break;
         }
       }
-      if (handled) updated += 1;
     } catch (error) {
       failed += 1;
       logger.error(
