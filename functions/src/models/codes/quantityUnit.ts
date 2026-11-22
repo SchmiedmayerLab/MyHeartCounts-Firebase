@@ -49,6 +49,8 @@ export class QuantityUnit {
     "breaths/minute",
   );
   static readonly mg_dL_glu = new QuantityUnit("mg/dL", "mg/dL");
+  // HbA1c in NGSP/DCCT percent, e.g. 6.5 for 6.5 %.
+  static readonly percent_hba1c = new QuantityUnit("%", "%");
 
   // HealthKit body measurements
   static readonly cm_height = new QuantityUnit("cm", "centimeters");
@@ -88,6 +90,7 @@ export class QuantityUnit {
     QuantityUnit.mL_kg_min,
     QuantityUnit.resp_min,
     QuantityUnit.mg_dL_glu,
+    QuantityUnit.percent_hba1c,
 
     // HealthKit body measurements
     QuantityUnit.cm_height,
