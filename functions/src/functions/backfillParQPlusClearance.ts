@@ -7,9 +7,19 @@ import admin from "firebase-admin";
 import { logger } from "firebase-functions/v2";
 import { onSchedule } from "firebase-functions/v2/scheduler";
 import { privilegedServiceAccount } from "./helpers.js";
-import { type DatabaseService } from "../services/database/databaseService.js";
+import {
+  type FHIRQuestionnaireResponse,
+  fhirQuestionnaireResponseConverter,
+} from "../models/index.js";
+import {
+  type DatabaseService,
+  type Document,
+} from "../services/database/databaseService.js";
 import { FirestoreService } from "../services/database/firestoreService.js";
-import { ParQPlusClearanceQuestionnaireResponseService } from "../services/questionnaireResponse/parQPlusClearanceService.js";
+import {
+  ParQPlusClearanceQuestionnaireResponseService,
+  parQPlusQuestionnaireUrl,
+} from "../services/questionnaireResponse/parQPlusClearanceService.js";
 
 // One-off migration for users who answered the Par-Q+ before the flag
 // existed. Idempotent: users that already carry the flag are skipped.
@@ -23,8 +33,9 @@ export const backfillParQPlusClearance = async (
     collections.firestore.collection("users"),
   );
 
-  let updated = 0;
+  let handled = 0;
   let skipped = 0;
+  let invalid = 0;
   let failed = 0;
 
   for (const user of users) {
@@ -33,16 +44,39 @@ export const backfillParQPlusClearance = async (
       continue;
     }
     try {
-      const responses = await databaseService.getQuery((collections) =>
-        collections.userQuestionnaireResponses(user.id),
+      // Decode per document so one malformed legacy response cannot block the user.
+      const raw = await databaseService.getQuery((collections) =>
+        collections.firestore
+          .collection("users")
+          .doc(user.id)
+          .collection("questionnaireResponses"),
       );
-      // Newest first, so the first Par-Q+ response handled is the one that counts.
+      const responses: Array<Document<FHIRQuestionnaireResponse>> = [];
+      for (const doc of raw) {
+        const data = doc.content as Record<string, unknown>;
+        const url =
+          typeof data.questionnaire === "string" ?
+            data.questionnaire.split("|")[0]
+          : undefined;
+        if (url !== parQPlusQuestionnaireUrl) continue;
+        const parsed =
+          fhirQuestionnaireResponseConverter.value.schema.safeParse(data);
+        if (!parsed.success) {
+          invalid += 1;
+          logger.warn(
+            `Skipping malformed Par-Q+ response ${doc.path}: ${parsed.error.issues.map((issue) => issue.path.join(".")).join(", ")}`,
+          );
+          continue;
+        }
+        responses.push({ ...doc, content: parsed.data });
+      }
+      // Newest first, so the first response handled is the one that counts.
       responses.sort(
         (a, b) => b.content.authored.getTime() - a.content.authored.getTime(),
       );
       for (const response of responses) {
         if (await service.handle(user.id, response, { isNew: false })) {
-          updated += 1;
+          handled += 1;
           break;
         }
       }
@@ -55,7 +89,7 @@ export const backfillParQPlusClearance = async (
   }
 
   logger.info(
-    `Par-Q+ clearance backfill complete: scanned=${users.length}, updated=${updated}, skipped=${skipped}, failed=${failed}`,
+    `Par-Q+ clearance backfill complete: scanned=${users.length}, handled=${handled}, skipped=${skipped}, invalid=${invalid}, failed=${failed}`,
   );
 };
 

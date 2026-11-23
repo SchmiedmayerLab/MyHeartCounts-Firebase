@@ -95,6 +95,18 @@ describe("ParQPlusClearanceQuestionnaireResponseService", () => {
     expect((await userDoc()).parQPlusCleared).to.equal(true);
   });
 
+  it("clears when every general question is no even if a stale follow-up yes is retained", async () => {
+    const { service, userDoc } = await setup();
+    await handle(
+      service,
+      groveQuestionnaireResponse("parQplus", "r1", [
+        ...generalItems(),
+        booleanItem(heartFollowUpLinkId, true),
+      ]),
+    );
+    expect((await userDoc()).parQPlusCleared).to.equal(true);
+  });
+
   it("does not clear when a follow-up condition question is answered yes", async () => {
     const { service, userDoc } = await setup();
     await handle(

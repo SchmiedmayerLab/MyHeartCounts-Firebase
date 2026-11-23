@@ -8,8 +8,12 @@ import { type Firestore, Timestamp } from "firebase-admin/firestore";
 import { describe, it } from "mocha";
 import { backfillParQPlusClearance } from "../../functions/backfillParQPlusClearance.js";
 import { FirestoreService } from "../../services/database/firestoreService.js";
-import { parQPlusGeneralQuestionLinkIds } from "../../services/questionnaireResponse/parQPlusClearanceService.js";
 import {
+  parQPlusGeneralQuestionLinkIds,
+  parQPlusQuestionnaireUrl,
+} from "../../services/questionnaireResponse/parQPlusClearanceService.js";
+import {
+  authoredAt,
   booleanItem,
   groveQuestionnaireResponse,
   parQPlusGeneralItems,
@@ -33,16 +37,7 @@ describe("backfillParQPlusClearance", () => {
         parQPlusAuthored: Timestamp.fromDate(new Date("2026-10-01T00:00:00Z")),
       });
       const responses = collections.userQuestionnaireResponses("answered");
-      // Older pre-Grove response says "no" everywhere, newer Grove one has a general "yes" and follow-up "yes".
-      transaction.set(
-        responses.doc("old"),
-        preGroveQuestionnaireResponse(
-          "parQplus",
-          "old",
-          parQPlusGeneralItems(),
-          new Date("2026-01-01T00:00:00Z"),
-        ),
-      );
+      // Newer Grove response has a general "yes" and follow-up "yes"; the older pre-Grove one says "no" everywhere.
       transaction.set(
         responses.doc("new"),
         groveQuestionnaireResponse("parQplus", "new", [
@@ -54,8 +49,40 @@ describe("backfillParQPlusClearance", () => {
         ]),
       );
       transaction.set(
+        responses.doc("old"),
+        preGroveQuestionnaireResponse(
+          "parQplus",
+          "old",
+          parQPlusGeneralItems(),
+          new Date("2026-01-01T00:00:00Z"),
+        ),
+      );
+      // Malformed legacy documents must not block the user.
+      transaction.set(
+        collections.firestore
+          .collection("users")
+          .doc("answered")
+          .collection("questionnaireResponses")
+          .doc("broken"),
+        { questionnaire: `${parQPlusQuestionnaireUrl}|0.1.0`, item: "nope" },
+      );
+      transaction.set(
+        collections.firestore
+          .collection("users")
+          .doc("answered")
+          .collection("questionnaireResponses")
+          .doc("legacy"),
+        { foo: "bar" },
+      );
+      // Newer and cleared, so processing it would flip the stored flag.
+      transaction.set(
         collections.userQuestionnaireResponses("already-flagged").doc("r"),
-        preGroveQuestionnaireResponse("parQplus", "r", parQPlusGeneralItems()),
+        preGroveQuestionnaireResponse(
+          "parQplus",
+          "r",
+          parQPlusGeneralItems(),
+          new Date("2026-11-01T00:00:00Z"),
+        ),
       );
     });
 
@@ -68,7 +95,11 @@ describe("backfillParQPlusClearance", () => {
         )
       )?.content as Record<string, unknown>;
 
-    expect((await user("answered")).parQPlusCleared).to.equal(false);
+    const answered = await user("answered");
+    expect(answered.parQPlusCleared).to.equal(false);
+    expect(
+      (answered.parQPlusAuthored as Timestamp).toDate().toISOString(),
+    ).to.equal(authoredAt.toISOString());
     expect(await user("never-answered")).to.deep.equal({});
     expect((await user("already-flagged")).parQPlusCleared).to.equal(false);
   });
