@@ -23,6 +23,7 @@ import {
   DefaultNicotineScoreCalculator,
   NicotineScoringQuestionnaireResponseService,
 } from "../questionnaireResponse/nicotineScoringService.js";
+import { ParQPlusClearanceQuestionnaireResponseService } from "../questionnaireResponse/parQPlusClearanceService.js";
 import { type QuestionnaireResponseService } from "../questionnaireResponse/questionnaireResponseService.js";
 import {
   DefaultWho5ScoreCalculator,
@@ -90,6 +91,9 @@ export class DefaultServiceFactory implements ServiceFactory {
           databaseService: this.databaseService.value,
         }),
         new HeartRiskHbA1cParsingQuestionnaireResponseService({
+          databaseService: this.databaseService.value,
+        }),
+        new ParQPlusClearanceQuestionnaireResponseService({
           databaseService: this.databaseService.value,
         }),
       ]),
