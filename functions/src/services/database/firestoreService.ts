@@ -9,9 +9,9 @@ import {
   type Transaction,
   type Firestore,
 } from "firebase-admin/firestore";
+import { Lazy } from "../../models/index.js";
 import { CollectionsService } from "./collections.js";
 import { type Document, type DatabaseService } from "./databaseService.js";
-import { Lazy } from "../../models/index.js";
 
 export class FirestoreService implements DatabaseService {
   // Properties

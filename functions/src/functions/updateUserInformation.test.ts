@@ -5,8 +5,8 @@
 
 import { expect } from "chai";
 import { it } from "mocha";
-import { updateUserInformation } from "./updateUserInformation.js";
 import { describeWithEmulators } from "../tests/functions/testEnvironment.js";
+import { updateUserInformation } from "./updateUserInformation.js";
 
 describeWithEmulators("function: updateUserInformation", (env) => {
   it("updates user information successfully", async () => {

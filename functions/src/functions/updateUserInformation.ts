@@ -3,12 +3,12 @@
 // SPDX-FileCopyrightText: 2026 Stanford University and the project authors (see CONTRIBUTORS.md)
 // SPDX-License-Identifier: MIT
 
-import { validatedOnCall, defaultServiceAccount } from "./helpers.js";
 import {
   updateUserInformationInputSchema,
   type UpdateUserInformationOutput,
 } from "../models/index.js";
 import { getServiceFactory } from "../services/factory/getServiceFactory.js";
+import { validatedOnCall, defaultServiceAccount } from "./helpers.js";
 
 export const updateUserInformation = validatedOnCall(
   "updateUserInformation",

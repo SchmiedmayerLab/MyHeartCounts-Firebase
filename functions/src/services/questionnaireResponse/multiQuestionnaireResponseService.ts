@@ -3,9 +3,9 @@
 // SPDX-FileCopyrightText: 2026 Stanford University and the project authors (see CONTRIBUTORS.md)
 // SPDX-License-Identifier: MIT
 
-import { QuestionnaireResponseService } from "./questionnaireResponseService.js";
 import type { FHIRQuestionnaireResponse } from "../../models/index.js";
 import type { Document } from "../database/databaseService.js";
+import { QuestionnaireResponseService } from "./questionnaireResponseService.js";
 
 export class MultiQuestionnaireResponseService extends QuestionnaireResponseService {
   private readonly components: QuestionnaireResponseService[];

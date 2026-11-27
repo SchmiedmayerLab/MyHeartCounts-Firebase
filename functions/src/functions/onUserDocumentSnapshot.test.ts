@@ -11,14 +11,14 @@ import {
 } from "firebase-admin/firestore";
 import { it } from "mocha";
 import {
+  describeWithEmulators,
+  type EmulatorTestEnvironment,
+} from "../tests/functions/testEnvironment.js";
+import {
   captureUserDocumentSnapshot,
   DEBOUNCE_WINDOW_MS,
   onUserDocumentSnapshot,
 } from "./onUserDocumentSnapshot.js";
-import {
-  describeWithEmulators,
-  type EmulatorTestEnvironment,
-} from "../tests/functions/testEnvironment.js";
 
 const t0 = FirestoreTimestamp.fromMillis(1_700_000_000_000);
 const tPlus = (ms: number) => FirestoreTimestamp.fromMillis(t0.toMillis() + ms);

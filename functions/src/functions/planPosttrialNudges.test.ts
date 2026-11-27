@@ -9,12 +9,12 @@ import admin from "firebase-admin";
 import { DateTime } from "luxon";
 import { it, describe } from "mocha";
 import { stub } from "sinon";
+import { describeWithEmulators } from "../tests/functions/testEnvironment.js";
 import { createNudgeNotifications } from "./planNudges.js";
 import {
   PosttrialNudgeService,
   createPosttrialNudgeNotifications,
 } from "./planPosttrialNudges.js";
-import { describeWithEmulators } from "../tests/functions/testEnvironment.js";
 
 const daysAgo = (days: number): Date => {
   const d = new Date();

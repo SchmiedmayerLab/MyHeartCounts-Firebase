@@ -6,9 +6,9 @@
 import admin from "firebase-admin";
 import { https, logger } from "firebase-functions/v2";
 import { z } from "zod";
-import { validatedOnCall, privilegedServiceAccount } from "./helpers.js";
 import { getServiceFactory } from "../services/factory/getServiceFactory.js";
 import { HealthSampleDeletionService } from "../services/healthSamples/healthSampleDeletionService.js";
+import { validatedOnCall, privilegedServiceAccount } from "./helpers.js";
 
 const markHealthSamplesEnteredInErrorInputSchema = z.object({
   userId: z.string().min(1, "User ID is required"),

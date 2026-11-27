@@ -6,12 +6,6 @@
 import { randomUUID } from "crypto";
 import { logger } from "firebase-functions";
 import {
-  scoreToObservation,
-  getNicotineObservationConfig,
-} from "./fhirObservationConverter.js";
-import { DefaultNicotineScoreCalculator } from "./nicotineScoringService.js";
-import { QuestionnaireResponseService } from "./questionnaireResponseService.js";
-import {
   type Score,
   type FHIRQuestionnaireResponse,
   mhcSampleTypeCollection,
@@ -21,6 +15,12 @@ import {
   type Document,
   type DatabaseService,
 } from "../database/databaseService.js";
+import {
+  scoreToObservation,
+  getNicotineObservationConfig,
+} from "./fhirObservationConverter.js";
+import { DefaultNicotineScoreCalculator } from "./nicotineScoringService.js";
+import { QuestionnaireResponseService } from "./questionnaireResponseService.js";
 
 export class HeartRiskNicotineScoringQuestionnaireResponseService extends QuestionnaireResponseService {
   private readonly databaseService: DatabaseService;

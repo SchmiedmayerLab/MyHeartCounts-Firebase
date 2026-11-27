@@ -7,9 +7,9 @@ import { expect } from "chai";
 import admin from "firebase-admin";
 import { it, describe } from "mocha";
 import { stub, restore } from "sinon";
-import { processNotificationBacklog } from "./sendNudges.js";
 import { describeWithEmulators } from "../tests/functions/testEnvironment.js";
 import { MockMessaging } from "../tests/mocks/messaging.js";
+import { processNotificationBacklog } from "./sendNudges.js";
 
 describeWithEmulators("function: sendNudges", (env) => {
   let mockMessaging: MockMessaging;

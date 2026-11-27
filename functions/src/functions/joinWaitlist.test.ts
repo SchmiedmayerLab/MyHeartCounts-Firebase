@@ -7,8 +7,8 @@
 
 import { expect } from "chai";
 import { https } from "firebase-functions/v2";
-import { joinWaitlist } from "./joinWaitlist.js";
 import { describeWithEmulators } from "../tests/functions/testEnvironment.js";
+import { joinWaitlist } from "./joinWaitlist.js";
 
 describeWithEmulators("function: joinWaitlist", (env) => {
   it("successfully adds an entry to the waitlist", async () => {

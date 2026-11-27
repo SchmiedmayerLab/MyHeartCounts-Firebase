@@ -7,8 +7,8 @@
 
 import { expect } from "chai";
 import { https } from "firebase-functions/v2";
-import { markAccountForDeletion } from "./markAccountForDeletion.js";
 import { describeWithEmulators } from "../tests/functions/testEnvironment.js";
+import { markAccountForDeletion } from "./markAccountForDeletion.js";
 
 describeWithEmulators("function: markAccountForDeletion", (env) => {
   it("successfully marks a user account for deletion", async () => {

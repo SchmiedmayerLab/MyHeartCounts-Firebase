@@ -6,9 +6,9 @@
 import admin from "firebase-admin";
 import { Timestamp } from "firebase-admin/firestore";
 import { logger } from "firebase-functions/v2";
-import type { PendingHealthSampleDeletion } from "./pendingHealthSampleDeletion.js";
 import { FHIRObservationStatus } from "../../models/index.js";
 import { CollectionsService } from "../database/collections.js";
+import type { PendingHealthSampleDeletion } from "./pendingHealthSampleDeletion.js";
 
 const MAX_QUEUE_RETRIES = 3;
 const QUEUE_BATCH_SIZE = 500;

@@ -8,8 +8,8 @@ import { expect } from "chai";
 import admin from "firebase-admin";
 import { DateTime } from "luxon";
 import { it, describe } from "mocha";
-import { createNudgeNotifications } from "./planNudges.js";
 import { describeWithEmulators } from "../tests/functions/testEnvironment.js";
+import { createNudgeNotifications } from "./planNudges.js";
 
 /* eslint-disable @typescript-eslint/no-unused-expressions */
 

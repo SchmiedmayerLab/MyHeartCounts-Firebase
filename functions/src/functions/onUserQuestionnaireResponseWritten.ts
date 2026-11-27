@@ -4,7 +4,6 @@
 // SPDX-License-Identifier: MIT
 
 import { onDocumentWritten } from "firebase-functions/v2/firestore";
-import { privilegedServiceAccount } from "./helpers.js";
 import {
   type FHIRQuestionnaireResponse,
   fhirQuestionnaireResponseConverter,
@@ -12,6 +11,7 @@ import {
 import { DatabaseConverter } from "../services/database/databaseConverter.js";
 import { type Document } from "../services/database/databaseService.js";
 import { getServiceFactory } from "../services/factory/getServiceFactory.js";
+import { privilegedServiceAccount } from "./helpers.js";
 
 const converter = new DatabaseConverter(
   fhirQuestionnaireResponseConverter.value,
