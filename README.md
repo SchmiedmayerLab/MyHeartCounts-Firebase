@@ -16,7 +16,7 @@ SPDX-License-Identifier: MIT
 [![REUSE status](https://api.reuse.software/badge/github.com/SchmiedmayerLab/MyHeartCounts-Firebase)](https://api.reuse.software/info/github.com/SchmiedmayerLab/MyHeartCounts-Firebase)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE.md)
 
-Firebase cloud hosting infrastructure for the Stanford My Heart Counts project.
+Firebase cloud hosting infrastructure for the My Heart Counts project, developed by the [Schmiedmayer Lab](https://schmiedmayerlab.stanford.edu) at the Stanford Division of Computational Medicine.
 
 The iOS Application can be found in the [SchmiedmayerLab/MyHeartCounts-iOS](https://github.com/SchmiedmayerLab/MyHeartCounts-iOS) repository, the repository for the data analysis side of this study can be found over at [SchmiedmayerLab/MyHeartCounts-DataAnalysis](https://github.com/SchmiedmayerLab/MyHeartCounts-DataAnalysis).
 
@@ -31,7 +31,7 @@ Key features of the backend infrastructure include:
 - Region-based waitlist for anonymous users (no account required) using ISO 3166-1 alpha-2 country codes
 
 > [!NOTE]
-> Do you want to learn more about the Stanford Spezi Template Application and how to use, extend, and modify this application? Check out the [Stanford Spezi Template Application documentation](https://stanfordspezi.github.io/SpeziTemplateApplication).
+> Do you want to learn more about Grove, the ecosystem this backend is built on? Check out the [Grove repository](https://github.com/SchmiedmayerLab/Grove) and the [Grove FHIR documentation](https://schmiedmayerlab.github.io/grove-fhir).
 
 
 ## Data Structure
@@ -108,7 +108,7 @@ The following table provides an overview of all fields in the `/users/{USER-ID}`
 
 |Path|Purpose|
 |-|-|
-|`/public/mhcStudyBundle.spezistudybundle.aar`|This it the Study definition bundle auto-build by the workflow in [MyHeartCounts-StudyDefinitions](https://github.com/SchmiedmayerLab/MyHeartCounts-StudyDefinitions/blob/main/.github/workflows/publish-study-definition.yml)|
+|`/public/mhcStudyBundle.studybundle.tar.zst`, `/public/mhcStudyBundle-imperial.studybundle.tar.zst`|The study definition bundles auto-built by the workflow in [MyHeartCounts-StudyDefinitions](https://github.com/SchmiedmayerLab/MyHeartCounts-StudyDefinitions/blob/main/.github/workflows/publish-study-definition.yml)|
 |`/user/{USER-ID}/consent`|PDF Files of every consent the user gave (this could be multiple in the case of consent revisions or re-signup by the user.)|
 |`/user/{USER-ID}/historicalHealthSamples/{HEALTHKIT.IDENTIFIER}{UUID}.json.zstd`|We collect health samples that were recorded before the user enrolled into the app, compress them via zstd and store them as-is in the folder historicalHealthSamples for future analytics|
 |`/user/{USER-ID}/liveHealthSamples/{UUID}.json.zstd`|Most recorded ongoing (new) health samples get directly uploaded into the Firestore NoSQL Database - however, if a large amount of data has accumulated, we archive these samples for server-side decoding and upload them into liveHealthSamples. **This folder will be empty most of the time!** On Upload, the function [onArchivedLiveHealthSampleUploaded.ts](functions/src/functions/onArchivedLiveHealthSampleUploaded.ts) gets triggered which upon successful unpacking and storing into the Firestore Database deletes the live health sample archive.|
@@ -169,7 +169,7 @@ Branches are following a `<type>/<short-description>` naming structure, e.g. `fe
 
 ### REUSE Compatibility
 
-All project files must adhere to version 3.3 of the REUSE Specification. A template for the file header is provided as [spezi.jinja2](.reuse/templates/spezi.jinja2), which can be auto-applied with:
+All project files must adhere to version 3.3 of the REUSE Specification. A template for the file header is provided as [grove.jinja2](.reuse/templates/grove.jinja2), which can be auto-applied with:
 
 ```bash
 reuse annotate \
@@ -177,7 +177,7 @@ reuse annotate \
   --license="MIT" \
   --year="$(date +%Y)" \
   --copyright-prefix=spdx \
-  --template=spezi \
+  --template=grove \
   --merge-copyrights \
   --recursive \
   --fallback-dot-license \
