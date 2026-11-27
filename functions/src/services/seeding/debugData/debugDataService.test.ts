@@ -6,11 +6,11 @@
 import fs from "fs";
 import { expect } from "chai";
 import { describe } from "mocha";
-import { type DebugDataService } from "./debugDataService.js";
 import { type MockFirestore } from "../../../tests/mocks/firestore.js";
 import { cleanupMocks, setupMockFirebase } from "../../../tests/setup.js";
 import { TestFlags } from "../../../tests/testFlags.js";
 import { getServiceFactory } from "../../factory/getServiceFactory.js";
+import { type DebugDataService } from "./debugDataService.js";
 
 describe("DebugDataService", () => {
   const date = new Date("2024-06-05");

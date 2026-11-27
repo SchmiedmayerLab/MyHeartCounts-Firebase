@@ -6,9 +6,9 @@
 import { expect } from "chai";
 import admin from "firebase-admin";
 import type { https } from "firebase-functions/v2";
-import { deleteHealthSamples } from "./deleteHealthSamples.js";
 import { describeWithEmulators } from "../tests/functions/testEnvironment.js";
 import { expectError } from "../tests/helpers.js";
+import { deleteHealthSamples } from "./deleteHealthSamples.js";
 
 describeWithEmulators(
   "function: deleteHealthSamples (FHIR compliant)",

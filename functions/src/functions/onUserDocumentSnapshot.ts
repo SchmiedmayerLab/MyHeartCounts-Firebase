@@ -8,8 +8,8 @@ import { isDeepStrictEqual } from "util";
 import admin from "firebase-admin";
 import { Timestamp } from "firebase-admin/firestore";
 import { onDocumentWritten } from "firebase-functions/v2/firestore";
-import { privilegedServiceAccount } from "./helpers.js";
 import { CollectionsService } from "../services/database/collections.js";
+import { privilegedServiceAccount } from "./helpers.js";
 
 /**
  * Debounce window for collapsing a burst of writes into a single snapshot.

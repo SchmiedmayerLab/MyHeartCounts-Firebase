@@ -6,11 +6,6 @@
 import { randomUUID } from "crypto";
 import { logger } from "firebase-functions";
 import {
-  scoreToObservation,
-  getNicotineObservationConfig,
-} from "./fhirObservationConverter.js";
-import { QuestionnaireResponseService } from "./questionnaireResponseService.js";
-import {
   Score,
   type FHIRQuestionnaireResponse,
   type FHIRObservation,
@@ -21,6 +16,11 @@ import {
   type Document,
   type DatabaseService,
 } from "../database/databaseService.js";
+import {
+  scoreToObservation,
+  getNicotineObservationConfig,
+} from "./fhirObservationConverter.js";
+import { QuestionnaireResponseService } from "./questionnaireResponseService.js";
 
 export interface NicotineScoreCalculator {
   calculate(smokingStatus: string): Score | null;

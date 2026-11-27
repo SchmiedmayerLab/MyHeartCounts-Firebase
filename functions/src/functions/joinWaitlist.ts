@@ -5,11 +5,11 @@
 
 import admin from "firebase-admin";
 import { FieldValue } from "firebase-admin/firestore";
-import { validatedOnCall, defaultServiceAccount } from "./helpers.js";
 import {
   joinWaitlistInputSchema,
   type JoinWaitlistOutput,
 } from "../models/index.js";
+import { validatedOnCall, defaultServiceAccount } from "./helpers.js";
 
 export const joinWaitlist = validatedOnCall(
   "joinWaitlist",

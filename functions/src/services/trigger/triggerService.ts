@@ -4,7 +4,7 @@
 // SPDX-License-Identifier: MIT
 
 import { logger } from "firebase-functions";
-// eslint-disable-next-line import/no-cycle
+// eslint-disable-next-line import-x/no-cycle
 import { _updateStaticData } from "../../functions/updateStaticData.js";
 import {
   type FHIRQuestionnaireResponse,

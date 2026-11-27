@@ -4,8 +4,8 @@
 // SPDX-License-Identifier: MIT
 
 import { onSchedule } from "firebase-functions/v2/scheduler";
-import { privilegedServiceAccount } from "./helpers.js";
 import { HealthSampleDeletionQueueService } from "../services/healthSamples/healthSampleDeletionQueueService.js";
+import { privilegedServiceAccount } from "./helpers.js";
 
 export const processPendingHealthSampleDeletions = onSchedule(
   {

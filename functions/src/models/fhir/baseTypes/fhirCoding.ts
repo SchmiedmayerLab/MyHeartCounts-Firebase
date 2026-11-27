@@ -3,14 +3,14 @@
 // SPDX-FileCopyrightText: 2026 Stanford University and the project authors (see CONTRIBUTORS.md)
 // SPDX-License-Identifier: MIT
 
-/* eslint-disable import/no-cycle */
+/* eslint-disable import-x/no-cycle */
 // Circular dependency is intentional and handled via Lazy wrappers
 
 import { z } from "zod";
-import { fhirElementConverter } from "./fhirElement.js";
 import { Lazy } from "../../helpers/lazy.js";
 import { optionalish } from "../../helpers/optionalish.js";
 import { SchemaConverter } from "../../helpers/schemaConverter.js";
+import { fhirElementConverter } from "./fhirElement.js";
 
 export const fhirCodingConverter = new Lazy(
   () =>

@@ -7,8 +7,11 @@ import http from "http";
 import { expect } from "chai";
 import admin from "firebase-admin";
 import { type DocumentSnapshot, Timestamp } from "firebase-admin/firestore";
-import { type Change } from "firebase-functions";
-import { type CloudEvent, type CloudFunction } from "firebase-functions/v2";
+import {
+  type Change,
+  type CloudEvent,
+  type CloudFunction,
+} from "firebase-functions";
 import {
   type CallableFunction,
   type CallableRequest,

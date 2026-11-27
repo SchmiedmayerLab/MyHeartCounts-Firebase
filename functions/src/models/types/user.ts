@@ -4,15 +4,15 @@
 // SPDX-License-Identifier: MIT
 
 import { z } from "zod";
+import { dateConverter } from "../helpers/dateConverter.js";
+import { Lazy } from "../helpers/lazy.js";
+import { optionalishDefault, optionalish } from "../helpers/optionalish.js";
+import { SchemaConverter } from "../helpers/schemaConverter.js";
 import {
   userRegistrationConverter,
   userRegistrationInputConverter,
   UserRegistration,
 } from "./userRegistration.js";
-import { dateConverter } from "../helpers/dateConverter.js";
-import { Lazy } from "../helpers/lazy.js";
-import { optionalishDefault, optionalish } from "../helpers/optionalish.js";
-import { SchemaConverter } from "../helpers/schemaConverter.js";
 
 export const userConverter = new Lazy(
   () =>

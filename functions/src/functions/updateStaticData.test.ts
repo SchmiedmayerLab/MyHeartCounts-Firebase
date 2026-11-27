@@ -5,9 +5,9 @@
 
 import { expect } from "chai";
 import { it } from "mocha";
-import { _updateStaticData } from "./updateStaticData.js";
 import { CachingStrategy, StaticDataComponent } from "../models/index.js";
 import { describeWithEmulators } from "../tests/functions/testEnvironment.js";
+import { _updateStaticData } from "./updateStaticData.js";
 
 describeWithEmulators("function: updateStaticData", (env) => {
   it("updates static data successfully", async () => {

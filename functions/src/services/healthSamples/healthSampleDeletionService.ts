@@ -5,9 +5,9 @@
 
 import admin from "firebase-admin";
 import { logger } from "firebase-functions/v2";
-import { HealthSampleDeletionQueueService } from "./healthSampleDeletionQueueService.js";
 import { FHIRObservationStatus } from "../../models/index.js";
 import { CollectionsService } from "../database/collections.js";
+import { HealthSampleDeletionQueueService } from "./healthSampleDeletionQueueService.js";
 
 export interface HealthSampleDeletionResult {
   totalMarked: number;

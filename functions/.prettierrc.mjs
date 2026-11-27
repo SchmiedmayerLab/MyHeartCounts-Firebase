@@ -3,11 +3,6 @@
 // SPDX-FileCopyrightText: 2025, 2026 Stanford University and the project authors (see CONTRIBUTORS.md)
 // SPDX-License-Identifier: MIT
 
-const { getEslintNodeConfig } = require('@stanfordspezi/spezi-web-configurations')
+import { prettierConfig } from '@schmiedmayerlab/grove-configurations'
 
-module.exports = [
-  ...getEslintNodeConfig({ tsconfigRootDir: __dirname }),
-  {
-    ignores: ['lib/**/*', 'node_modules/**/*'],
-  },
-]
+export default prettierConfig

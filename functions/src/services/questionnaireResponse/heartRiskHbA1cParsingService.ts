@@ -6,11 +6,6 @@
 import { randomUUID } from "crypto";
 import { logger } from "firebase-functions";
 import {
-  getHbA1cObservationConfig,
-  questionnaireObservation,
-} from "./fhirObservationConverter.js";
-import { QuestionnaireResponseService } from "./questionnaireResponseService.js";
-import {
   CodingSystem,
   mhcSampleTypeCollection,
   MhcSampleTypeCode,
@@ -20,6 +15,11 @@ import {
   type Document,
   type DatabaseService,
 } from "../database/databaseService.js";
+import {
+  getHbA1cObservationConfig,
+  questionnaireObservation,
+} from "./fhirObservationConverter.js";
+import { QuestionnaireResponseService } from "./questionnaireResponseService.js";
 
 // Inverse of the IFCC-NGSP master equation; the scales differ by an offset, not a factor.
 const hbA1cPercentFromMmolPerMol = (mmolPerMol: number): number =>

@@ -3,14 +3,14 @@
 // SPDX-FileCopyrightText: 2026 Stanford University and the project authors (see CONTRIBUTORS.md)
 // SPDX-License-Identifier: MIT
 
-/* eslint-disable import/no-cycle */
+/* eslint-disable import-x/no-cycle */
 // Circular dependency is intentional and handled via Lazy wrappers
 
 import { z } from "zod";
-import { fhirCodingConverter } from "./fhirCoding.js";
 import { dateConverterISO } from "../../helpers/dateConverter.js";
 import { optionalish } from "../../helpers/optionalish.js";
 import { SchemaConverter } from "../../helpers/schemaConverter.js";
+import { fhirCodingConverter } from "./fhirCoding.js";
 
 export const fhirMetaConverter = new SchemaConverter({
   schema: z.object({

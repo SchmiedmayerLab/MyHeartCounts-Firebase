@@ -3,9 +3,9 @@
 // SPDX-FileCopyrightText: 2026 Stanford University and the project authors (see CONTRIBUTORS.md)
 // SPDX-License-Identifier: MIT
 
-import { CodingSystem } from "./codes.js";
 import { type FHIRQuantity } from "../fhir/baseTypes/fhirQuantity.js";
 import { type Observation } from "../types/observation.js";
+import { CodingSystem } from "./codes.js";
 
 export class QuantityUnit {
   // Static Properties

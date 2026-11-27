@@ -6,11 +6,6 @@
 import { randomUUID } from "crypto";
 import { logger } from "firebase-functions";
 import {
-  scoreToObservation,
-  getWho5ObservationConfig,
-} from "./fhirObservationConverter.js";
-import { QuestionnaireResponseService } from "./questionnaireResponseService.js";
-import {
   mhcSampleTypeCollection,
   MhcSampleTypeCode,
   Score,
@@ -20,6 +15,11 @@ import {
   type Document,
   type DatabaseService,
 } from "../database/databaseService.js";
+import {
+  scoreToObservation,
+  getWho5ObservationConfig,
+} from "./fhirObservationConverter.js";
+import { QuestionnaireResponseService } from "./questionnaireResponseService.js";
 
 export interface Who5ScoreCalculator {
   calculate(answers: Record<string, number>): Score;

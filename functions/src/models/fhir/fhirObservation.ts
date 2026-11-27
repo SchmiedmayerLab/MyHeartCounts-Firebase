@@ -4,6 +4,13 @@
 // SPDX-License-Identifier: MIT
 
 import { z } from "zod";
+import { CodingSystem, LoincCode } from "../codes/codes.js";
+import { QuantityUnit } from "../codes/quantityUnit.js";
+import { dateConverterISO } from "../helpers/dateConverter.js";
+import { Lazy } from "../helpers/lazy.js";
+import { optionalish } from "../helpers/optionalish.js";
+import { SchemaConverter } from "../helpers/schemaConverter.js";
+import { type Observation } from "../types/observation.js";
 import {
   type FHIRCodeableConcept,
   fhirCodeableConceptConverter,
@@ -26,13 +33,6 @@ import {
   type FHIRReference,
   fhirReferenceConverter,
 } from "./baseTypes/fhirReference.js";
-import { CodingSystem, LoincCode } from "../codes/codes.js";
-import { QuantityUnit } from "../codes/quantityUnit.js";
-import { dateConverterISO } from "../helpers/dateConverter.js";
-import { Lazy } from "../helpers/lazy.js";
-import { optionalish } from "../helpers/optionalish.js";
-import { SchemaConverter } from "../helpers/schemaConverter.js";
-import { type Observation } from "../types/observation.js";
 
 export enum UserObservationCollection {
   heartRate = "heartRateObservations",

@@ -6,9 +6,9 @@
 import { expect } from "chai";
 import type { https } from "firebase-functions/v2";
 import { it } from "mocha";
-import { markAccountForStudyReenrollment } from "./markAccountForStudyReenrollment.js";
 import { describeWithEmulators } from "../tests/functions/testEnvironment.js";
 import { expectError } from "../tests/helpers.js";
+import { markAccountForStudyReenrollment } from "./markAccountForStudyReenrollment.js";
 
 describeWithEmulators("function: markAccountForStudyReenrollment", (env) => {
   it("re-enrolls user in study successfully", async () => {

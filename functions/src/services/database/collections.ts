@@ -4,7 +4,6 @@
 // SPDX-License-Identifier: MIT
 
 import { type Firestore } from "firebase-admin/firestore";
-import { DatabaseConverter } from "./databaseConverter.js";
 import {
   fhirObservationConverter,
   fhirQuestionnaireConverter,
@@ -15,6 +14,7 @@ import {
   userMessageConverter,
 } from "../../models/index.js";
 import { historyChangeItemConverter } from "../history/historyService.js";
+import { DatabaseConverter } from "./databaseConverter.js";
 
 export class CollectionsService {
   // Properties

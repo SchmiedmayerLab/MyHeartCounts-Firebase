@@ -6,11 +6,6 @@
 import { randomUUID } from "crypto";
 import { logger } from "firebase-functions";
 import {
-  getLdlObservationConfig,
-  questionnaireObservation,
-} from "./fhirObservationConverter.js";
-import { QuestionnaireResponseService } from "./questionnaireResponseService.js";
-import {
   CodingSystem,
   mhcSampleTypeCollection,
   MhcSampleTypeCode,
@@ -20,6 +15,11 @@ import {
   type Document,
   type DatabaseService,
 } from "../database/databaseService.js";
+import {
+  getLdlObservationConfig,
+  questionnaireObservation,
+} from "./fhirObservationConverter.js";
+import { QuestionnaireResponseService } from "./questionnaireResponseService.js";
 
 // LDL cholesterol: 1 mmol/L corresponds to 38.67 mg/dL (cholesterol's molar mass is 386.65 g/mol).
 const ldlMgPerDlPerMmolPerL = 38.67;

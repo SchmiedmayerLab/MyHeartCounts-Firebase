@@ -7,7 +7,6 @@ import { setTimeout } from "timers/promises";
 import { type Auth } from "firebase-admin/auth";
 import { type UserRecord } from "firebase-functions/v1/auth";
 import { https, logger } from "firebase-functions/v2";
-import { type EnrollUserOptions, type UserService } from "./userService.js";
 import {
   advanceDateByDays,
   dateConverter,
@@ -18,6 +17,7 @@ import {
   type Document,
   type DatabaseService,
 } from "../database/databaseService.js";
+import { type EnrollUserOptions, type UserService } from "./userService.js";
 
 export class DatabaseUserService implements UserService {
   // Properties

@@ -8,8 +8,8 @@ import {
   beforeUserCreated,
   beforeUserSignedIn,
 } from "firebase-functions/v2/identity";
-import { defaultServiceAccount } from "./helpers.js";
 import { getServiceFactory } from "../services/factory/getServiceFactory.js";
+import { defaultServiceAccount } from "./helpers.js";
 
 export const beforeUserCreatedFunction = beforeUserCreated(
   {

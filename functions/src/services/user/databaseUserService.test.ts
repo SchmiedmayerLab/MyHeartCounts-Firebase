@@ -8,12 +8,12 @@
 import { expect } from "chai";
 import admin from "firebase-admin";
 import { describe } from "mocha";
-import { type UserService } from "./userService.js";
 import { type UserAuth } from "../../models/index.js";
 import { type MockFirestore } from "../../tests/mocks/firestore.js";
 import { cleanupMocks, setupMockFirebase } from "../../tests/setup.js";
 import { CollectionsService } from "../database/collections.js";
 import { getServiceFactory } from "../factory/getServiceFactory.js";
+import { type UserService } from "./userService.js";
 
 describe("DatabaseUserService", () => {
   let _mockFirestore: MockFirestore;

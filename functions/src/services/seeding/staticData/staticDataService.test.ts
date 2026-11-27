@@ -5,10 +5,10 @@
 
 import { expect } from "chai";
 import admin from "firebase-admin";
-import { type StaticDataService } from "./staticDataService.js";
 import { CachingStrategy } from "../../../models/index.js";
 import { cleanupMocks, setupMockFirebase } from "../../../tests/setup.js";
 import { getServiceFactory } from "../../factory/getServiceFactory.js";
+import { type StaticDataService } from "./staticDataService.js";
 
 describe("StaticDataService", () => {
   let staticDataService: StaticDataService;

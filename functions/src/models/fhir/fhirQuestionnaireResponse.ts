@@ -4,6 +4,10 @@
 // SPDX-License-Identifier: MIT
 
 import { z } from "zod";
+import { dateConverter } from "../helpers/dateConverter.js";
+import { Lazy } from "../helpers/lazy.js";
+import { optionalish } from "../helpers/optionalish.js";
+import { SchemaConverter } from "../helpers/schemaConverter.js";
 import { fhirCodingConverter } from "./baseTypes/fhirCoding.js";
 import {
   FHIRResource,
@@ -11,10 +15,6 @@ import {
   type FHIRResourceInput,
 } from "./baseTypes/fhirElement.js";
 import { fhirQuantityConverter } from "./baseTypes/fhirQuantity.js";
-import { dateConverter } from "../helpers/dateConverter.js";
-import { Lazy } from "../helpers/lazy.js";
-import { optionalish } from "../helpers/optionalish.js";
-import { SchemaConverter } from "../helpers/schemaConverter.js";
 
 const fhirQuestionnaireResponseItemBaseConverter = new SchemaConverter({
   schema: z.object({

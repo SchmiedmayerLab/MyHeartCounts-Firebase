@@ -3,8 +3,8 @@
 // SPDX-FileCopyrightText: 2026 Stanford University and the project authors (see CONTRIBUTORS.md)
 // SPDX-License-Identifier: MIT
 
-import { CodingSystem } from "./codes.js";
 import { type FHIRCoding } from "../fhir/baseTypes/fhirCoding.js";
+import { CodingSystem } from "./codes.js";
 
 export enum MhcSampleTypeCode {
   bloodGlucoseA1c = "MHCCustomSampleTypeBloodGlucoseA1c",

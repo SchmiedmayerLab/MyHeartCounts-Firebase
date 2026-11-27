@@ -5,7 +5,6 @@
 
 import admin from "firebase-admin";
 import { type AuthData } from "firebase-functions/v2/tasks";
-import { type ServiceFactory } from "./serviceFactory.js";
 import { Lazy } from "../../models/index.js";
 import { Credential } from "../credential/credential.js";
 import { FirestoreService } from "../database/firestoreService.js";
@@ -30,13 +29,14 @@ import {
 } from "../questionnaireResponse/who5ScoringService.js";
 import { DebugDataService } from "../seeding/debugData/debugDataService.js";
 import { StaticDataService } from "../seeding/staticData/staticDataService.js";
-// eslint-disable-next-line import/no-cycle -- TriggerServiceImpl requires ServiceFactory for dependency injection, creating a necessary cycle between factory and service implementation
+// eslint-disable-next-line import-x/no-cycle -- TriggerServiceImpl requires ServiceFactory for dependency injection, creating a necessary cycle between factory and service implementation
 import {
   TriggerServiceImpl,
   type TriggerService,
 } from "../trigger/triggerService.js";
 import { DatabaseUserService } from "../user/databaseUserService.js";
 import { type UserService } from "../user/userService.js";
+import { type ServiceFactory } from "./serviceFactory.js";
 
 export class DefaultServiceFactory implements ServiceFactory {
   // Properties - Options

@@ -6,9 +6,9 @@
 import { expect } from "chai";
 import { DocumentReference, Timestamp } from "firebase-admin/firestore";
 import { restore, stub } from "sinon";
-import { HealthSampleDeletionQueueService } from "./healthSampleDeletionQueueService.js";
 import { FHIRObservationStatus } from "../../models/index.js";
 import { describeWithEmulators } from "../../tests/functions/testEnvironment.js";
+import { HealthSampleDeletionQueueService } from "./healthSampleDeletionQueueService.js";
 
 describeWithEmulators("service: HealthSampleDeletionQueueService", (env) => {
   let queueService: HealthSampleDeletionQueueService;

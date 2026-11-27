@@ -30,7 +30,6 @@
     "deploy:datacollection-rules": "firebase deploy --only storage --config firebase.datacollection.json"
   },
   "devDependencies": {
-    "@stanfordspezi/spezi-web-configurations": "^0.6.0",
     "@types/luxon": "^3.7.1",
     "eslint": "^9.39.2",
     "prettier": "^3.8.1"

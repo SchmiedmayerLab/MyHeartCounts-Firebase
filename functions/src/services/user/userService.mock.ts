@@ -3,9 +3,9 @@
 // SPDX-FileCopyrightText: 2026 Stanford University and the project authors (see CONTRIBUTORS.md)
 // SPDX-License-Identifier: MIT
 
-import { type EnrollUserOptions, type UserService } from "./userService.js";
 import { User, type UserAuth } from "../../models/index.js";
 import { type Document } from "../database/databaseService.js";
+import { type EnrollUserOptions, type UserService } from "./userService.js";
 
 export class MockUserService implements UserService {
   // Methods - Auth

@@ -6,8 +6,8 @@
 import { isDeepStrictEqual } from "util";
 import { type DocumentSnapshot } from "firebase-admin/firestore";
 import { type Change } from "firebase-functions";
-import { type HistoryService } from "./historyService.js";
 import { type DatabaseService } from "../database/databaseService.js";
+import { type HistoryService } from "./historyService.js";
 
 export class DatabaseHistoryService implements HistoryService {
   // Properties

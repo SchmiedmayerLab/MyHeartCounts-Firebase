@@ -5,17 +5,17 @@
 
 import { type z } from "zod";
 import {
+  updateStaticDataInputSchema,
+  type UpdateStaticDataOutput,
+} from "../models/index.js";
+// eslint-disable-next-line import-x/no-cycle -- Factory pattern requires circular dependency for service initialization
+import { getServiceFactory } from "../services/factory/getServiceFactory.js";
+import { type ServiceFactory } from "../services/factory/serviceFactory.js";
+import {
   validatedOnCall,
   validatedOnRequest,
   privilegedServiceAccount,
 } from "./helpers.js";
-import {
-  updateStaticDataInputSchema,
-  type UpdateStaticDataOutput,
-} from "../models/index.js";
-// eslint-disable-next-line import/no-cycle -- Factory pattern requires circular dependency for service initialization
-import { getServiceFactory } from "../services/factory/getServiceFactory.js";
-import { type ServiceFactory } from "../services/factory/serviceFactory.js";
 
 export const _updateStaticData = async (
   factory: ServiceFactory,
