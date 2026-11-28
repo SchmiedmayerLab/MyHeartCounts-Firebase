@@ -1,0 +1,493 @@
+{
+ "version": "0.6.0",
+ "keyHex": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+ "keyId": "test-key",
+ "epoch": "1",
+ "identities": [
+  {
+   "id": "unicode-and-separator-source-record",
+   "identityKind": "source-record",
+   "components": [
+    "health-connect",
+    "RestingHeartRateRecord",
+    "urn:uuid:1f5c58aa-6ec6-4e79-a682-829a9debd3f5",
+    "default",
+    "record|東京"
+   ],
+   "value": "v0:test-key:1:BDCkwCFA2Wg4-fHVRsy4L0JWYuvQknZkCTXL4Ct01IQ"
+  },
+  {
+   "id": "multi-output-sample",
+   "identityKind": "source-output",
+   "components": [
+    "health-connect",
+    "HeartRateRecord",
+    "urn:uuid:1f5c58aa-6ec6-4e79-a682-829a9debd3f5",
+    "default",
+    "record-heart-001",
+    "sample",
+    "2026-08-19T10:30:00.000000000Z|0"
+   ],
+   "value": "v0:test-key:1:MYPFjAMsSt0suOqpN29y_KjG__sagIpCbYKAfVKx6ck"
+  },
+  {
+   "id": "provider-account-complete-pair",
+   "identityKind": "provider-record",
+   "components": [
+    "withings",
+    "measure",
+    "https://accounts.example.org",
+    "patient|α",
+    "17348211"
+   ],
+   "value": "v0:test-key:1:qfmx1ajnVg_rNE8qiL_hIAWI8GtbVpRtf6T2RWREezM"
+  },
+  {
+   "id": "provider-output-domain-separated",
+   "identityKind": "provider-output",
+   "components": [
+    "withings",
+    "getmeas:9+10",
+    "https://accounts.example.org",
+    "patient|α",
+    "17348211",
+    "blood-pressure-panel",
+    "single"
+   ],
+   "value": "v0:test-key:1:mum-FTSsu6Kv_QBFNSjcFuznTp5C6D3QnrQ6iwm23Ec"
+  },
+  {
+   "id": "provider-artifact-domain-separated",
+   "identityKind": "provider-artifact",
+   "components": [
+    "google-health-api",
+    "heart-rate",
+    "https://accounts.example.org",
+    "patient|α",
+    "recording-001",
+    "provider-recording",
+    "0"
+   ],
+   "value": "v0:test-key:1:0LxvhsWmRngwxPPMqWk7--4qTN8Wa1j-oTbGuMCCgrA"
+  },
+  {
+   "id": "generic-source-artifact",
+   "identityKind": "source-artifact",
+   "components": [
+    "sensorkit",
+    "device-usage",
+    "https://store.example.org",
+    "default",
+    "record-001",
+    "native-recording",
+    "0"
+   ],
+   "value": "v0:test-key:1:iN5W23PWv_0jfI3RuCiO__c--cElAPDllZ4Gl_3CUPM"
+  },
+  {
+   "id": "writer-record-complete-application-pair",
+   "identityKind": "writer-record",
+   "components": [
+    "https://applications.example.org",
+    "com.withings.wiscale2",
+    "logical-record-001"
+   ],
+   "value": "v0:test-key:1:DvVpDnGZfj28tqpozMhpZSHjT2J65wvN_bmTYu0x0Cw"
+  },
+  {
+   "id": "healthkit-medication-source-context",
+   "identityKind": "source-context",
+   "components": [
+    "healthkit",
+    "medication-health-concept",
+    "urn:uuid:1f5c58aa-6ec6-4e79-a682-829a9debd3f5",
+    "default",
+    "2f8a51c6-9d34-4e07-b2f1-63c8ad905e12"
+   ],
+   "value": "v0:test-key:1:YTeSyVMN8VDKaIp7rLq6h9HfDIypiKcwO-nFqCJA8Dk"
+  },
+  {
+   "id": "recording-device-per-unit",
+   "identityKind": "recording-device",
+   "components": [
+    "healthkit",
+    "https://study.example.org/participants",
+    "participant-001",
+    "watch-unit-token-001"
+   ],
+   "value": "v0:test-key:1:BZfymBSOLQlRaEwkvjBNFKbiTvUoNrz8CJEgYlztkus"
+  },
+  {
+   "id": "device-snapshot-per-event",
+   "identityKind": "device-snapshot",
+   "components": [
+    "https://study.example.org/fhir/NamingSystem/grove-event-v0",
+    "e0:1f5c58aa-6ec6-4e79-a682-829a9debd3f5:42",
+    "application",
+    "com.example.app|1.2.3"
+   ],
+   "value": "v0:test-key:1:Q2sME_dGFj94xyprI1HtMokER94GYsHINZi0ilnsnRY"
+  },
+  {
+   "id": "normative-corpus-heart-rate-source-record",
+   "identityKind": "source-record",
+   "components": [
+    "health-connect",
+    "HeartRateRecord",
+    "urn:uuid:1f5c58aa-6ec6-4e79-a682-829a9debd3f5",
+    "default",
+    "record-heart-001"
+   ],
+   "value": "v0:test-key:1:ptHr751zWyYfaR2WIvrP1TfnVEK4bInC__ibP_AYfVY"
+  },
+  {
+   "id": "normative-corpus-heart-rate-source-output",
+   "identityKind": "source-output",
+   "components": [
+    "health-connect",
+    "HeartRateRecord",
+    "urn:uuid:1f5c58aa-6ec6-4e79-a682-829a9debd3f5",
+    "default",
+    "record-heart-001",
+    "sample",
+    "2026-08-20T15:30:00.251000000Z|0"
+   ],
+   "value": "v0:test-key:1:PPULnf0LKpASjIj8mU5TKafPKig_oqWND3_dHFShGd8"
+  },
+  {
+   "id": "normative-corpus-heart-rate-source-artifact",
+   "identityKind": "source-artifact",
+   "components": [
+    "health-connect",
+    "HeartRateRecord",
+    "urn:uuid:1f5c58aa-6ec6-4e79-a682-829a9debd3f5",
+    "default",
+    "record-heart-001",
+    "heart-rate-samples",
+    "0"
+   ],
+   "value": "v0:test-key:1:ZWmx94XtgArrE8XO6W6LQ7QYbkiWCIn-K1JVw8hxwrI"
+  },
+  {
+   "id": "normative-corpus-retraction-application-snapshot",
+   "identityKind": "device-snapshot",
+   "components": [
+    "https://study.example.org/fhir/NamingSystem/grove-event-v0",
+    "e0:1f5c58aa-6ec6-4e79-a682-829a9debd3f5:43",
+    "application",
+    "com.example.app|1.2.3"
+   ],
+   "value": "v0:test-key:1:JUZooa4NZX-rlMn9-NC8W078xzEuUO9X3Xo1mgk0Vac"
+  },
+  {
+   "id": "questionnaire-extraction-source-record",
+   "identityKind": "source-record",
+   "components": [
+    "questionnaire",
+    "QuestionnaireResponse",
+    "https://study.example.org/fhir/NamingSystem/questionnaire-response",
+    "default",
+    "home-vitals-2026-08-28"
+   ],
+   "value": "v0:test-key:1:7_7dmqTFxPH01QGTycmp8nIPty7WwphH2X0ZaV-p3wk"
+  },
+  {
+   "id": "questionnaire-extraction-body-weight-output",
+   "identityKind": "source-output",
+   "components": [
+    "questionnaire",
+    "QuestionnaireResponse",
+    "https://study.example.org/fhir/NamingSystem/questionnaire-response",
+    "default",
+    "home-vitals-2026-08-28",
+    "body-weight",
+    "single"
+   ],
+   "value": "v0:test-key:1:oY5ARo6F_wNj5wVdtFqORMdUwZ__B9kQ6GW1RSaEz10"
+  },
+  {
+   "id": "questionnaire-extraction-blood-pressure-output",
+   "identityKind": "source-output",
+   "components": [
+    "questionnaire",
+    "QuestionnaireResponse",
+    "https://study.example.org/fhir/NamingSystem/questionnaire-response",
+    "default",
+    "home-vitals-2026-08-28",
+    "blood-pressure",
+    "single"
+   ],
+   "value": "v0:test-key:1:ljzpyfYa15oOpj_A37-cd-_8JXqQwwfomR9iT0gct6g"
+  },
+  {
+   "id": "questionnaire-extraction-application-snapshot",
+   "identityKind": "device-snapshot",
+   "components": [
+    "https://study.example.org/fhir/NamingSystem/grove-event-v0",
+    "e0:6f9d1c4a-2b7e-4f18-9c33-5a1d0e7b2c48:1",
+    "application",
+    "org.grovealliance.example.client|1.4.0|1402"
+   ],
+   "value": "v0:test-key:1:W8r_v8DzqOippQF5DUZiyhr_iwyRQk3NTa_sQLF8aM0"
+  },
+  {
+   "id": "receiver-secondary-output",
+   "identityKind": "source-output",
+   "components": [
+    "health-connect",
+    "HeartRateRecord",
+    "urn:uuid:1f5c58aa-6ec6-4e79-a682-829a9debd3f5",
+    "default",
+    "record-heart-001",
+    "sample",
+    "2026-08-20T15:30:01.251000000Z|0"
+   ],
+   "value": "v0:test-key:1:BYrV6N3A1WrjO1saOCgLww1gdAQqFQ5jLoFoTKwec9c"
+  },
+  {
+   "id": "receiver-changed-source-record",
+   "identityKind": "source-record",
+   "components": [
+    "health-connect",
+    "HeartRateRecord",
+    "urn:uuid:1f5c58aa-6ec6-4e79-a682-829a9debd3f5",
+    "default",
+    "another-record"
+   ],
+   "value": "v0:test-key:1:WssrtI7oYzcgG0mFxlitvSznCx4esKSDEbK-bOUQpTk"
+  },
+  {
+   "id": "receiver-application-snapshot-67",
+   "identityKind": "device-snapshot",
+   "components": [
+    "https://study.example.org/fhir/NamingSystem/grove-event-v0",
+    "e0:1f5c58aa-6ec6-4e79-a682-829a9debd3f5:67",
+    "application",
+    "fixture-app"
+   ],
+   "value": "v0:test-key:1:2f3FbY5IkXSZQs9xgEChYLIWANCcdFhDmauCsjHgA7A"
+  },
+  {
+   "id": "receiver-other-writer",
+   "identityKind": "writer-record",
+   "components": [
+    "https://study.example.org/apps",
+    "another-writer",
+    "heart-rate-1"
+   ],
+   "value": "v0:test-key:1:5mIZKnS2ox49bXbK-YuTn_SPDVdslEyQIsXF7oV2h3k"
+  },
+  {
+   "id": "receiver-application-snapshot-60",
+   "identityKind": "device-snapshot",
+   "components": [
+    "https://study.example.org/fhir/NamingSystem/grove-event-v0",
+    "e0:1f5c58aa-6ec6-4e79-a682-829a9debd3f5:60",
+    "application",
+    "fixture-app"
+   ],
+   "value": "v0:test-key:1:dFdgpZqSrZI83hNxyslxoI1qXUlq0fa2bAo4tnhv2CE"
+  },
+  {
+   "id": "receiver-application-snapshot-61",
+   "identityKind": "device-snapshot",
+   "components": [
+    "https://study.example.org/fhir/NamingSystem/grove-event-v0",
+    "e0:1f5c58aa-6ec6-4e79-a682-829a9debd3f5:61",
+    "application",
+    "fixture-app"
+   ],
+   "value": "v0:test-key:1:G0shWKztBFVa7S2QFoeDhU71zLfIEkS5BkE_3jFpiNk"
+  },
+  {
+   "id": "receiver-application-snapshot-62",
+   "identityKind": "device-snapshot",
+   "components": [
+    "https://study.example.org/fhir/NamingSystem/grove-event-v0",
+    "e0:1f5c58aa-6ec6-4e79-a682-829a9debd3f5:62",
+    "application",
+    "fixture-app"
+   ],
+   "value": "v0:test-key:1:tfnsLulBQxFAOUV6gNjzORPIjCXbXgrqMMZ3bvNa1ik"
+  },
+  {
+   "id": "receiver-application-snapshot-63",
+   "identityKind": "device-snapshot",
+   "components": [
+    "https://study.example.org/fhir/NamingSystem/grove-event-v0",
+    "e0:1f5c58aa-6ec6-4e79-a682-829a9debd3f5:63",
+    "application",
+    "fixture-app"
+   ],
+   "value": "v0:test-key:1:-mUWvC9wBT8cKHPAO4t6fvsJW9ele_WgaEO0swH-tQc"
+  },
+  {
+   "id": "receiver-application-snapshot-64",
+   "identityKind": "device-snapshot",
+   "components": [
+    "https://study.example.org/fhir/NamingSystem/grove-event-v0",
+    "e0:1f5c58aa-6ec6-4e79-a682-829a9debd3f5:64",
+    "application",
+    "fixture-app"
+   ],
+   "value": "v0:test-key:1:EYUasFsZmO8n8-2AWt5w5VyYh-6Yz5-5vSybbwLlMb8"
+  },
+  {
+   "id": "receiver-application-snapshot-65",
+   "identityKind": "device-snapshot",
+   "components": [
+    "https://study.example.org/fhir/NamingSystem/grove-event-v0",
+    "e0:1f5c58aa-6ec6-4e79-a682-829a9debd3f5:65",
+    "application",
+    "fixture-app"
+   ],
+   "value": "v0:test-key:1:oPK4uLWJLUJo8JL5r7lWjaQL8dAiSAsfVOtqsk6ruQ8"
+  },
+  {
+   "id": "receiver-application-snapshot-66",
+   "identityKind": "device-snapshot",
+   "components": [
+    "https://study.example.org/fhir/NamingSystem/grove-event-v0",
+    "e0:1f5c58aa-6ec6-4e79-a682-829a9debd3f5:66",
+    "application",
+    "fixture-app"
+   ],
+   "value": "v0:test-key:1:Tj726etFKNnHaooVq2wP2K9I5odIL8ZDIp4yvqJJtS4"
+  },
+  {
+   "id": "receiver-writer",
+   "identityKind": "writer-record",
+   "components": [
+    "https://study.example.org/apps",
+    "fixture-writer",
+    "heart-rate-1"
+   ],
+   "value": "v0:test-key:1:TN39cF6jcCICy4SlWBjpAulk4eMlcb-KM3MwESD9cvw"
+  },
+  {
+   "id": "receiver-target-record",
+   "identityKind": "source-record",
+   "components": [
+    "questionnaire",
+    "heart-rate",
+    "https://study.example.org/repositories",
+    "fixture",
+    "record-2"
+   ],
+   "value": "v0:test-key:1:TE47APXmta6xbmGufkf8LBv8q3aPR4NDn9bltP7vEn4"
+  },
+  {
+   "id": "receiver-target-output",
+   "identityKind": "source-output",
+   "components": [
+    "questionnaire",
+    "heart-rate",
+    "https://study.example.org/repositories",
+    "fixture",
+    "record-2",
+    "primary",
+    "0"
+   ],
+   "value": "v0:test-key:1:M6afafiHPF1Pqyg4OZ5IN0R_8s97oM3WWy904IjTwy8"
+  },
+  {
+   "id": "receiver-application-snapshot-41",
+   "identityKind": "device-snapshot",
+   "components": [
+    "https://study.example.org/fhir/NamingSystem/grove-event-v0",
+    "e0:1f5c58aa-6ec6-4e79-a682-829a9debd3f5:41",
+    "application",
+    "fixture-app"
+   ],
+   "value": "v0:test-key:1:s7LpE9vScdo_lguSPQ-KetFYzpcgwAdbUFlTLS8ECPY"
+  },
+  {
+   "id": "receiver-application-snapshot-42",
+   "identityKind": "device-snapshot",
+   "components": [
+    "https://study.example.org/fhir/NamingSystem/grove-event-v0",
+    "e0:1f5c58aa-6ec6-4e79-a682-829a9debd3f5:42",
+    "application",
+    "fixture-app"
+   ],
+   "value": "v0:test-key:1:FhFF4pknUiHfdg3v3p6KQYzE8ZI_U3YKj-IdsYcRpLU"
+  },
+  {
+   "id": "receiver-application-snapshot-44",
+   "identityKind": "device-snapshot",
+   "components": [
+    "https://study.example.org/fhir/NamingSystem/grove-event-v0",
+    "e0:1f5c58aa-6ec6-4e79-a682-829a9debd3f5:44",
+    "application",
+    "fixture-app"
+   ],
+   "value": "v0:test-key:1:6I8uWw-e6duXMHPcuf6Zcjv5YKphw1S0hZgfq1N9EMM"
+  },
+  {
+   "id": "receiver-application-snapshot-45",
+   "identityKind": "device-snapshot",
+   "components": [
+    "https://study.example.org/fhir/NamingSystem/grove-event-v0",
+    "e0:1f5c58aa-6ec6-4e79-a682-829a9debd3f5:45",
+    "application",
+    "fixture-app"
+   ],
+   "value": "v0:test-key:1:v4OvFw1CH0dYyiwUrWICl6MPUpp9BrBDva51303xv4M"
+  },
+  {
+   "id": "receiver-application-snapshot-46",
+   "identityKind": "device-snapshot",
+   "components": [
+    "https://study.example.org/fhir/NamingSystem/grove-event-v0",
+    "e0:1f5c58aa-6ec6-4e79-a682-829a9debd3f5:46",
+    "application",
+    "fixture-app"
+   ],
+   "value": "v0:test-key:1:P-CZcBXDylBtujPUTLBrMVc24OEl_83sh_WrgLhEGfk"
+  },
+  {
+   "id": "receiver-application-snapshot-47",
+   "identityKind": "device-snapshot",
+   "components": [
+    "https://study.example.org/fhir/NamingSystem/grove-event-v0",
+    "e0:1f5c58aa-6ec6-4e79-a682-829a9debd3f5:47",
+    "application",
+    "fixture-app"
+   ],
+   "value": "v0:test-key:1:7CSIYKL1G_jH0947A2Wrz5arDAmPJ__NU5syHdbiLFk"
+  },
+  {
+   "id": "multi-study-application-snapshot-50",
+   "identityKind": "device-snapshot",
+   "components": [
+    "https://study.example.org/fhir/NamingSystem/grove-event-v0",
+    "e0:1f5c58aa-6ec6-4e79-a682-829a9debd3f5:50",
+    "application",
+    "fixture-app"
+   ],
+   "value": "v0:test-key:1:IPo3xVSPUNGwqi_4L3JZCTpztid-H4rQEvEt3YZ2TcU"
+  },
+  {
+   "id": "multi-study-application-snapshot-51",
+   "identityKind": "device-snapshot",
+   "components": [
+    "https://study.example.org/fhir/NamingSystem/grove-event-v0",
+    "e0:1f5c58aa-6ec6-4e79-a682-829a9debd3f5:51",
+    "application",
+    "fixture-app"
+   ],
+   "value": "v0:test-key:1:1BRlmWamqCymL8adxO0bJCs1rV4L6ZGkPUGzrOfixnw"
+  },
+  {
+   "id": "questionnaire-extraction-host-snapshot",
+   "identityKind": "device-snapshot",
+   "components": [
+    "https://study.example.org/fhir/NamingSystem/grove-event-v0",
+    "e0:6f9d1c4a-2b7e-4f18-9c33-5a1d0e7b2c48:1",
+    "host",
+    "iPhone17,1|26.0"
+   ],
+   "value": "v0:test-key:1:Bjx_NBNO2-QhII9c1M5mcLUUOJRB0YSTXbg68kkTDdc"
+  }
+ ]
+}

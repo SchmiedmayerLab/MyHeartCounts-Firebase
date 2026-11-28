@@ -1,0 +1,462 @@
+{
+ "source": {
+  "study_definitions_commit": "48cfb06d346d5581c16323219f89a33d01f40c07",
+  "study_revision": 44,
+  "files": [
+   "Sources/MHCStudyDefinitionExporter/Study.swift",
+   "Sources/MHCStudyDefinitionExporter/Study+IDs.swift"
+  ],
+  "note": "Version 1 exports HealthKit records only. Types not listed are excluded as not collected by the study."
+ },
+ "default": {
+  "disposition": "excluded",
+  "reason": "not_in_study"
+ },
+ "types": {
+  "HKCategoryTypeIdentifierAppleStandHour": {
+   "disposition": "export",
+   "reason": "supported/codeableConcept -> apple-stand-hour",
+   "optional": false
+  },
+  "HKCategoryTypeIdentifierAppleWalkingSteadinessEvent": {
+   "disposition": "export",
+   "reason": "supported/codeableConcept -> walking-steadiness-notification",
+   "optional": false
+  },
+  "HKCategoryTypeIdentifierCervicalMucusQuality": {
+   "disposition": "export",
+   "reason": "supported/codeableConcept -> cervical-mucus-quality",
+   "optional": false
+  },
+  "HKCategoryTypeIdentifierChestTightnessOrPain": {
+   "disposition": "deferred",
+   "reason": "ECG-linked symptom; same reason",
+   "optional": false
+  },
+  "HKCategoryTypeIdentifierContraceptive": {
+   "disposition": "export",
+   "reason": "supported/codeableConcept -> contraceptive-use",
+   "optional": false
+  },
+  "HKCategoryTypeIdentifierDizziness": {
+   "disposition": "deferred",
+   "reason": "ECG-linked symptom; same reason",
+   "optional": false
+  },
+  "HKCategoryTypeIdentifierFainting": {
+   "disposition": "deferred",
+   "reason": "ECG-linked symptom; same reason",
+   "optional": false
+  },
+  "HKCategoryTypeIdentifierFatigue": {
+   "disposition": "deferred",
+   "reason": "ECG-linked symptom; same reason",
+   "optional": false
+  },
+  "HKCategoryTypeIdentifierHighHeartRateEvent": {
+   "disposition": "export",
+   "reason": "supported/codeableConcept -> high-heart-rate-notification",
+   "optional": false
+  },
+  "HKCategoryTypeIdentifierInfrequentMenstrualCycles": {
+   "disposition": "export",
+   "reason": "supported/codeableConcept -> infrequent-menstrual-cycles",
+   "optional": false
+  },
+  "HKCategoryTypeIdentifierIntermenstrualBleeding": {
+   "disposition": "export",
+   "reason": "supported/codeableConcept -> intermenstrual-bleeding",
+   "optional": false
+  },
+  "HKCategoryTypeIdentifierIrregularHeartRhythmEvent": {
+   "disposition": "export",
+   "reason": "supported/codeableConcept -> irregular-heart-rhythm-notification",
+   "optional": false
+  },
+  "HKCategoryTypeIdentifierIrregularMenstrualCycles": {
+   "disposition": "export",
+   "reason": "supported/codeableConcept -> irregular-menstrual-cycles",
+   "optional": false
+  },
+  "HKCategoryTypeIdentifierLactation": {
+   "disposition": "export",
+   "reason": "supported/codeableConcept -> lactation-status",
+   "optional": false
+  },
+  "HKCategoryTypeIdentifierLowHeartRateEvent": {
+   "disposition": "export",
+   "reason": "supported/codeableConcept -> low-heart-rate-notification",
+   "optional": false
+  },
+  "HKCategoryTypeIdentifierMenstrualFlow": {
+   "disposition": "export",
+   "reason": "supported/codeableConcept -> menstruation-flow",
+   "optional": false
+  },
+  "HKCategoryTypeIdentifierMindfulSession": {
+   "disposition": "export",
+   "reason": "supported/quantity -> mindfulness-session, min (Grove turns the category into a duration; code mindfulness-session-duration)",
+   "optional": false
+  },
+  "HKCategoryTypeIdentifierOvulationTestResult": {
+   "disposition": "export",
+   "reason": "supported/codeableConcept -> ovulation-test-result",
+   "optional": false
+  },
+  "HKCategoryTypeIdentifierPersistentIntermenstrualBleeding": {
+   "disposition": "export",
+   "reason": "supported/codeableConcept -> persistent-intermenstrual-bleeding",
+   "optional": false
+  },
+  "HKCategoryTypeIdentifierPregnancy": {
+   "disposition": "export",
+   "reason": "supported/codeableConcept -> pregnancy-status",
+   "optional": false
+  },
+  "HKCategoryTypeIdentifierPregnancyTestResult": {
+   "disposition": "export",
+   "reason": "supported/codeableConcept -> pregnancy-test-result",
+   "optional": false
+  },
+  "HKCategoryTypeIdentifierProgesteroneTestResult": {
+   "disposition": "export",
+   "reason": "supported/codeableConcept -> progesterone-test-result",
+   "optional": false
+  },
+  "HKCategoryTypeIdentifierProlongedMenstrualPeriods": {
+   "disposition": "export",
+   "reason": "supported/codeableConcept -> prolonged-menstrual-periods",
+   "optional": false
+  },
+  "HKCategoryTypeIdentifierRapidPoundingOrFlutteringHeartbeat": {
+   "disposition": "deferred",
+   "reason": "Not in the study definition",
+   "optional": false
+  },
+  "HKCategoryTypeIdentifierShortnessOfBreath": {
+   "disposition": "deferred",
+   "reason": "ECG-linked symptom; same reason",
+   "optional": false
+  },
+  "HKCategoryTypeIdentifierSkippedHeartbeat": {
+   "disposition": "deferred",
+   "reason": "ECG-linked symptom; same reason as RapidPoundingOrFlutteringHeartbeat",
+   "optional": false
+  },
+  "HKCategoryTypeIdentifierSleepAnalysis": {
+   "disposition": "export",
+   "reason": "supported/codeableConcept -> sleep-stage",
+   "optional": false
+  },
+  "HKCharacteristicTypeIdentifierActivityMoveMode": {
+   "disposition": "excluded",
+   "reason": "intentionally-unsupported in Grove; characteristic, not uploaded",
+   "optional": false
+  },
+  "HKCharacteristicTypeIdentifierBiologicalSex": {
+   "disposition": "excluded",
+   "reason": "Characteristic and quasi-identifier, not uploaded as a HealthKit record",
+   "optional": false
+  },
+  "HKCharacteristicTypeIdentifierBloodType": {
+   "disposition": "excluded",
+   "reason": "Characteristic, not uploaded",
+   "optional": false
+  },
+  "HKCharacteristicTypeIdentifierDateOfBirth": {
+   "disposition": "excluded",
+   "reason": "Direct identifier",
+   "optional": false
+  },
+  "HKCharacteristicTypeIdentifierFitzpatrickSkinType": {
+   "disposition": "excluded",
+   "reason": "Characteristic, not uploaded",
+   "optional": false
+  },
+  "HKCharacteristicTypeIdentifierWheelchairUse": {
+   "disposition": "excluded",
+   "reason": "Characteristic, not uploaded",
+   "optional": false
+  },
+  "HKClinicalTypeIdentifierAllergyRecord": {
+   "disposition": "deferred",
+   "reason": "platform-exclusive clinical record (DocumentReference envelope; project drops it as clinical_record)",
+   "optional": true
+  },
+  "HKClinicalTypeIdentifierClinicalNoteRecord": {
+   "disposition": "deferred",
+   "reason": "platform-exclusive clinical record",
+   "optional": true
+  },
+  "HKClinicalTypeIdentifierConditionRecord": {
+   "disposition": "deferred",
+   "reason": "platform-exclusive clinical record",
+   "optional": true
+  },
+  "HKClinicalTypeIdentifierCoverageRecord": {
+   "disposition": "deferred",
+   "reason": "platform-exclusive clinical record",
+   "optional": true
+  },
+  "HKClinicalTypeIdentifierImmunizationRecord": {
+   "disposition": "deferred",
+   "reason": "platform-exclusive clinical record",
+   "optional": true
+  },
+  "HKClinicalTypeIdentifierLabResultRecord": {
+   "disposition": "deferred",
+   "reason": "platform-exclusive clinical record",
+   "optional": true
+  },
+  "HKClinicalTypeIdentifierMedicationRecord": {
+   "disposition": "deferred",
+   "reason": "platform-exclusive clinical record",
+   "optional": true
+  },
+  "HKClinicalTypeIdentifierProcedureRecord": {
+   "disposition": "deferred",
+   "reason": "platform-exclusive clinical record",
+   "optional": true
+  },
+  "HKClinicalTypeIdentifierVitalSignRecord": {
+   "disposition": "deferred",
+   "reason": "platform-exclusive clinical record",
+   "optional": true
+  },
+  "HKCorrelationTypeIdentifierBloodPressure": {
+   "disposition": "deferred",
+   "reason": "supported/components (two-component panel, LOINC 85354-9)",
+   "optional": false
+  },
+  "HKDataTypeIdentifierElectrocardiogram": {
+   "disposition": "deferred",
+   "reason": "supported/unmodeled",
+   "optional": false
+  },
+  "HKDataTypeStateOfMind": {
+   "disposition": "deferred",
+   "reason": "Deferred by decision",
+   "optional": false
+  },
+  "HKQuantityTypeIdentifierActiveEnergyBurned": {
+   "disposition": "export",
+   "reason": "supported/quantity -> active-energy, kcal",
+   "optional": false
+  },
+  "HKQuantityTypeIdentifierAppleExerciseTime": {
+   "disposition": "export",
+   "reason": "supported/quantity -> apple-exercise-time, min",
+   "optional": false
+  },
+  "HKQuantityTypeIdentifierAppleMoveTime": {
+   "disposition": "export",
+   "reason": "supported/quantity -> apple-move-time, min",
+   "optional": false
+  },
+  "HKQuantityTypeIdentifierAppleStandTime": {
+   "disposition": "export",
+   "reason": "supported/quantity -> apple-stand-time, min",
+   "optional": false
+  },
+  "HKQuantityTypeIdentifierAppleWalkingSteadiness": {
+   "disposition": "export",
+   "reason": "supported/quantity -> walking-steadiness, % (Grove '%' is percentage points)",
+   "optional": false
+  },
+  "HKQuantityTypeIdentifierAtrialFibrillationBurden": {
+   "disposition": "export",
+   "reason": "supported/quantity -> atrial-fibrillation-burden, %",
+   "optional": false
+  },
+  "HKQuantityTypeIdentifierBasalBodyTemperature": {
+   "disposition": "export",
+   "reason": "supported/quantity -> basal-body-temperature, Cel",
+   "optional": false
+  },
+  "HKQuantityTypeIdentifierBasalEnergyBurned": {
+   "disposition": "export",
+   "reason": "supported/quantity -> basal-energy, kcal",
+   "optional": false
+  },
+  "HKQuantityTypeIdentifierBloodAlcoholContent": {
+   "disposition": "export",
+   "reason": "supported/quantity -> blood-alcohol-content, %",
+   "optional": false
+  },
+  "HKQuantityTypeIdentifierBloodGlucose": {
+   "disposition": "export",
+   "reason": "supported/quantity -> blood-glucose-unspecified-specimen, mg/dL",
+   "optional": false
+  },
+  "HKQuantityTypeIdentifierBodyFatPercentage": {
+   "disposition": "export",
+   "reason": "supported/quantity -> body-fat-percentage, %",
+   "optional": false
+  },
+  "HKQuantityTypeIdentifierBodyMass": {
+   "disposition": "export",
+   "reason": "supported/quantity -> body-weight, kg",
+   "optional": false
+  },
+  "HKQuantityTypeIdentifierBodyMassIndex": {
+   "disposition": "export",
+   "reason": "supported/quantity -> body-mass-index, kg/m2 (standard claim http://hl7",
+   "optional": false
+  },
+  "HKQuantityTypeIdentifierBodyTemperature": {
+   "disposition": "export",
+   "reason": "supported/quantity -> body-temperature, Cel",
+   "optional": false
+  },
+  "HKQuantityTypeIdentifierDietaryCholesterol": {
+   "disposition": "export",
+   "reason": "supported/quantity -> dietary-cholesterol, mg",
+   "optional": false
+  },
+  "HKQuantityTypeIdentifierDietaryVitaminD": {
+   "disposition": "export",
+   "reason": "supported/quantity -> dietary-vitamin-d, ug",
+   "optional": false
+  },
+  "HKQuantityTypeIdentifierDistanceCycling": {
+   "disposition": "export",
+   "reason": "supported/quantity -> distance, m",
+   "optional": false
+  },
+  "HKQuantityTypeIdentifierDistanceSwimming": {
+   "disposition": "export",
+   "reason": "supported/quantity -> distance, m",
+   "optional": false
+  },
+  "HKQuantityTypeIdentifierDistanceWalkingRunning": {
+   "disposition": "export",
+   "reason": "supported/quantity -> distance, m",
+   "optional": false
+  },
+  "HKQuantityTypeIdentifierDistanceWheelchair": {
+   "disposition": "export",
+   "reason": "supported/quantity -> distance, m",
+   "optional": false
+  },
+  "HKQuantityTypeIdentifierFlightsClimbed": {
+   "disposition": "export",
+   "reason": "supported/quantity -> flights-climbed, {flights}",
+   "optional": false
+  },
+  "HKQuantityTypeIdentifierHeartRate": {
+   "disposition": "export",
+   "reason": "supported/quantity -> heart-rate, /min, plus a motion_context column (HKMetadataKeyHeartRateMotionContext component)",
+   "optional": false
+  },
+  "HKQuantityTypeIdentifierHeartRateRecoveryOneMinute": {
+   "disposition": "export",
+   "reason": "supported/quantity -> heart-rate-recovery-one-minute, /min",
+   "optional": false
+  },
+  "HKQuantityTypeIdentifierHeartRateVariabilitySDNN": {
+   "disposition": "export",
+   "reason": "supported/quantity -> heart-rate-variability-sdnn, ms",
+   "optional": false
+  },
+  "HKQuantityTypeIdentifierHeight": {
+   "disposition": "export",
+   "reason": "supported/quantity -> body-height, cm",
+   "optional": false
+  },
+  "HKQuantityTypeIdentifierInhalerUsage": {
+   "disposition": "export",
+   "reason": "supported/quantity -> inhaler-usage, {puff}",
+   "optional": false
+  },
+  "HKQuantityTypeIdentifierLeanBodyMass": {
+   "disposition": "export",
+   "reason": "supported/quantity -> lean-body-mass, kg",
+   "optional": false
+  },
+  "HKQuantityTypeIdentifierNumberOfTimesFallen": {
+   "disposition": "export",
+   "reason": "supported/quantity -> number-of-times-fallen, {falls}",
+   "optional": false
+  },
+  "HKQuantityTypeIdentifierOxygenSaturation": {
+   "disposition": "export",
+   "reason": "supported/quantity -> oxygen-saturation, % (Swift name bloodOxygen)",
+   "optional": false
+  },
+  "HKQuantityTypeIdentifierRespiratoryRate": {
+   "disposition": "export",
+   "reason": "supported/quantity -> respiratory-rate, /min",
+   "optional": false
+  },
+  "HKQuantityTypeIdentifierRestingHeartRate": {
+   "disposition": "export",
+   "reason": "supported/quantity -> resting-heart-rate, /min (LOINC 40443-4)",
+   "optional": false
+  },
+  "HKQuantityTypeIdentifierSixMinuteWalkTestDistance": {
+   "disposition": "export",
+   "reason": "supported/quantity -> six-minute-walk-test-distance, m (listed twice in Study",
+   "optional": false
+  },
+  "HKQuantityTypeIdentifierStairAscentSpeed": {
+   "disposition": "export",
+   "reason": "supported/quantity -> stair-ascent-speed, m/s (listed twice)",
+   "optional": false
+  },
+  "HKQuantityTypeIdentifierStairDescentSpeed": {
+   "disposition": "export",
+   "reason": "supported/quantity -> stair-descent-speed, m/s (listed twice)",
+   "optional": false
+  },
+  "HKQuantityTypeIdentifierStepCount": {
+   "disposition": "export",
+   "reason": "supported/quantity -> step-count, {steps}",
+   "optional": false
+  },
+  "HKQuantityTypeIdentifierVO2Max": {
+   "disposition": "export",
+   "reason": "supported/quantity -> vo2-max, mL/kg/min",
+   "optional": false
+  },
+  "HKQuantityTypeIdentifierWaistCircumference": {
+   "disposition": "export",
+   "reason": "supported/quantity -> waist-circumference, cm",
+   "optional": false
+  },
+  "HKQuantityTypeIdentifierWalkingAsymmetryPercentage": {
+   "disposition": "export",
+   "reason": "supported/quantity -> walking-asymmetry, %",
+   "optional": false
+  },
+  "HKQuantityTypeIdentifierWalkingDoubleSupportPercentage": {
+   "disposition": "export",
+   "reason": "supported/quantity -> walking-double-support, %",
+   "optional": false
+  },
+  "HKQuantityTypeIdentifierWalkingHeartRateAverage": {
+   "disposition": "export",
+   "reason": "supported/quantity -> walking-heart-rate-average, /min",
+   "optional": false
+  },
+  "HKQuantityTypeIdentifierWalkingSpeed": {
+   "disposition": "export",
+   "reason": "supported/quantity -> walking-speed, m/s (listed twice)",
+   "optional": false
+  },
+  "HKQuantityTypeIdentifierWalkingStepLength": {
+   "disposition": "export",
+   "reason": "supported/quantity -> walking-step-length, cm",
+   "optional": false
+  },
+  "HKScoredAssessmentTypeIdentifierGAD7": {
+   "disposition": "export",
+   "reason": "supported/quantity -> gad7-assessment, {score} (LOINC 70274-6 total score only; item answers and interpretation are not projected)",
+   "optional": false
+  },
+  "HKWorkoutTypeIdentifier": {
+   "disposition": "deferred",
+   "reason": "supported/unmodeled (workout and workout-segment outputs have no row model)",
+   "optional": false
+  }
+ }
+}

@@ -1,0 +1,368 @@
+{
+  "resourceType": "Bundle",
+  "id": "GroveMobileExchangeBundleExample",
+  "meta": {
+    "profile": [
+      "https://grovealliance.org/fhir/mobile/StructureDefinition/grove-mobile-exchange-bundle"
+    ]
+  },
+  "type": "collection",
+  "identifier": {
+    "type": {
+      "coding": [
+        {
+          "code": "event",
+          "system": "https://grovealliance.org/fhir/mobile/CodeSystem/grove-identifier-role",
+          "display": "Event"
+        }
+      ]
+    },
+    "system": "https://study.example.org/fhir/NamingSystem/grove-event-v0",
+    "value": "e0:1f5c58aa-6ec6-4e79-a682-829a9debd3f5:47"
+  },
+  "entry": [
+    {
+      "extension": [
+        {
+          "url": "https://grovealliance.org/fhir/mobile/StructureDefinition/grove-exchange-entry-node-key",
+          "valueIdentifier": {
+            "type": {
+              "coding": [
+                {
+                  "code": "entry-node",
+                  "system": "https://grovealliance.org/fhir/mobile/CodeSystem/grove-identifier-role",
+                  "display": "Entry node"
+                }
+              ]
+            },
+            "system": "https://study.example.org/fhir/NamingSystem/grove-entry-node-v0",
+            "value": "n0:patient:0:ZSPD5PHzutPagk6qSayyq9GH64UGhUFCYRT361KDygk"
+          }
+        }
+      ],
+      "fullUrl": "urn:uuid:6cfd6eec-c9a2-58e1-9c1c-7e0099f2ddff",
+      "resource": {
+        "resourceType": "Patient",
+        "id": "GroveMobileExchangePatientExample",
+        "identifier": [
+          {
+            "system": "https://study.example.org/fhir/identifiers/participant",
+            "value": "participant-001"
+          }
+        ]
+      }
+    },
+    {
+      "extension": [
+        {
+          "url": "https://grovealliance.org/fhir/mobile/StructureDefinition/grove-exchange-entry-node-key",
+          "valueIdentifier": {
+            "type": {
+              "coding": [
+                {
+                  "code": "device-snapshot",
+                  "system": "https://grovealliance.org/fhir/mobile/CodeSystem/grove-identifier-role",
+                  "display": "Device snapshot"
+                }
+              ]
+            },
+            "system": "https://study.example.org/fhir/NamingSystem/grove-device-snapshot-v0/test-key/1",
+            "value": "v0:test-key:1:7CSIYKL1G_jH0947A2Wrz5arDAmPJ__NU5syHdbiLFk"
+          }
+        }
+      ],
+      "fullUrl": "urn:uuid:059b32db-025e-5bce-9d3e-451f14a2bf7a",
+      "resource": {
+        "resourceType": "Device",
+        "id": "GroveMobileExchangeApplicationExample",
+        "meta": {
+          "profile": [
+            "https://grovealliance.org/fhir/mobile/StructureDefinition/grove-application-device"
+          ]
+        },
+        "identifier": [
+          {
+            "type": {
+              "coding": [
+                {
+                  "code": "device-snapshot",
+                  "system": "https://grovealliance.org/fhir/mobile/CodeSystem/grove-identifier-role",
+                  "display": "Device snapshot"
+                }
+              ]
+            },
+            "system": "https://study.example.org/fhir/NamingSystem/grove-device-snapshot-v0/test-key/1",
+            "value": "v0:test-key:1:7CSIYKL1G_jH0947A2Wrz5arDAmPJ__NU5syHdbiLFk"
+          }
+        ],
+        "deviceName": [
+          {
+            "type": "user-friendly-name",
+            "name": "Mobile Study"
+          }
+        ],
+        "status": "active"
+      }
+    },
+    {
+      "extension": [
+        {
+          "url": "https://grovealliance.org/fhir/mobile/StructureDefinition/grove-exchange-entry-node-key",
+          "valueIdentifier": {
+            "type": {
+              "coding": [
+                {
+                  "system": "https://grovealliance.org/fhir/mobile/CodeSystem/grove-identifier-role",
+                  "code": "source-output"
+                }
+              ]
+            },
+            "system": "https://study.example.org/fhir/NamingSystem/grove-source-output-v0/test-key/1",
+            "value": "v0:test-key:1:M6afafiHPF1Pqyg4OZ5IN0R_8s97oM3WWy904IjTwy8"
+          }
+        }
+      ],
+      "fullUrl": "urn:uuid:a0b3b2a7-a112-5a26-9090-e0b1ee94dcab",
+      "resource": {
+        "resourceType": "Observation",
+        "id": "GroveMobileExchangeHeartRateExample",
+        "meta": {
+          "profile": [
+            "https://grovealliance.org/fhir/mobile/StructureDefinition/grove-mobile-heart-rate"
+          ]
+        },
+        "code": {
+          "coding": [
+            {
+              "code": "8867-4",
+              "system": "http://loinc.org",
+              "display": "Heart rate"
+            }
+          ]
+        },
+        "identifier": [
+          {
+            "type": {
+              "coding": [
+                {
+                  "system": "https://grovealliance.org/fhir/mobile/CodeSystem/grove-identifier-role",
+                  "code": "source-record"
+                }
+              ]
+            },
+            "system": "https://study.example.org/fhir/NamingSystem/grove-source-record-v0/test-key/1",
+            "value": "v0:test-key:1:TE47APXmta6xbmGufkf8LBv8q3aPR4NDn9bltP7vEn4"
+          },
+          {
+            "type": {
+              "coding": [
+                {
+                  "system": "https://grovealliance.org/fhir/mobile/CodeSystem/grove-identifier-role",
+                  "code": "source-output"
+                }
+              ]
+            },
+            "system": "https://study.example.org/fhir/NamingSystem/grove-source-output-v0/test-key/1",
+            "value": "v0:test-key:1:M6afafiHPF1Pqyg4OZ5IN0R_8s97oM3WWy904IjTwy8"
+          }
+        ],
+        "extension": [
+          {
+            "url": "http://hl7.org/fhir/StructureDefinition/observation-gatewayDevice",
+            "valueReference": {
+              "reference": "urn:uuid:059b32db-025e-5bce-9d3e-451f14a2bf7a"
+            }
+          }
+        ],
+        "status": "final",
+        "category": [
+          {
+            "coding": [
+              {
+                "code": "vital-signs",
+                "system": "http://terminology.hl7.org/CodeSystem/observation-category",
+                "display": "Vital Signs"
+              }
+            ]
+          }
+        ],
+        "subject": {
+          "reference": "urn:uuid:6cfd6eec-c9a2-58e1-9c1c-7e0099f2ddff"
+        },
+        "performer": [
+          {
+            "reference": "urn:uuid:6cfd6eec-c9a2-58e1-9c1c-7e0099f2ddff"
+          }
+        ],
+        "derivedFrom": [
+          {
+            "reference": "urn:uuid:67ffa41f-8ddb-54db-b3bb-7f2702db250c"
+          }
+        ],
+        "effectiveDateTime": "2026-08-20T08:30:00.251-07:00",
+        "issued": "2026-08-20T17:30:02Z",
+        "valueQuantity": {
+          "value": 72,
+          "code": "/min",
+          "system": "http://unitsofmeasure.org",
+          "unit": "beats/minute"
+        }
+      }
+    },
+    {
+      "extension": [
+        {
+          "url": "https://grovealliance.org/fhir/mobile/StructureDefinition/grove-exchange-entry-node-key",
+          "valueIdentifier": {
+            "type": {
+              "coding": [
+                {
+                  "code": "entry-node",
+                  "system": "https://grovealliance.org/fhir/mobile/CodeSystem/grove-identifier-role",
+                  "display": "Entry node"
+                }
+              ]
+            },
+            "system": "https://study.example.org/fhir/NamingSystem/grove-entry-node-v0",
+            "value": "n0:conversion-provenance:0:myQoJ_RMebZA__rH0KS_EAMTRcGBx2PSCbRFcmBaEuc"
+          }
+        }
+      ],
+      "fullUrl": "urn:uuid:4fac4f5b-e17f-5493-b601-1e7dfdf8c11f",
+      "resource": {
+        "resourceType": "Provenance",
+        "id": "GroveMobileExchangeProvenanceExample",
+        "meta": {
+          "profile": [
+            "https://grovealliance.org/fhir/mobile/StructureDefinition/grove-mobile-conversion-provenance"
+          ]
+        },
+        "activity": {
+          "coding": [
+            {
+              "code": "transform",
+              "system": "http://terminology.hl7.org/CodeSystem/iso-21089-lifecycle",
+              "display": "Transform/Translate Record Lifecycle Event"
+            }
+          ]
+        },
+        "agent": [
+          {
+            "type": {
+              "coding": [
+                {
+                  "code": "assembler",
+                  "system": "http://terminology.hl7.org/CodeSystem/provenance-participant-type",
+                  "display": "Assembler"
+                }
+              ]
+            },
+            "who": {
+              "reference": "urn:uuid:059b32db-025e-5bce-9d3e-451f14a2bf7a"
+            }
+          }
+        ],
+        "entity": [
+          {
+            "role": "source",
+            "what": {
+              "identifier": {
+                "type": {
+                  "coding": [
+                    {
+                      "system": "https://grovealliance.org/fhir/mobile/CodeSystem/grove-identifier-role",
+                      "code": "source-record"
+                    }
+                  ]
+                },
+                "system": "https://study.example.org/fhir/NamingSystem/grove-source-record-v0/test-key/1",
+                "value": "v0:test-key:1:TE47APXmta6xbmGufkf8LBv8q3aPR4NDn9bltP7vEn4"
+              }
+            }
+          }
+        ],
+        "target": [
+          {
+            "reference": "urn:uuid:a0b3b2a7-a112-5a26-9090-e0b1ee94dcab"
+          }
+        ],
+        "occurredDateTime": "2026-08-20T10:30:02-07:00",
+        "recorded": "2026-08-20T17:30:02Z"
+      }
+    },
+    {
+      "extension": [
+        {
+          "url": "https://grovealliance.org/fhir/mobile/StructureDefinition/grove-exchange-entry-node-key",
+          "valueIdentifier": {
+            "type": {
+              "coding": [
+                {
+                  "code": "entry-node",
+                  "system": "https://grovealliance.org/fhir/mobile/CodeSystem/grove-identifier-role",
+                  "display": "Entry node"
+                }
+              ]
+            },
+            "system": "https://study.example.org/fhir/NamingSystem/grove-entry-node-v0",
+            "value": "n0:questionnaire-response:0:CvzBJHl1HWW5BPp_L9EHpwMGXCh1LupLAZKXrP7sGkk"
+          }
+        }
+      ],
+      "fullUrl": "urn:uuid:67ffa41f-8ddb-54db-b3bb-7f2702db250c",
+      "resource": {
+        "resourceType": "QuestionnaireResponse",
+        "id": "GroveMobileExchangeQuestionnaireResponseExample",
+        "meta": {
+          "profile": [
+            "https://grovealliance.org/fhir/questionnaire/StructureDefinition/grove-questionnaire-response"
+          ]
+        },
+        "language": "en-US",
+        "extension": [
+          {
+            "url": "http://hl7.org/fhir/StructureDefinition/questionnaireresponse-completionMode",
+            "valueCodeableConcept": {
+              "coding": [
+                {
+                  "system": "http://terminology.hl7.org/CodeSystem/v3-ParticipationMode",
+                  "code": "ELECTRONIC"
+                }
+              ]
+            }
+          }
+        ],
+        "identifier": {
+          "system": "https://study.example.org/fhir/NamingSystem/questionnaire-response",
+          "value": "response-1"
+        },
+        "questionnaire": "https://study.example.org/fhir/Questionnaire/heart-rate-check|1.0.0",
+        "status": "completed",
+        "subject": {
+          "type": "Patient",
+          "identifier": {
+            "system": "https://study.example.org/fhir/identifiers/participant",
+            "value": "participant-001"
+          }
+        },
+        "authored": "2026-08-20T08:30:00-07:00",
+        "item": [
+          {
+            "linkId": "heart-rate",
+            "answer": [
+              {
+                "valueQuantity": {
+                  "value": 72,
+                  "code": "/min",
+                  "system": "http://unitsofmeasure.org",
+                  "unit": "beats/minute"
+                }
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ],
+  "timestamp": "2026-08-20T17:30:02Z"
+}
